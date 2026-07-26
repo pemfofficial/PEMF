@@ -54,6 +54,9 @@ void Log(const char* fmt, ...)
 static bool HookIAT(const char* dllName, const char* funcName,
                     void* replacement, void** original)
 {
+  // SEH guard: never let a malformed/encrypted import table (a packed host)
+  // fault here. Callers already gate on a verified build, but this is cheap.
+  __try {
     HMODULE base = GetModuleHandleA(NULL);
     auto* dos = (IMAGE_DOS_HEADER*)base;
     auto* nt  = (IMAGE_NT_HEADERS*)((BYTE*)base + dos->e_lfanew);
@@ -85,6 +88,10 @@ static bool HookIAT(const char* dllName, const char* funcName,
         }
     }
     return false;
+  }
+  __except (EXCEPTION_EXECUTE_HANDLER) {
+    return false;
+  }
 }
 
 // --------------------------------------------------------- build diagnostics
@@ -420,17 +427,26 @@ static DWORD WINAPI Init(LPVOID)
         Log("refusing to touch game memory");
     }
 
-    struct { const char* dll; const char* fn; void* hook; void** orig; } hooks[] = {
-        { "WINMM.dll",    "timeGetTime",  (void*)&Hook_timeGetTime,  (void**)&g_origTimeGetTime },
-        { "USER32.dll",   "PeekMessageA", (void*)&Hook_PeekMessageA, (void**)&g_origPeekMessage },
-        { "KERNEL32.dll", "CreateFileA",  (void*)&Hook_CreateFileA,  (void**)&g_origCreateFile  },
-        { "KERNEL32.dll", "CreateFileW",  (void*)&Hook_CreateFileW,  (void**)&g_origCreateFileW },
-    };
-    for (auto& h : hooks) {
-        if (HookIAT(h.dll, h.fn, h.hook, h.orig))
-            Log("hooked %s!%s", h.dll, h.fn);
-        else
-            Log("ERROR: could not hook %s!%s", h.dll, h.fn);
+    // Install IAT hooks ONLY on a verified build. On an unrecognised or
+    // DRM-packed host the import table may be encrypted/mid-unpack, so walking
+    // and patching it can fault -- and we have no business modifying a binary we
+    // do not recognise. Loading passively also lets a packed build keep running
+    // so the delayed diagnostic can capture the real, unpacked import table.
+    if (g_targetOK) {
+        struct { const char* dll; const char* fn; void* hook; void** orig; } hooks[] = {
+            { "WINMM.dll",    "timeGetTime",  (void*)&Hook_timeGetTime,  (void**)&g_origTimeGetTime },
+            { "USER32.dll",   "PeekMessageA", (void*)&Hook_PeekMessageA, (void**)&g_origPeekMessage },
+            { "KERNEL32.dll", "CreateFileA",  (void*)&Hook_CreateFileA,  (void**)&g_origCreateFile  },
+            { "KERNEL32.dll", "CreateFileW",  (void*)&Hook_CreateFileW,  (void**)&g_origCreateFileW },
+        };
+        for (auto& h : hooks) {
+            if (HookIAT(h.dll, h.fn, h.hook, h.orig))
+                Log("hooked %s!%s", h.dll, h.fn);
+            else
+                Log("ERROR: could not hook %s!%s", h.dll, h.fn);
+        }
+    } else {
+        Log("target not verified -- PASSIVE LOAD: installing no hooks, touching no memory");
     }
 
     // Content lives beside the exe so players can edit it without touching the
@@ -446,8 +462,9 @@ static DWORD WINAPI Init(LPVOID)
     if (g_targetOK) render::Install();
 
     // The D3D9 route. Done here, before the game creates its own device, so our
-    // throwaway one never coexists with a fullscreen device.
-    d3d9hook::Install();
+    // throwaway one never coexists with a fullscreen device. Gated on a verified
+    // build for the same reason as the IAT hooks (passive load otherwise).
+    if (g_targetOK) d3d9hook::Install();
 
     Log("debug hotkeys: Ctrl+Shift+1 = event #0, Ctrl+Shift+2 = event #1");
     return 0;
