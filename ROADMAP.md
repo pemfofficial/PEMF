@@ -63,6 +63,15 @@ These are the load-bearing pieces everything else stands on. They work.
   easing out at the end. It is drawn by the same routine the game uses for its
   own ship labels, so it looks native because it is. `"anchor": "ship"` works on
   **any** notice, whatever fired it — placement and trigger are independent.
+- ✅ **Authoring without the sharp edges** — a `{placeholder}` layer over the
+  engine's own text tokens. An author writes `"Land ho! {port} off the bow!"`
+  and supplies no arguments at all; PEMF carries the token and its value
+  together so they cannot fall out of step. This matters more than it looks:
+  the engine's `@CITYNAME` consumes *three* arguments rather than one, and
+  getting that wrong reads stack garbage. `{port}` hides it entirely.
+- ✅ **Live world values in authored text** — `{port}`, `{portNation}`,
+  `{portType}` name the nearest settlement, so an event can say
+  *"Land ho! Nevis off the bow!"* Verified in-game.
 - ✅ **Triggers beyond time and place** — `stateCrosses` fires when a live value
   crosses a threshold: crew, gold, morale or months at sea. Edge-triggered, so
   it fires on crossing and re-arms on crossing back, rather than repeating while
@@ -202,7 +211,11 @@ Rough order, subject to change:
 2. **Callout plus floating text together** — a voice line at the ship's world
    position paired with the notice above it. Both halves exist now.
 3. **Event cards from inside the frame** (stage 3) — fixes the half-drawn
-   background behind dialogs.
+   background behind dialogs, which is the one visible rough edge left. The
+   scaffolding exists; the work is that the game's dialog is **modal and
+   blocking**, so presenting it from inside the frame hook re-enters
+   `BeginScene`/`EndScene` from the dialog's own message loop. That needs a
+   re-entrancy guard, not just raising the stage constant.
 4. **Labels on world objects** — the world-text facility takes any map
    position, not just the player's ship, so ports, rivals and waypoints can all
    carry our own text.

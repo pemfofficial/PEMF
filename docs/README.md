@@ -108,6 +108,9 @@ levels are used throughout the docs:
 | `notice` event kind — visible on screen | **Verified** — drawn from inside the frame |
 | Notices anchored to the player's ship | **Verified** — hangs over the vessel and follows it as you sail |
 | `stateCrosses` trigger — crew / gold / morale / months | **Built** |
+| City tokens — `@CITYNAME` / `@NATIONALITY` / `@LOCTYPE` | **Verified** — "Land ho! Nevis off the bow!" |
+| `{placeholder}` authoring layer | **Verified** — every shipped event uses it |
+| Notices confined to the sailing view | **Verified** |
 | Playing a named game sound with an event | **Verified** |
 | Officer simulation | Not started |
 | Factions and divisions | Not started |
@@ -150,9 +153,14 @@ and the exact call the ship labels use, is in
 
 **A displayed frame contains more than one render pass**, and they do not share
 a camera. World text drawn in every pass appears several times over in different
-places. `Present` is hooked purely to mark the real frame boundary, so anchored
-text is drawn once per frame, in the last pass — the one the player is looking
-through.
+places. So it is drawn in the **first** pass only — the world pass, the one that
+walks the scene graph the label was just attached to.
+
+The boundary that separates one frame's passes from the next comes from the
+**safe point**, not from `Present`: this game never calls `Present` on the
+device, so a counter reset only there never resets, and anchored text stops
+drawing after the first frame. The top of the game's own main loop runs once
+per iteration and is the reliable boundary.
 
 Stage 3 — presenting event cards from inside the frame, which fixes the
 half-drawn background behind dialogs — is the next step.

@@ -116,6 +116,45 @@ Example, verified in-game:
   -> "Your crew of 40 stands DEVOTED."
 ```
 
+### Token argument appetites — read, never guessed
+
+A token consumes a fixed number of varargs, and that number is only knowable by
+reading the code. Getting it wrong does not error: it reads whatever is next on
+the stack. Verified counts:
+
+| Token | Slots | Where the value comes from |
+|---|---|---|
+| `@NUM` | 1 | any int |
+| `@HAPPY` | 1 | mood 0-4 |
+| `@CITYNAME` | **3** | `0x008DBD08 + index*12`, three dwords |
+| `@NATIONALITY` | 1 | `0x00860B74 + index*32`, **signed** byte |
+| `@LOCTYPE` | 1 | `0x00860B80 + index*32`, int |
+
+`@CITYNAME` taking three is the one that catches people. From the sailing
+render at `0x00462548`, formatting
+`"'We're bound for @CITYNAME.' (@NATIONALITY @LOCTYPE)"`:
+
+```asm
+mov  al,  [edx + 0x860B74]      ; nation, movsx'd before pushing
+mov  ecx, ebx
+shl  ecx, 5                     ; index * 32
+mov  edx, [ecx + 0x860B80]      ; location type
+push edx                        ; ... pushed right-to-left
+movsx eax, al
+push eax
+lea  ecx, [ebx + ebx*2]         ; index * 3
+lea  edx, [ecx*4 + 0x8DBD08]    ; record base + index*12
+mov  ecx, [edx]                 ; three dwords, written as a block
+sub  esp, 0xC
+...
+push 0x707948                   ; the format string, last
+```
+
+A city name is a **three-word record**, not a string pointer. Any token not in
+the table above is refused by the content loader, because enabling one means
+reading its call site first. `docs/EVENT_AUTHORING.md` hides all of this behind
+`{port}`.
+
 ### Functions
 
 | Address | Name | Convention | Notes |
@@ -549,17 +588,34 @@ issued in every pass is drawn several times over, in different places. The
 symptom is a notice that appears twice: one copy correctly tracking the ship,
 one apparently stale copy drifting somewhere else.
 
-So `Present` (vtable 17) is hooked too — not to draw, but to mark where a
-displayed frame actually ends. The passes in each frame are counted, and world
-text is drawn only in the **last** one, which is the pass whose camera the
-player is looking through. The count carries over from the previous frame, so
-this self-tunes instead of assuming a number, and collapses to "the only pass"
-when there is just one.
+World text is therefore drawn in the **first** pass of each frame only. The
+first pass is the world pass: the one that walks the scene graph the label was
+just attached to. Later passes carry their own camera and their own graph, so a
+label built during one either lands in the wrong place or is never walked at
+all.
 
-If the game ever presents through the swap chain rather than the device, this
-hook would never fire and every pass would look like the only pass — so that
-case is detected and warned about in the log rather than left to be
-rediscovered as a duplicate notice.
+**The frame boundary comes from the safe point, not from `Present`.** This is
+worth stating flatly because the obvious answer is wrong and fails silently:
+`Present` (vtable 17) *is* hooked, but **this game never calls it on the
+device**. A pass counter reset only there never resets, so after the first
+frame no pass is ever "the first" again and anchored text stops drawing
+entirely. The top of the game's own main loop — the safe point, which already
+runs exactly once per iteration — is the reliable boundary. `Present` still
+resets the counter when it fires; nothing depends on it.
+
+### Drawing belongs to the sailing view
+
+World coordinates are projected against whatever camera the current screen is
+using, so a label drawn from a menu lands *on that menu* — a lookout's call
+across the Load/Save map. Both draw phases are gated on the overworld being on
+screen.
+
+That test has to be **tighter for drawing than for firing**. The trigger layer
+deliberately tolerates a couple of seconds of stillness so an event is not lost
+to one frozen frame; opening a menu freezes the ship, so the same tolerance
+keeps painting over the menu for its whole window. Drawing uses a short window
+of its own (`triggers::kDrawWindowMs`). Losing a few frames of a notice while
+becalmed is a better failure than a notice across the save screen.
 
 ### The shared message buffer is a trap — and a discovery
 
