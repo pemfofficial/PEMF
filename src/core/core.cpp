@@ -287,6 +287,11 @@ static void UpdateMouseAspect()
     if (dw > 0 && dh > 0)
         g_mouseHitTestXScale = 768.0f * (float)dw / (float)dh;
 }
+
+// Widescreen-UI research toggle (Ctrl+Shift+3). When on, the safe point forces
+// the UI logical dimensions (ScreenW/H and UIWidth/H) to the device resolution,
+// to test whether the UI then fills the screen at the correct scale.
+static bool g_forceUIDims = false;
 static DWORD g_tickCount         = 0;
 static DWORD g_safePointHits     = 0;
 static bool  g_safePointFound    = false;
@@ -311,6 +316,20 @@ static void RunSafePoint()
     if (!g_safePointFound) {
         g_safePointFound = true;
         Log("safe point reached (main loop PeekMessageA) -- deferred dispatch live");
+    }
+
+    // Widescreen-UI experiment: while the toggle is on, force the UI logical
+    // dimensions to the device resolution every frame (the game keeps resetting
+    // them to 640x480). Lets us see live whether the UI fills the screen and the
+    // mouse aligns. Experimental -- opt-in via Ctrl+Shift+3.
+    if (g_forceUIDims) {
+        int dw = *(int*)game::addr::DevWidth, dh = *(int*)game::addr::DevHeight;
+        if (dw > 0 && dh > 0) {
+            *(int*)game::addr::ScreenW  = dw;
+            *(int*)game::addr::ScreenH  = dh;
+            *(int*)game::addr::UIWidth  = dw;
+            *(int*)game::addr::UIHeight = dh;
+        }
     }
 
     // Resolution diagnostic: log the layout globals whenever the device size
@@ -440,11 +459,21 @@ static DWORD WINAPI Hook_timeGetTime(void)
                 (GetAsyncKeyState(VK_SHIFT)   & 0x8000);
     bool k1 = mods && (GetAsyncKeyState('1') & 0x8000);
     bool k2 = mods && (GetAsyncKeyState('2') & 0x8000);
-    bool down = k1 || k2;
+    bool k3 = mods && (GetAsyncKeyState('3') & 0x8000);
+    bool down = k1 || k2 || k3;
 
     bool rising = down && !g_prevKeyDown;
     g_prevKeyDown = down;
     if (!rising) return r;
+
+    // Ctrl+Shift+3: widescreen-UI research toggle. Flips whether the safe point
+    // forces the UI logical dimensions to the device resolution, so we can see
+    // live at the menu how the UI and mouse respond. Purely experimental.
+    if (k3) {
+        g_forceUIDims = !g_forceUIDims;
+        Log("ws-experiment: force UI dims = %s", g_forceUIDims ? "ON" : "OFF");
+        return r;
+    }
 
     // POST only. The card is presented later, at the safe point.
     // Debug triggers fire content events by index. Ctrl+Shift+1 runs the first
