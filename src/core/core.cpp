@@ -87,6 +87,68 @@ static bool HookIAT(const char* dllName, const char* funcName,
     return false;
 }
 
+// --------------------------------------------------------- build diagnostics
+// Dumps the host image's layout and import table. On a DRM-packed build (e.g.
+// the Steam executable) the on-disk imports are a tiny unpacker stub; the real
+// game imports are rebuilt in memory only after the unpacker runs. Logging this
+// at load time AND again a few seconds later shows whether -- and when -- the
+// real import table appears, which tells us if the injection vector survives the
+// packer and when our hooks could take. Harmless on a plain build.
+static void DiagnoseImage(const char* when)
+{
+    HMODULE base = GetModuleHandleA(NULL);
+    if (!base) { Log("[diag %s] no module base", when); return; }
+    __try {
+        auto* dos = (IMAGE_DOS_HEADER*)base;
+        auto* nt  = (IMAGE_NT_HEADERS*)((BYTE*)base + dos->e_lfanew);
+        Log("[diag %s] base=%p entry=0x%08X sizeOfImage=0x%X sections=%u",
+            when, base, nt->OptionalHeader.AddressOfEntryPoint,
+            nt->OptionalHeader.SizeOfImage, nt->FileHeader.NumberOfSections);
+
+        DWORD impRva = nt->OptionalHeader
+            .DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress;
+        if (!impRva) { Log("[diag %s] no import directory", when); return; }
+
+        auto* desc = (IMAGE_IMPORT_DESCRIPTOR*)((BYTE*)base + impRva);
+        int dllCount = 0;
+        // the three imports our hooks depend on
+        bool haveTimeGetTime = false, havePeekMessageA = false, haveCreateFileA = false;
+        for (; desc->Name && dllCount < 64; ++desc, ++dllCount) {
+            const char* dll = (const char*)((BYTE*)base + desc->Name);
+            auto* oft = (IMAGE_THUNK_DATA*)((BYTE*)base +
+                        (desc->OriginalFirstThunk ? desc->OriginalFirstThunk
+                                                  : desc->FirstThunk));
+            int fnCount = 0;
+            char first[96]; first[0] = 0;
+            for (; oft->u1.AddressOfData && fnCount < 4096; ++oft, ++fnCount) {
+                if (oft->u1.Ordinal & IMAGE_ORDINAL_FLAG) continue;
+                auto* ibn = (IMAGE_IMPORT_BY_NAME*)((BYTE*)base + oft->u1.AddressOfData);
+                const char* fn = (const char*)ibn->Name;
+                if (!first[0]) { strncpy_s(first, fn, _TRUNCATE); }
+                if (!_stricmp(dll, "WINMM.dll")    && !strcmp(fn, "timeGetTime"))  haveTimeGetTime = true;
+                if (!_stricmp(dll, "USER32.dll")   && !strcmp(fn, "PeekMessageA")) havePeekMessageA = true;
+                if (!_stricmp(dll, "KERNEL32.dll") && !strcmp(fn, "CreateFileA"))  haveCreateFileA = true;
+            }
+            Log("[diag %s]   %-16s %4d fn  e.g. %s", when, dll, fnCount, first);
+        }
+        Log("[diag %s] total DLLs=%d | hook targets present: timeGetTime=%d PeekMessageA=%d CreateFileA=%d",
+            when, dllCount, haveTimeGetTime, havePeekMessageA, haveCreateFileA);
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER) {
+        Log("[diag %s] EXCEPTION walking imports (image mid-unpack?)", when);
+    }
+}
+
+// Re-runs the diagnostic after the process has had time to unpack. Comparing the
+// two dumps reveals a DRM stub IAT turning into the real one.
+static DWORD WINAPI DelayedDiag(LPVOID)
+{
+    Sleep(10000);
+    Log("--- delayed diagnostic (10s after load) ---");
+    DiagnoseImage("t+10s");
+    return 0;
+}
+
 // ------------------------------------------------------------------- state
 static constexpr bool kDebugHotkeys = true;
 
@@ -345,6 +407,10 @@ static DWORD WINAPI Init(LPVOID)
         GetCurrentProcessId(), st.wYear, st.wMonth, st.wDay,
         st.wHour, st.wMinute, st.wSecond);
     Log("host: %s", dir);
+
+    // Build diagnostics -- at load, and again after any unpacker has run.
+    DiagnoseImage("at-load");
+    CloseHandle(CreateThread(nullptr, 0, DelayedDiag, nullptr, 0, nullptr));
 
     char why[256] = {0};
     g_targetOK = game::VerifyTarget(why, sizeof(why));

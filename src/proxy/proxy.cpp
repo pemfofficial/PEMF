@@ -15,6 +15,9 @@
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#include <stdio.h>
+#include <stdarg.h>
+#include <string.h>
 
 // ---------------------------------------------------------- forward pointers
 #define PROXY_EXPORT(name) extern "C" void* g_p_##name = nullptr;
@@ -82,6 +85,28 @@ extern "C" void __cdecl ProxyResolve()
 #include "generated.inc"
 #undef PROXY_EXPORT
 
+// ------------------------------------------------------------- proxy logging
+// Independent of the core's log, so we still get diagnostics if the core never
+// loads (e.g. a DRM-packed host interfering). Written next to the executable.
+static void ProxyLog(const char* fmt, ...)
+{
+    char dir[MAX_PATH]{};
+    GetModuleFileNameA(GetModuleHandleA(NULL), dir, MAX_PATH);
+    if (char* slash = strrchr(dir, '\\')) *slash = 0;
+    char path[MAX_PATH];
+    _snprintf_s(path, sizeof(path), _TRUNCATE, "%s\\pemf_proxy.log", dir);
+
+    FILE* f = nullptr;
+    if (fopen_s(&f, path, "a") != 0 || !f) return;
+    SYSTEMTIME st; GetLocalTime(&st);
+    fprintf(f, "[%02d:%02d:%02d.%03d] ", st.wHour, st.wMinute, st.wSecond, st.wMilliseconds);
+    va_list ap; va_start(ap, fmt);
+    vfprintf(f, fmt, ap);
+    va_end(ap);
+    fputc('\n', f);
+    fclose(f);
+}
+
 // ---------------------------------------------------------------- core load
 static DWORD WINAPI LoadCore(LPVOID)
 {
@@ -90,10 +115,15 @@ static DWORD WINAPI LoadCore(LPVOID)
     if (char* slash = strrchr(path, '\\')) *slash = 0;
     strcat_s(path, sizeof(path), "\\pemf_core.dll");
 
-    if (!LoadLibraryA(path)) {
+    ProxyLog("proxy: attempting to load core: %s", path);
+    HMODULE core = LoadLibraryA(path);
+    if (core) {
+        ProxyLog("proxy: core loaded OK at %p", (void*)core);
+    } else {
+        DWORD err = GetLastError();
+        ProxyLog("proxy: core FAILED to load, GetLastError=%lu", err);
         char msg[MAX_PATH + 96];
-        wsprintfA(msg, "Failed to load:\n%s\n\nGetLastError = %lu",
-                  path, GetLastError());
+        wsprintfA(msg, "Failed to load:\n%s\n\nGetLastError = %lu", path, err);
         MessageBoxA(nullptr, msg, "Pirates! mod", MB_OK | MB_ICONERROR);
     }
     return 0;
