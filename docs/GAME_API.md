@@ -373,6 +373,69 @@ City record layout (`0x00860B70`, stride `0x20`):
 
 Positions live in the parallel table at `0x0085B170` (x, y as 32-bit ints).
 
+### Trade goods — the cargo model, and what "adding one" would cost
+
+> **Confidence: static analysis.** Addresses and counts read from the binary;
+> not yet exercised at runtime.
+
+**Seven item slots, 0-6.** The names come from the `[ITEM]` group in
+`text.ini`: `Gold, Food, Luxuries, Goods, Spice, Sugar, Cannon`.
+
+**The player's hold is one contiguous int array at `0x00869AB4`**, indexed by
+item — the code reads `[reg*4 + 0x869AB4]` (e.g. `0x00405466`, `0x004DDF23`,
+`0x00443E76`). Item 0 is *gold*, which is why `0x00869AB4` is also the
+undivided-plunder global; item 6 is cannon at `0x00869ACC`.
+
+| Item | Address | Name |
+|---|---|---|
+| 0 | `0x00869AB4` | Gold (= undivided plunder) |
+| 1 | `0x00869AB8` | Food |
+| 2 | `0x00869ABC` | Luxuries |
+| 3 | `0x00869AC0` | Goods |
+| 4 | `0x00869AC4` | Spice |
+| 5 | `0x00869AC8` | Sugar |
+| 6 | `0x00869ACC` | Cannon |
+
+**There is no headroom, and the array cannot grow in place:**
+
+- `0x00869AD0` — the dword immediately after item 6 — is a live global with
+  ~43 references. The array is boxed in.
+- **82 code sites** touch the array.
+- Each item is *also* referenced by its own absolute address 11-18 times. The
+  code is not a clean indexed abstraction; it names individual goods directly.
+- The count appears as immediate loop bounds: `cmp eax, 6` (`0x00405472`),
+  `cmp edi, 6` (`0x004DDF07`), `mov ecx, 7` (`0x004DCFEE`) — 15 such sites sit
+  within a few instructions of a cargo access alone.
+
+So an 8th engine slot means relocating a 7-entry array that 82 sites reference,
+many by hardcoded per-item address, and finding every bound. That is not a
+seventh-slot fight worth having.
+
+**What *is* data-driven, and is the opening:**
+
+- **Item names are not in the exe.** `text.ini` is parsed at runtime: `@ITEM`
+  (`0x006FAE1C`) and `__VAR` (`0x007107E0`) are strings in the binary, while
+  `[ITEM]` is not — group names come from the file. The list length is the
+  file's, not the engine's.
+- **Loose files override packed ones.** The exe carries a `custom` path string
+  (`0x0070C168`) and the shipped `custom\` folder overrides art without
+  touching a `.FPK`.
+- **The town side stores no per-good table.** A settlement record holds a single
+  `goods` int (`+0x08`) and `economy` (`+0x0C`) — prices and availability are
+  *derived*, not stored per (city, good). There is far less fixed table on the
+  economy side than on the cargo side.
+
+**The shape that works.** A new good lives in PEMF's own memory with its own
+price model, reading the town's real `economy` and `goods` fields as inputs so
+it behaves like part of the world, and presenting through our own drawing rather
+than the engine's trade screen — which iterates 0-5 and cannot be given a row.
+Its *name* can come from the engine's own text system by extending `[ITEM]`,
+so authored text about it reads natively.
+
+This is the standing principle — new systems live in our memory, the exe stays
+the world and the renderer — but it is a much better bet than it was, because
+drawing our own UI is now solved rather than blocked.
+
 ### Overworld map format
 
 The map loaders (`0x004458D0`, `0x00445D40`) read `CaribbeanMap2/4/6.bmp` — the

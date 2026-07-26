@@ -132,6 +132,28 @@ out to be far more open to modding than expected.
   procedurally-placed towns that map mods generate. Natural collaboration point
   with existing map-mod projects.
 
+## Economy & trade goods
+
+Investigated 2026-07-26; findings in [`docs/GAME_API.md`](docs/GAME_API.md).
+
+- ✅ **Cargo model mapped** — seven item slots (`Gold, Food, Luxuries, Goods,
+  Spice, Sugar, Cannon`), the hold being one contiguous array at `0x00869AB4`
+  indexed by item. Item names come from `text.ini`, not the exe.
+- ⛔ **An eighth *engine* slot is not worth pursuing.** The array is boxed in by
+  a live global, 82 code sites touch it, individual goods are referenced by
+  hardcoded address, and the count is baked into loop bounds. Measured, not
+  assumed — the numbers are in `GAME_API.md`.
+- 📐 **Adding goods the way that works**: a new good lives in PEMF's own memory
+  with its own price model, reads the settlement's real `economy` and `goods`
+  fields so it behaves like part of the world, and presents through our own
+  drawing. Encouragingly the town side stores **no** per-good table — prices are
+  derived — so there is much less fixed structure to fight there than in the
+  hold. Its name can come from the engine's own text system by extending the
+  `[ITEM]` list, so authored text about it reads natively.
+- 💡 **Worth one cheap test first**: whether an eighth `Value` in `[ITEM]` loads
+  and renders. That decides whether new goods can be named natively or need
+  their own text path.
+
 ## Crew & morale
 
 - ✅ **Morale model understood** — the game's own crew-happiness math is mapped
