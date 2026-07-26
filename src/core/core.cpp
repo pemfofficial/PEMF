@@ -320,6 +320,11 @@ static void RunSafePoint()
     // installs and re-verifies itself from here. A few guarded reads per frame.
     if (g_targetOK) d3d9hook::TryInstall();
 
+    // One main-loop iteration is one displayed frame. Closing off the render
+    // pass count here is what lets the frame hook tell the world pass from the
+    // passes that follow it.
+    d3d9hook::MarkFrameBoundary();
+
     // Reporting for the render hooks happens here, not inside them: this point
     // is known to be safe to log from.
     render::ReportFromSafePoint();

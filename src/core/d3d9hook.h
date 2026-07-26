@@ -74,16 +74,25 @@ volatile LONG  g_pemfResetCount     = 0;
 
 // A displayed frame can contain SEVERAL BeginScene/EndScene pairs -- the game
 // renders more than one pass, and they do not share a camera. World-anchored
-// text drawn in every pass appears several times over, in different places,
-// which is exactly what a stale-looking duplicate turns out to be.
+// text drawn in every pass appears several times over in different places,
+// which is what a stale-looking duplicate notice turns out to be.
 //
-// So the frame boundary that matters is Present, not EndScene. We count the
-// passes in each displayed frame and draw world text only in the LAST one --
-// the pass whose camera is the one the player is looking through. The count is
-// carried from the previous frame, so this self-tunes rather than assuming a
-// number, and degrades to "the only pass" when there is just one.
+// So world text is drawn in the FIRST pass of each frame only. The first pass
+// is the world pass: the one that walks the scene graph our label was just
+// attached to. Later passes have their own camera and their own graph, and a
+// label built during one either lands in the wrong place or is never walked at
+// all.
+//
+// WHICH BOUNDARY RESETS THE COUNT MATTERS MORE THAN IT LOOKS. Present seemed
+// like the obvious answer and is the wrong one to depend on: this game does
+// not call the device's Present, so a counter reset only there never resets,
+// no pass is ever the first again, and anchored text silently stops drawing
+// after the very first frame. The reset therefore comes from the safe point --
+// the top of the game's own main loop, once per iteration, already proven as
+// the place one-per-frame work happens. Present still resets it when it does
+// fire, but nothing depends on that.
 volatile LONG  g_pemfPassThisFrame  = 0;   // passes so far in the current frame
-volatile LONG  g_pemfPassesPerFrame = 1;   // what the last complete frame used
+volatile LONG  g_pemfPassesLast     = 0;   // passes the previous frame used
 
 // Both implemented in core.cpp.
 //
@@ -110,20 +119,19 @@ HRESULT WINAPI PemfBeginSceneHook(void* device)
     HRESULT hr = ((PemfBeginScene_t)g_pemfOrigBeginScene)(device);
     if (FAILED(hr)) return hr;
 
-    LONG expected = g_pemfPassesPerFrame;
-    if (expected < 1) expected = 1;
-    if (pass == expected - 1) PemfOnBeginScene(device);
+    if (pass == 0) PemfOnBeginScene(device);
     return hr;
 }
 
-// The real frame boundary. Only used to close off the pass count -- nothing is
-// drawn here, because by Present the frame is finished and gone.
+// Present is hooked for completeness and for the counter, but nothing depends
+// on it firing -- see the note above. Nothing is drawn here: by Present the
+// frame is finished and gone.
 HRESULT WINAPI PemfPresentHook(void* device, const RECT* src, const RECT* dst,
                                HWND wnd, const void* dirty)
 {
     InterlockedIncrement(&g_pemfPresentCalls);
     const LONG passes = InterlockedExchange(&g_pemfPassThisFrame, 0);
-    if (passes > 0) g_pemfPassesPerFrame = passes;
+    if (passes > 0) g_pemfPassesLast = passes;
     return ((PemfPresent_t)g_pemfOrigPresent)(device, src, dst, wnd, dirty);
 }
 
@@ -266,6 +274,16 @@ inline void Uninstall()
     g_pemfDeviceVTable = nullptr;
 }
 
+// Called from the safe point -- the top of the game's main loop, once per
+// iteration. This is what makes "the first render pass of the frame" mean
+// anything, and it is deliberately NOT tied to Present, which this game never
+// calls on the device.
+inline void MarkFrameBoundary()
+{
+    const LONG passes = InterlockedExchange(&g_pemfPassThisFrame, 0);
+    if (passes > 0) g_pemfPassesLast = passes;
+}
+
 // Reported from the safe point, which is known to be sound to log from.
 // After the first line, a heartbeat every 15s -- and an explicit warning if
 // EndScene ever goes quiet, so a dead hook is never ambiguous.
@@ -284,26 +302,12 @@ inline void ReportFromSafePoint()
     // once: more than one means world text has to pick a pass, and picking
     // wrong is what draws a notice twice in two different places.
     static LONG loggedPasses = 0;
-    static bool noPresentLogged = false;
-    if (g_pemfPresentCalls > 0) {
-        LONG passes = g_pemfPassesPerFrame;
-        if (passes != loggedPasses) {
-            loggedPasses = passes;
-            Log("d3d9: %ld render pass(es) per displayed frame "
-                "(%ld BeginScene / %ld Present) -- world text draws in the "
-                "last one", passes, g_pemfBeginSceneCalls, g_pemfPresentCalls);
-        }
-    } else if (!noPresentLogged && g_pemfBeginSceneCalls > 100) {
-        // Present is how we know where one displayed frame ends. If the game
-        // presents through the swap chain instead of the device, this hook
-        // never fires, every pass looks like the only pass, and world text is
-        // drawn once per pass -- which looks like a duplicate notice. Worth
-        // saying plainly rather than leaving it to be rediscovered.
-        noPresentLogged = true;
-        Log("d3d9: WARNING -- %ld BeginScene calls but Present never fired. "
-            "Frame boundaries are unknown, so anchored notices may draw once "
-            "per render pass instead of once per frame.",
-            g_pemfBeginSceneCalls);
+    LONG passes = g_pemfPassesLast;
+    if (passes > 0 && passes != loggedPasses) {
+        loggedPasses = passes;
+        Log("d3d9: %ld render pass(es) per frame (%ld BeginScene, %ld Present) "
+            "-- world text draws in the first pass",
+            passes, g_pemfBeginSceneCalls, g_pemfPresentCalls);
     }
     static DWORD lastT = 0;
     static LONG  lastCalls = 0;
