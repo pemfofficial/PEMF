@@ -505,9 +505,15 @@ inline void ShowPendingOutcome(int)
 // composed once, here, and re-drawn from the render hook.
 struct ActiveNotice {
     std::string resolved;          // @-tokens already substituted, at post time
+    DWORD       posted = 0;
     DWORD       until  = 0;
     bool        anchor = false;    // true: track the player's ship in the world
 };
+
+// How long an anchored notice spends easing out at the end of its life. The
+// game ramps its own ship labels over roughly ten frames; a little longer
+// reads as a deliberate fade rather than a dropped frame.
+constexpr DWORD kNoticeFadeMs = 900;
 
 constexpr int kMaxNotices = 3;
 inline ActiveNotice g_notices[kMaxNotices];
@@ -522,28 +528,44 @@ inline void ClearNotices()
 // whatever has expired.
 // Drawing state, reported from the safe point rather than logged in place --
 // the render hook stays free of allocation and file I/O.
-inline volatile LONG g_drawOk     = 0;   // notices drawn without incident
-inline volatile LONG g_drawFaults = 0;   // draws that raised an exception
-inline bool          g_drawOff    = false;  // latched off after a fault
+inline volatile LONG g_drawOk      = 0;  // screen notices drawn without incident
+inline volatile LONG g_drawWorldOk = 0;  // anchored notices drawn ditto
+inline volatile LONG g_drawFaults  = 0;  // draws that raised an exception
+inline bool          g_drawOff     = false;  // latched off after a fault
 
-// Draw one line, either fixed at the top of the screen or anchored in the
-// world over the player's ship. Wrapped so the SEH frame contains nothing
-// with a destructor.
-inline bool DrawOneNotice(const char* text, int y, bool anchor)
+// Draw one line. Wrapped so the SEH frame contains nothing with a destructor.
+inline bool DrawScreenNotice(const char* text, int y)
 {
     __try {
-        if (anchor) {
-            float wx = 0.0f, wy = 0.0f;
-            game::PlayerWorldPos(&wx, &wy);
-            game::ShowWorldNotice(text, wx, wy);
-        } else {
-            game::ShowNotice(text, y, game::kNoticeWhite);
-        }
+        game::ShowNotice(text, y, game::kNoticeWhite);
         return true;
     }
-    __except (EXCEPTION_EXECUTE_HANDLER) {
-        return false;
+    __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
+}
+
+// Anchored over the player's ship, at the ship's live map position, so it
+// follows the vessel for free -- the game re-projects the label every frame
+// from the world coordinates we hand it.
+inline bool DrawWorldNotice(const char* text, int fade)
+{
+    __try {
+        int mx = 0, my = 0;
+        game::PlayerMapPos(&mx, &my);
+        // Lifted clear of the hull, the way the game lifts ship speech.
+        game::ShowWorldText(text, mx, my - 500, fade);
+        return true;
     }
+    __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
+}
+
+// The game's seventh argument, driven over a notice's life: full for most of
+// it, easing to nothing over the last kNoticeFadeMs.
+inline int NoticeFade(const ActiveNotice& n, DWORD now)
+{
+    const int left = (int)(n.until - now);
+    if (left <= 0)                    return 0;
+    if (left >= (int)kNoticeFadeMs)   return game::addr::kWorldTextA7Max;
+    return (int)((__int64)left * game::addr::kWorldTextA7Max / kNoticeFadeMs);
 }
 
 // Called from inside the frame (the D3D9 EndScene hook). Notices have no timer
@@ -552,6 +574,28 @@ inline bool DrawOneNotice(const char* text, int y, bool anchor)
 // A fault here latches drawing OFF for the rest of the session instead of
 // repeating every frame: one bad draw should cost a missing notice, never a
 // crashing game. The safe point reports it.
+// The world phase, issued at BeginScene: anchored notices only. They build
+// scene-graph nodes, so they have to exist before the render walk.
+inline void DrawWorldNotices()
+{
+    if (g_drawOff || g_noticeCount <= 0) return;
+
+    DWORD now = GetTickCount();
+    for (int i = 0; i < g_noticeCount; ++i) {
+        ActiveNotice& n = g_notices[i];
+        if (!n.anchor || (int)(now - n.until) >= 0) continue;
+        if (DrawWorldNotice(n.resolved.c_str(), NoticeFade(n, now))) {
+            InterlockedIncrement(&g_drawWorldOk);
+        } else {
+            InterlockedIncrement(&g_drawFaults);
+            g_drawOff = true;
+            return;
+        }
+    }
+}
+
+// The screen phase, issued at EndScene: fixed HUD lines, on top of everything.
+// Expiry is settled here, once per frame, after both phases have had the list.
 inline void DrawNotices()
 {
     if (g_drawOff || g_noticeCount <= 0) return;
@@ -562,14 +606,16 @@ inline void DrawNotices()
     for (int i = 0; i < g_noticeCount; ++i) {
         ActiveNotice& n = g_notices[i];
         if ((int)(now - n.until) >= 0) continue;          // expired
-        if (DrawOneNotice(n.resolved.c_str(), y, n.anchor)) {
-            InterlockedIncrement(&g_drawOk);
-        } else {
-            InterlockedIncrement(&g_drawFaults);
-            g_drawOff = true;
-            break;
+        if (!n.anchor) {
+            if (DrawScreenNotice(n.resolved.c_str(), y)) {
+                InterlockedIncrement(&g_drawOk);
+            } else {
+                InterlockedIncrement(&g_drawFaults);
+                g_drawOff = true;
+                break;
+            }
+            y += 24;                 // anchored lines do not stack at the top
         }
-        if (!n.anchor) y += 24;      // anchored lines do not stack at the top
         if (write != i) g_notices[write] = n;
         ++write;
     }
@@ -580,11 +626,16 @@ inline void DrawNotices()
 // actually reached the screen, and stays quiet afterwards.
 inline void ReportDrawFromSafePoint()
 {
-    static bool okLogged = false, faultLogged = false;
+    static bool okLogged = false, worldLogged = false, faultLogged = false;
     if (!okLogged && g_drawOk > 0) {
         okLogged = true;
         Log("draw: notices are rendering through the frame hook (%ld draws)",
             g_drawOk);
+    }
+    if (!worldLogged && g_drawWorldOk > 0) {
+        worldLogged = true;
+        Log("draw: anchored notices are rendering in the world (%ld draws)",
+            g_drawWorldOk);
     }
     if (!faultLogged && g_drawFaults > 0) {
         faultLogged = true;
@@ -603,7 +654,8 @@ inline void PostDebugNotice(const char* text, int seconds, bool anchor = false)
     ActiveNotice& n = g_notices[g_noticeCount++];
     n.resolved = text;
     n.anchor   = anchor;
-    n.until    = GetTickCount() + (DWORD)seconds * 1000;
+    n.posted   = GetTickCount();
+    n.until    = n.posted + (DWORD)seconds * 1000;
     Log("debug: notice posted -- '%s' for %d s (%s)", text, seconds,
         anchor ? "anchored to the ship" : "top of screen");
 }
@@ -628,7 +680,8 @@ inline void PostNotice(const Event& ev)
     game::ComposeText(ev.body.c_str(), args, argc, buf, sizeof(buf));
     n.resolved = buf;
     n.anchor   = ev.anchorShip;
-    n.until = GetTickCount() + (DWORD)ev.seconds * 1000;
+    n.posted = GetTickCount();
+    n.until  = n.posted + (DWORD)ev.seconds * 1000;
     Log("  notice '%s' for %d s", ev.id.c_str(), ev.seconds);
     if (!render::WantsNotices() && !d3d9hook::WantsNotices()) {
         Log("  !! it will NOT be visible: drawing needs a render hook at stage "

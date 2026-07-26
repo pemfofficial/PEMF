@@ -18,6 +18,8 @@
 #define PGA_SHOWMESSAGE 0x00410C50
 #define PGA_MSGBUF      0x008E9F58
 #define PGA_DRAWHUDTEXT 0x004B06C0
+// Inline asm cannot see constexpr, so the world-text drawer needs a macro too.
+#define PGA_DRAWWORLDTEXT 0x004AEC30
 
 namespace game {
 
@@ -39,25 +41,68 @@ namespace addr {
     // holds esi across the whole compose->wrap->show sequence.
     constexpr uintptr_t MsgBufObject  = 0x008E9F58;
 
-    // World-anchored text: the floating labels that hang over ships and follow
-    // them ("'We're 2 days out of Antigua.'"), and the same treatment the game
-    // gives the player's own ship. 51 call sites use it, so it is a general
-    // facility rather than a special case.
+    // Positional audio. NOT a text function -- an earlier reading of this
+    // project had it as the world-label drawer, which was wrong: it opens with
+    // the audio manager at [0x008ECD78], calls its "is initialised" method at
+    // +0x18, and bails to the string "The audio manager has not been properly
+    // initialized yet". It plays sound `id` at a world position.
     //
-    //   FUN_00488A80(int kind, float wx, float wy, float wz,
-    //                int, int, int, int, int, float, int)   -- cdecl
+    //   FUN_00488A80(int id, float wx, float wy, float wz,
+    //                int, int, int, int, int, float gain, int)   -- cdecl
     //
-    // It takes NO text pointer: it draws whatever is currently composed in the
-    // shared message buffer, which is why text left in that buffer reappears
-    // over the player's ship on its own. Kinds seen in the sailing render:
-    // 9 for the player's ship, 10 and 11 for other ships' speech.
+    // The sailing render uses it for ship hails: id 9 at the player's ship,
+    // 10 and 11 for other ships depending on nationality standing, with
+    // 0xFFFFFFFF for the unused ints and -1.0f for gain. This is the way in
+    // for spoken callouts.
+    constexpr uintptr_t PlayWorldSound = 0x00488A80;
+    constexpr float     kWorldScale    = 0.001f;   // map units -> sound-space
+    constexpr int       kSoundPlayerHail = 9;
+
+    // The real world-anchored text drawer: the floating labels that hang over
+    // ships and track them as the camera moves ("'We're 2 days out of
+    // Antigua.'", "@NATIONALITY @SHIPTYPE '@SHIPNAME'"). 13 call sites.
     //
-    // World coordinates are the map position scaled by 0.001 (the game does
-    // `fild [PlayerX]; fmul [0x00713590]`), with z = 0 at sea level.
-    constexpr uintptr_t DrawWorldLabel = 0x00488A80;
-    constexpr float     kWorldScale    = 0.001f;
-    constexpr int       kLabelPlayer   = 9;
-    constexpr int       kLabelSpeech   = 10;
+    //   DrawWorldText(ecx = const char* text, eax = uint32 colour,
+    //                 int wx, int wy, int wz, int a4, int a5,
+    //                 int a6, int a7, int a8, int a9)
+    //
+    // Register parameters, then nine cdecl stack arguments -- the caller does
+    // `add esp, 0x24`. Verified against both sailing call sites (0x0046231A
+    // for the ship-name label, 0x00462E88 for ship speech), which are
+    // identical but for wz, a5 and a7.
+    //
+    // It is NOT a 2D blit: it builds Gamebryo scene-graph nodes that the
+    // render walk then draws. That is why it has to be issued at BeginScene,
+    // before the world is built, and not at EndScene with the HUD text.
+    //
+    // The text is a genuine parameter, taken from ecx: the callee saves it
+    // (`mov ebx, ecx`) and the string builder at 0x004AEB20 walks it with a
+    // plain strlen and copies it. The game passes the shared message buffer
+    // 0x00869B48 at both sites, but nothing requires that -- we pass our own.
+    //
+    // World coordinates are map units divided by 1000 (plain ints, not the
+    // 0.001 float scaling the audio call uses).
+    constexpr uintptr_t DrawWorldText = 0x004AEC30;
+
+    // Arguments, as the sailing render passes them.
+    //   wz  625 for the name label, 500 for speech -- height above sea level.
+    //   a4  0 at both sites.
+    //   a5  round((flags & kViewFlagClose ? -90 : -70) * [0x00713600]) -- a
+    //       camera-relative vertical offset; the game recomputes it per frame.
+    //   a6  the camera-height global at 0x008B98D8.
+    //   a7  500 for the name label; for speech the game ramps it as
+    //       clamp(age * 30 + 200, 0, 500) while the phrase is up.
+    //   a8  12 at both sites.
+    //   a9  0 -- the target context, which makes the callee use the default
+    //       label manager at [0x008C9DD8].
+    constexpr uintptr_t WorldTextTilt   = 0x00713600;  // double
+    constexpr uintptr_t WorldTextCamera = 0x008B98D8;  // int
+    constexpr uintptr_t WorldTextSize   = 0x0085A11C;  // int, read by the drawer
+    constexpr uintptr_t ViewFlags       = 0x0085A164;  // int
+    constexpr int       kViewFlagClose  = 0x40;
+    constexpr unsigned  kWorldTextColour = 0xFF000000; // what both sites pass
+    constexpr int       kWorldTextA7Max  = 500;
+    constexpr int       kWorldTextA8     = 12;
 
     // The actual message text, a plain NUL-terminated char buffer. WrapText
     // reads it via `mov ebx, 0x869B48` before calling the string-assign at
@@ -604,27 +649,87 @@ inline void ShowNotice(const char* resolved, int y, unsigned colour)
     DrawHudTextRaw(resolved, ScreenW() / 2, y, kNoticeStyle, colour, 4, -1, 0);
 }
 
-typedef void (__cdecl *DrawWorldLabel_t)(int kind, float wx, float wy, float wz,
-                                         int, int, int, int, int, float, int);
-
-// Draw already-resolved text anchored in the world, so it tracks whatever it
-// is over as the camera moves -- the treatment the game gives ship speech.
-// The trailing arguments are exactly what the sailing render passes.
-inline void ShowWorldNotice(const char* resolved, float wx, float wy,
-                            float wz = 0.0f, int kind = addr::kLabelPlayer)
+// Call the world-text drawer. Text goes in ecx and the colour in eax, so this
+// needs a shim; the nine stack arguments are ordinary cdecl and we clean them
+// up ourselves.
+__declspec(naked) inline void DrawWorldTextRaw(
+    const char* /*text*/, unsigned /*colour*/,
+    int /*wx*/, int /*wy*/, int /*wz*/, int /*a4*/, int /*a5*/,
+    int /*a6*/, int /*a7*/, int /*a8*/, int /*a9*/)
 {
-    ResetMessage();
-    AddText("%s", (int)(uintptr_t)resolved);
-    ((DrawWorldLabel_t)addr::DrawWorldLabel)(kind, wx, wy, wz,
-                                             -1, -1, -1, -1, 0, -1.0f, -1);
-    ResetMessage();
+    __asm {
+        push ebx
+        push ebp
+        push esi
+        push edi
+        // Nine stack arguments, pushed last-to-first. Our own args start at
+        // esp+0x14 after the four saves plus the return address.
+        mov  eax, [esp + 0x3C]      // a9
+        push eax
+        mov  eax, [esp + 0x3C]      // a8
+        push eax
+        mov  eax, [esp + 0x3C]      // a7
+        push eax
+        mov  eax, [esp + 0x3C]      // a6
+        push eax
+        mov  eax, [esp + 0x3C]      // a5
+        push eax
+        mov  eax, [esp + 0x3C]      // a4
+        push eax
+        mov  eax, [esp + 0x3C]      // wz
+        push eax
+        mov  eax, [esp + 0x3C]      // wy
+        push eax
+        mov  eax, [esp + 0x3C]      // wx
+        push eax
+        mov  eax, [esp + 0x3C]      // colour -> eax
+        mov  ecx, [esp + 0x38]      // text   -> ecx
+        mov  edx, PGA_DRAWWORLDTEXT
+        call edx
+        add  esp, 0x24              // cdecl: nine arguments are ours to clean
+        pop  edi
+        pop  esi
+        pop  ebp
+        pop  ebx
+        ret
+    }
 }
 
-// The player ship's world position, in the units the label API expects.
-inline void PlayerWorldPos(float* wx, float* wy)
+// Draw already-resolved text anchored in the world at a map position, so it
+// hangs there and tracks as the camera moves -- the treatment the game gives
+// ship speech. Must be issued at BeginScene; see the note on DrawWorldText.
+//
+// `fade` is the game's seventh argument, which it ramps 200 -> 500 while a
+// ship's line is up. We drive it the other way to bring a notice down.
+inline void ShowWorldText(const char* resolved, int mapX, int mapY,
+                          int fade, int height = 500,
+                          unsigned colour = addr::kWorldTextColour)
 {
-    *wx = (float)*(int*)addr::PlayerX * addr::kWorldScale;
-    *wy = (float)*(int*)addr::PlayerY * addr::kWorldScale;
+    if (!resolved || !*resolved) return;
+
+    // The camera-relative tilt, computed the way the sailing render computes
+    // it every frame.
+    const int  flags = *(int*)addr::ViewFlags;
+    const int  base  = (flags & addr::kViewFlagClose) ? -90 : -70;
+    const double k   = *(double*)addr::WorldTextTilt;
+    const int    a5  = (int)(base * k);
+
+    DrawWorldTextRaw(resolved, colour,
+                     mapX, mapY, height,
+                     0,
+                     a5,
+                     *(int*)addr::WorldTextCamera,
+                     fade,
+                     addr::kWorldTextA8,
+                     0);
+}
+
+// The player ship's map position, in the units the world-text API expects:
+// the raw milli-unit globals divided by 1000, exactly as the game does it.
+inline void PlayerMapPos(int* mx, int* my)
+{
+    *mx = *(int*)addr::PlayerX / 1000;
+    *my = *(int*)addr::PlayerY / 1000;
 }
 
 // ------------------------------------------------------------ sanity checks

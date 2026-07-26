@@ -518,15 +518,28 @@ Call sites consistently push the arguments, then the buffer, then `xor eax, eax`
 Two facilities together make it work: a place to draw from, and the game's own
 text routines to draw with.
 
-### The frame hook
+### The frame hook — two phases
 
-The framework runs inside every frame at `IDirect3DDevice9::EndScene`, on the
-game's **own** device — the renderer singleton at `0x00727C30` holds the
-`IDirect3DDevice9*` at `+0x60`. Full account in
-[`README.md`](README.md#the-render-hook--solved). At that point the scene is
-complete and nothing has been presented, which is exactly when text must be
-drawn: the game paints the world over anything drawn earlier in the frame,
-which is why the safe point is right for *deciding* and wrong for *showing*.
+The framework runs inside every frame on the game's **own** device — the
+renderer singleton at `0x00727C30` holds the `IDirect3DDevice9*` at `+0x60`.
+Full account in [`README.md`](README.md#the-render-hook--solved).
+
+Both `BeginScene` (vtable 41) and `EndScene` (42) are hooked, and **which phase
+a draw belongs in is decided by how the game draws that kind of thing.** They
+are not interchangeable:
+
+| Phase | State of the frame | What goes here |
+|---|---|---|
+| `BeginScene` | open and empty; the world has not been built | **world-anchored text**, which builds scene-graph nodes for the render walk to draw |
+| `EndScene` | scene complete, nothing presented | **screen-space HUD text**, an immediate 2D blit that must land on top |
+
+Getting this backwards is silent: a 2D blit at `BeginScene` is painted over by
+the world, and a scene-graph node at `EndScene` is built after the walk that
+would have drawn it. Neither errors — you simply see nothing. The safe point,
+meanwhile, is right for *deciding* and wrong for *showing*.
+
+At `BeginScene` the real method is called **first**, then our callback: the
+device has to be inside a scene before anything we do can contribute to it.
 
 ### The shared message buffer is a trap — and a discovery
 
@@ -540,44 +553,82 @@ So: **resolve once, when the notice is posted (at the safe point), copy the
 result out, and hand the buffer back empty.** Per-frame drawing then takes a
 plain string and touches no shared state. `game::ComposeText` does exactly this.
 
-That accident led straight to the next facility.
+### World-anchored text — `FUN_004AEC30`
 
-### World-anchored text — `FUN_00488A80`
-
-The floating labels over ships (`'We're 2 days out of Antigua.'`) come from a
-general world-anchored text call with **51 call sites**:
+The floating labels over ships — `@NATIONALITY @SHIPTYPE '@SHIPNAME'` and
+`'We're 2 days out of Antigua.'` — come from one call with **13 call sites**.
+It takes register parameters *and* nine `cdecl` stack arguments:
 
 ```
-FUN_00488A80(int kind, float wx, float wy, float wz,
-             int, int, int, int, int, float, int)      // cdecl
+DrawWorldText(ecx = const char* text, eax = uint32 colour,
+              int wx, int wy, int wz,
+              int a4, int a5, int a6, int a7, int a8, int a9)
 ```
 
-The sailing render passes `-1, -1, -1, -1, 0, -1.0f, -1` for the trailing
-arguments. It takes **no text pointer** — it draws whatever is composed in the
-message buffer at the time, which is precisely why stale text reappears over
-the ship.
+The caller does `add esp, 0x24` — nine arguments, ours to clean up. Recovered
+from the two sailing call sites, which are identical but for `wz`, `a5` and
+`a7`:
 
-| Value | Meaning |
-|---|---|
-| `kind = 9` | the player's own ship (`0x00462775`) |
-| `kind = 10`, `11` | other ships' speech (`0x0046285C`) |
-| world x/y | map position × `0.001` (`fild [PlayerX]; fmul [0x00713590]`) |
-| world z | `0` at sea level |
+| | ship name (`0x0046231A`) | ship speech (`0x00462E88`) |
+|---|---|---|
+| `ecx` | `0x00869B48` | `0x00869B48` |
+| `eax` | `0xFF000000` | `0xFF000000` |
+| `wx`, `wy` | ship map pos / 1000 | ship map pos / 1000, `wy` less 500 |
+| `wz` | `625` | `500` |
+| `a4` | `0` | `0` |
+| `a5` | `round(-70 or -90 × [0x00713600])` | same |
+| `a6` | `[0x008B98D8]` | `[0x008B98D8]` |
+| `a7` | `500` | `clamp(age × 30 + 200, 0, 500)` |
+| `a8` | `12` | `12` |
+| `a9` | `0` | `0` |
 
-The player's map position is at `0x00814304` / `0x00814308`, so a label on the
-player's vessel is `(PlayerX * 0.001, PlayerY * 0.001, 0)` with kind 9. The
-label tracks the ship as the camera moves — no projection maths of our own, and
-it looks native because it *is* native.
+Notes that matter:
 
-Any world position works, not just the player's: anything with a map coordinate
-can be labelled this way.
+- **The text is a genuine parameter.** The callee saves `ecx` (`mov ebx, ecx`)
+  and the string builder at `0x004AEB20` walks it with a plain `strlen` and
+  copies it. The game passes the shared message buffer at both sites, but
+  nothing requires that — we pass our own, and so avoid the buffer entirely.
+- **World coordinates are map units divided by 1000** — plain integers here,
+  *not* the `× 0.001` float scaling the positional-audio call uses.
+- `a5` is a camera-relative tilt the game recomputes every frame:
+  `-90` if view flag `0x40` is set in `[0x0085A164]`, else `-70`, times the
+  double at `0x00713600`.
+- `a7` runs `0` … `500`. The game ramps it **up** as a line appears; driving it
+  **down** is what gives a notice a fade as it expires.
+- `a9 = 0` makes the callee use the default label manager at `[0x008C9DD8]`.
+- The drawer reads the text size from the global at `0x0085A11C`.
+
+Hand it a map position and the game re-projects the label every frame, so it
+**follows whatever it is over** with no projection maths of our own — and it
+looks native because it *is* native. Any world position works, not just the
+player's: anything with a map coordinate can be labelled this way.
+
+### A correction worth recording
+
+For a while this project had `FUN_00488A80` documented as the world-label
+drawer, with a `kind` argument selecting the player's ship. **That was wrong.**
+`0x00488A80` is **positional audio**: it opens with the audio manager at
+`[0x008ECD78]`, calls its "is initialised" method at `+0x18`, and bails to the
+string *"The audio manager has not been properly initialized yet"*. Its first
+argument is a sound id, not a label kind, and its trailing `float` is gain.
+
+The mistake was plausible because it *is* called from the sailing render at the
+player's ship position, right beside the label code, and calling it appeared to
+work — the text that showed up over the ship was the game redrawing the stale
+message buffer, the very trap described above. Two effects with one apparent
+cause. The lesson: **a call that "works" is not a call that is understood**; the
+disassembly settled in a minute what screenshots could not.
+
+The error was not wasted. `0x00488A80` is now the entry point for spoken
+callouts at a world position — see the audio section of the roadmap.
 
 ### In the framework
 
-`notice` events take `"anchor"`: `"screen"` (default, a line at the top) or
-`"ship"` (hangs over the player's vessel). A draw that raises an exception
-latches drawing off for the session and says so in the log, rather than
-repeating the fault every frame.
+`notice` events take `"anchor"`: `"screen"` (default, a line at the top, drawn
+at `EndScene`) or `"ship"` (hangs over the player's vessel and follows it,
+drawn at `BeginScene`, easing out over its last second). A draw that raises an
+exception latches drawing off for the session and says so in the log, rather
+than repeating the fault every frame.
 
 ## The render phase — `FUN_004612B0`
 

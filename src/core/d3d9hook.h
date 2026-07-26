@@ -48,23 +48,49 @@
 
 // IDirect3DDevice9 vtable indices. Fixed by the COM interface: IUnknown
 // occupies 0-2, Reset is 16, BeginScene 41, EndScene 42.
-#define PEMF_VTBL_RESET    16
-#define PEMF_VTBL_ENDSCENE 42
+#define PEMF_VTBL_RESET      16
+#define PEMF_VTBL_BEGINSCENE 41
+#define PEMF_VTBL_ENDSCENE   42
 
 extern "C" {
 
 typedef HRESULT (WINAPI *PemfEndScene_t)(void* device);
+typedef HRESULT (WINAPI *PemfBeginScene_t)(void* device);
 typedef HRESULT (WINAPI *PemfReset_t)(void* device, void* params);
 
-void*          g_pemfOrigEndScene  = nullptr;   // the real EndScene
-void*          g_pemfOrigReset     = nullptr;   // the real Reset
-void*          g_pemfGameDevice    = nullptr;   // the game's IDirect3DDevice9*
-void**         g_pemfDeviceVTable  = nullptr;   // its vtable
-volatile LONG  g_pemfEndSceneCalls = 0;
-volatile LONG  g_pemfResetCount    = 0;
+void*          g_pemfOrigEndScene   = nullptr;  // the real EndScene
+void*          g_pemfOrigBeginScene = nullptr;  // the real BeginScene
+void*          g_pemfOrigReset      = nullptr;  // the real Reset
+void*          g_pemfGameDevice     = nullptr;  // the game's IDirect3DDevice9*
+void**         g_pemfDeviceVTable   = nullptr;  // its vtable
+volatile LONG  g_pemfEndSceneCalls  = 0;
+volatile LONG  g_pemfBeginSceneCalls = 0;
+volatile LONG  g_pemfResetCount     = 0;
 
-// Implemented in core.cpp. Runs with a complete scene behind it.
+// Both implemented in core.cpp.
+//
+// The two phases are NOT interchangeable, and which one a draw belongs in is
+// decided by how the game draws that kind of thing:
+//
+//   BeginScene -- the frame is empty and the world has not been built yet.
+//                 World-anchored text goes here, because the game's own
+//                 world-text call builds scene-graph nodes that the render
+//                 walk then draws. Issued after the walk, they would be a
+//                 frame late at best.
+//   EndScene   -- the scene is complete. Screen-space HUD text goes here,
+//                 because it is an immediate 2D blit that must land on top.
+void __cdecl PemfOnBeginScene(void* device);
 void __cdecl PemfOnEndScene(void* device);
+
+HRESULT WINAPI PemfBeginSceneHook(void* device)
+{
+    InterlockedIncrement(&g_pemfBeginSceneCalls);
+    // The real BeginScene runs FIRST: the device must be inside a scene
+    // before anything we do can contribute geometry to it.
+    HRESULT hr = ((PemfBeginScene_t)g_pemfOrigBeginScene)(device);
+    if (SUCCEEDED(hr)) PemfOnBeginScene(device);
+    return hr;
+}
 
 HRESULT WINAPI PemfEndSceneHook(void* device)
 {
@@ -132,7 +158,8 @@ inline void TryInstall()
         void** vt = SlotReadable(device, sizeof(void*)) ? *(void***)device : nullptr;
         if (vt == g_pemfDeviceVTable &&
             SlotReadable(&vt[PEMF_VTBL_ENDSCENE], sizeof(void*)) &&
-            vt[PEMF_VTBL_ENDSCENE] == (void*)&PemfEndSceneHook)
+            vt[PEMF_VTBL_ENDSCENE]   == (void*)&PemfEndSceneHook &&
+            vt[PEMF_VTBL_BEGINSCENE] == (void*)&PemfBeginSceneHook)
             return;
         Log("d3d9: hooks lost (vtable rebuilt under us) -- rehooking");
         g_installed = false;
@@ -147,7 +174,8 @@ inline void TryInstall()
     // A recreated device can come back on the SAME vtable. If our hook is
     // already in the slot, re-hooking would capture our own hook as the
     // "original" and recurse -- just adopt the new device pointer.
-    if (vtable[PEMF_VTBL_ENDSCENE] == (void*)&PemfEndSceneHook) {
+    if (vtable[PEMF_VTBL_ENDSCENE]   == (void*)&PemfEndSceneHook ||
+        vtable[PEMF_VTBL_BEGINSCENE] == (void*)&PemfBeginSceneHook) {
         Log("d3d9: new device 0x%p reuses the hooked vtable 0x%p", device, vtable);
         g_pemfGameDevice = device;
         g_installed = true;
@@ -163,18 +191,21 @@ inline void TryInstall()
         g_gaveUp = true;
         return;
     }
-    g_pemfGameDevice   = device;
-    g_pemfDeviceVTable = vtable;
-    g_pemfOrigReset    = vtable[PEMF_VTBL_RESET];
-    g_pemfOrigEndScene = vtable[PEMF_VTBL_ENDSCENE];
-    vtable[PEMF_VTBL_RESET]    = (void*)&PemfResetHook;
-    vtable[PEMF_VTBL_ENDSCENE] = (void*)&PemfEndSceneHook;
+    g_pemfGameDevice     = device;
+    g_pemfDeviceVTable   = vtable;
+    g_pemfOrigReset      = vtable[PEMF_VTBL_RESET];
+    g_pemfOrigEndScene   = vtable[PEMF_VTBL_ENDSCENE];
+    g_pemfOrigBeginScene = vtable[PEMF_VTBL_BEGINSCENE];
+    vtable[PEMF_VTBL_RESET]      = (void*)&PemfResetHook;
+    vtable[PEMF_VTBL_ENDSCENE]   = (void*)&PemfEndSceneHook;
+    vtable[PEMF_VTBL_BEGINSCENE] = (void*)&PemfBeginSceneHook;
     VirtualProtect(first, span, old, &old);
 
     g_installed = true;
     Log("d3d9: hooked the game's device 0x%p (vtable 0x%p, try %d) -- "
-        "EndScene 0x%p  Reset 0x%p  STAGE %d",
-        device, vtable, g_tryCount, g_pemfOrigEndScene, g_pemfOrigReset, kStage);
+        "BeginScene 0x%p  EndScene 0x%p  Reset 0x%p  STAGE %d",
+        device, vtable, g_tryCount, g_pemfOrigBeginScene, g_pemfOrigEndScene,
+        g_pemfOrigReset, kStage);
 }
 
 inline void Uninstall()
@@ -186,8 +217,9 @@ inline void Uninstall()
     DWORD old = 0;
     if (SlotReadable(first, span) &&
         VirtualProtect(first, span, PAGE_EXECUTE_READWRITE, &old)) {
-        if (g_pemfOrigReset)    vtable[PEMF_VTBL_RESET]    = g_pemfOrigReset;
-        if (g_pemfOrigEndScene) vtable[PEMF_VTBL_ENDSCENE] = g_pemfOrigEndScene;
+        if (g_pemfOrigReset)      vtable[PEMF_VTBL_RESET]      = g_pemfOrigReset;
+        if (g_pemfOrigEndScene)   vtable[PEMF_VTBL_ENDSCENE]   = g_pemfOrigEndScene;
+        if (g_pemfOrigBeginScene) vtable[PEMF_VTBL_BEGINSCENE] = g_pemfOrigBeginScene;
         VirtualProtect(first, span, old, &old);
     }
     g_installed = false;

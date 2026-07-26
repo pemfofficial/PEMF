@@ -359,6 +359,18 @@ extern "C" void __cdecl PemfOnEndScene(void* /*device*/)
     if (d3d9hook::WantsPresent()) events::Pump();    // stage 3
 }
 
+// Called from IDirect3DDevice9::BeginScene, with the frame open and empty.
+// Anchored notices belong here and nowhere else: the game's world-text call
+// builds scene-graph nodes, and the render walk that draws them has not run
+// yet. Nothing else may go here -- a 2D blit issued now would be painted over.
+extern "C" void __cdecl PemfOnBeginScene(void* /*device*/)
+{
+    if (!d3d9hook::WantsNotices()) return;
+    if (events::Faulted() || !g_targetOK) return;
+
+    content::DrawWorldNotices();                     // stage 2
+}
+
 extern "C" void __cdecl PemfAfterSailingRender(void)
 {
     InterlockedIncrement(&g_pemfRenderFrames);

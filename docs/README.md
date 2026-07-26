@@ -104,9 +104,10 @@ levels are used throughout the docs:
 | Firing a JSON event — card observed on screen | **Verified** |
 | `nearPort` trigger firing during play | **Verified** — fired at distance 3000, and re-armed correctly |
 | `notice` event kind — schema, validation, triggering | **Verified** |
-| Render-phase hook — the game's own D3D9 device | **Working** — live on both builds |
+| Render-phase hook — the game's own D3D9 device | **Verified** — live on GOG and Steam |
 | `notice` event kind — visible on screen | **Verified** — drawn from inside the frame |
-| Notices anchored to the player's ship | **Verified** — tracks the vessel as you sail |
+| Notices anchored to the player's ship | **Built** — world-text call recovered; drawn at `BeginScene` |
+| Playing a named game sound with an event | **Verified** |
 
 ### The render hook — solved
 
@@ -136,9 +137,12 @@ Two earlier approaches failed, and both are worth remembering:
 | Throwaway device to read "the" vtable | Cannot work: the vtable is **per-instance heap memory**, freed with the throwaway device (`MEM_RESERVE` right after `Release`) |
 
 Currently at **stage 2** — our own text is drawn from inside the frame, on both
-builds. Notices appear at the top of the screen, or hang over the player's ship
-in the world and track it as you sail, using the same facility the game uses for
-ship speech. How that works is in
+builds. Two phases are hooked, because the game draws the two kinds of text
+differently and they are not interchangeable: **`EndScene`** for screen-space
+HUD lines (an immediate 2D blit, on top of the finished scene) and
+**`BeginScene`** for world-anchored text (which builds scene-graph nodes the
+render walk then draws, so it must exist before the world does). How that works,
+and the exact call the ship labels use, is in
 [`GAME_API.md`](GAME_API.md#drawing-our-own-text--solved-and-how).
 
 Stage 3 — presenting event cards from inside the frame, which fixes the

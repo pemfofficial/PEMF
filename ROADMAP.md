@@ -72,15 +72,19 @@ event-driven audio here before.
 
 - ✅ **Sound engine mapped** — the game uses Miles Sound System; its whole audio
   import surface and the in-game load/play functions are located.
-- 🟡 **Play-by-name details** — the exact way to trigger a named sound is mapped
-  structurally but needs final confirmation (see the tooling note under Blockers).
+- ✅ **Playing a named game sound** — events name a sound and it plays with the
+  card, through the game's own presentation path. Confirmed in-game.
+- ✅ **Positional audio located** — `0x00488A80` plays a sound *at a world
+  position*, and it is what the sailing render uses for ship hails. This is the
+  entry point for spoken callouts that come from where the thing actually is.
+  (It was misread as a text function for a while; see the note in
+  [`docs/GAME_API.md`](docs/GAME_API.md).)
 - 📐 **Custom clips added, not just swapped** — drop a new `.wav` in and play it;
   the game already loads loose `.wav` files by name, which is the groundwork.
-- 📐 **Sound on events** — an event or notice names a clip to play when it fires
-  (a voice line, a callout, a sting). Slots straight into the JSON schema.
-- 💡 **Spoken callouts** — "land ho", lookout calls, crew reactions. Notably these
-  are **not** blocked by the render work, so audio callouts can arrive before the
-  on-screen versions.
+  This is the remaining piece: today we can only play sounds the game ships.
+- 📐 **Sound on notices** — pairing a callout with the floating text, so "Land
+  ho!" is heard and seen over the ship at once. Both halves now exist; wiring
+  them together is next.
 
 ## World & map
 
@@ -138,31 +142,40 @@ re-installs itself), and a heartbeat in the log means a dead hook can never
 pass unnoticed. A draw that faults disables drawing for the session rather than
 repeating: a missing notice, never a crashing game.
 
+Two phases, because the game treats the two kinds of text completely
+differently and they are not interchangeable:
+
+- **Screen text** is an immediate 2D blit, drawn at `EndScene` so it lands on
+  top of the finished frame.
+- **World-anchored text** builds scene-graph nodes that the render walk then
+  draws, so it is issued at `BeginScene`, before the world is built. Hand it a
+  map position and the game re-projects it every frame — which is what makes a
+  notice follow the ship for free, with no projection maths of our own.
+
 Text is done. Still open, and now ordinary work rather than research: drawing
 **shapes and art** of our own (panels, indicators, a roster), and presenting
 event cards from inside the frame. Details in
 [`docs/GAME_API.md`](docs/GAME_API.md#drawing-our-own-text--solved-and-how).
 
-### 🟡 Running on every version of the game
+### ✅ GOG and Steam both supported
 
-The framework currently targets one specific build. Different releases are
-different binaries, so internal addresses don't line up; a version-detection step
-(fingerprint the game, load the right map) is the plan, and until then PEMF refuses
-any build it doesn't recognise rather than risk your game.
+Both storefront builds run from one codebase, with no separate offset map.
 
-The build landscape, now measured:
-
-- **GOG** — fully supported. Plain executable, analysed, every address mapped.
-- **Steam** — **DRM-packed, but tractable.** The executable is encrypted on disk and
-  unpacks in memory at launch. A runtime probe established the important facts: the
-  mod **coexists cleanly with the DRM** (once image inspection is fault-free), the
-  **underlying build is GOG** (so the whole offset map transfers — no re-mapping),
-  and although the packer wrecks the import name tables (so hooking by name fails),
-  the actual import slots are populated at their known addresses. So Steam support is
-  a focused job: wait for the game to unpack, then hook the import slots **by absolute
-  address** rather than by name. Details in
+- **GOG** — plain executable, analysed, every address mapped.
+- **Steam** — **solved.** The executable is DRM-packed: encrypted on disk,
+  unpacked in memory at launch. The packer wrecks the import *name* tables, so
+  hooking by name fails outright — but the import *slots* are populated at their
+  known addresses, and the underlying build is the same one GOG ships, so the
+  whole offset map transfers unchanged. PEMF waits for the game to unpack and
+  then hooks the slots **by absolute address**. The mod and the DRM coexist
+  cleanly, provided every image read is fault-guarded, which is now an
+  invariant rather than a precaution. Details in
   [`docs/GAME_API.md`](docs/GAME_API.md#build-support-gog-vs-steam).
-- **Challenge Pack / retail disc** — different builds again; out of scope for now.
+
+Still open: **Challenge Pack / retail disc** are different builds, and PEMF
+refuses any build it does not recognise rather than risk your game. Broadening
+that set means a version-detection step — fingerprint the game, load the right
+map — which is now ordinary work rather than research.
 
 ### 🟡 Windows Smart App Control
 
@@ -177,20 +190,20 @@ not a bug in the mod. The fix is code signing, which is in progress. See
 
 Rough order, subject to change:
 
-1. **Audio callouts** — confirm the play-by-name path and fire a custom sound
-   from an event. Pairs directly with the notices that now draw: the voice line
-   and the floating text together.
-2. **Event cards from inside the frame** (stage 3) — fixes the half-drawn
+1. **Custom clips** — play a `.wav` we ship, not just a sound the game already
+   has, and name it from an event.
+2. **Callout plus floating text together** — a voice line at the ship's world
+   position paired with the notice above it. Both halves exist now.
+3. **Event cards from inside the frame** (stage 3) — fixes the half-drawn
    background behind dialogs.
-3. **Labels on world objects** — the anchored-text facility takes any map
+4. **Labels on world objects** — the world-text facility takes any map
    position, not just the player's ship, so ports, rivals and waypoints can all
    carry our own text.
-4. **Code signing** so the mod loads cleanly on locked-down Windows installs
+5. **Code signing** so the mod loads cleanly on locked-down Windows installs
    (application submitted, awaiting approval).
-5. **Officer roster** — data model first, then the panel, now that drawing is
+6. **Officer roster** — data model first, then the panel, now that drawing is
    within reach.
-6. **Version detection** — broaden the set of game builds supported (GOG and
-   Steam both run from one codebase today).
+7. **Version detection** — broaden support beyond GOG and Steam.
 
 ---
 
