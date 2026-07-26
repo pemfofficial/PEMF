@@ -707,36 +707,63 @@ two-pass count-then-fill, so the count stays consistent.
 **Result: 1920×1080 is selectable and the 3D world renders in true 16:9** (the
 projection aspect comes from the resolution).
 
-### The 4:3 UI at 16:9 — a parked research problem
+### The 4:3 UI at 16:9 — SOLVED (via the device hook)
 
-**Recommended 1080p: 1440×1080.** It is a 4:3 mode the engine handles perfectly —
-crisp, full 1080-line height, correct UI, pixel-accurate mouse. This is the
-flagship "1080p" for the mod; it is better in practice than every existing
-widescreen fix, which trade a working UI/mouse for a 16:9 aspect.
+**16:9 is now genuinely playable.** The fix lives at the last point the UI's
+projection must pass on its way to the GPU — `IDirect3DDevice9::SetTransform`,
+reached through the real-device hook (renderer singleton `0x00727C30`, device
+at `+0x60`). Everything earlier failed for the same reason: the frustum set in
+**`FUN_00503CA0`** (`-0.5,+0.5,+0.375,-0.375,921.6,1536.0`) is copied into a
+heap-cached camera long before it is used, so patching the source constants or
+the live copy changes nothing on screen.
 
-**16:9 (e.g. 1920×1080) is selectable and the 3D world renders correctly**, but the
-**2D UI does not** — it stretches/overflows and the mouse is offset over menu
-items. This is a genuinely hard, still-unsolved problem for this game (the
-established widescreen fixes leave the same UI/mouse limitation). What we mapped:
+How the game actually behaves at a wide aspect, measured live:
 
-- The 2D UI is drawn in a fixed **4:3 logical space** that the renderer stretches
-  to fill the viewport. Confirmed empirically (forcing `ScreenW`/`ScreenH` to the
-  device size double-scales the UI — it is not the lever).
-- The UI camera's 4:3 frustum is set in **`FUN_00503CA0`** via
-  `FUN_0054AA00(left,right,top,bottom,near,far)` = `-0.5,+0.5,+0.375,-0.375,921.6,1536.0`.
-- **But it is copied once into a heap-allocated camera object**, so neither
-  patching the source `push` immediates nor rewriting the live frustum in memory
-  visibly pillarboxed the menu — the 2D layer is driven further down still
-  (the per-frame render path). A full-memory scan for the live frustum also lagged
-  the intro and destabilised the DRM-packed build.
-- The mouse hit-test (`FUN_00504310`) projects the cursor into a fixed **1024×768
-  (4:3) plane** (`fmul [0x007135C8]=1024.0` X, `fmul [0x007135C4]=768.0` Y) — the
-  root of the horizontal click offset.
+- The **UI camera** is a *perspective* matrix with an unmistakable signature:
+  `_11 == 2.0`, `_33 == 2.5` (near 921.6 / far 1536). At a wide aspect the game
+  sets `_22 = 2 × aspect` and lays the UI out to **fit the width** — every
+  element keeps its proportions, but the 4:3 whole is taller than the screen
+  and the top/bottom are cut off.
+- **The fix:** scale the UI camera's `_11` and `_22` by `(4/3) / aspect`.
+  Width-fit becomes **height-fit**: the full UI is visible, centred, pixels
+  square, with black side bars. (Bars are the honest floor for 4:3 artwork on
+  a 16:9 screen — the only alternatives are stretching or cropping.)
+- The **mouse hit-test** (`FUN_00504310`) maps the cursor into a fixed 1024-wide
+  plane via `(x/width − 0.5) × 1024.0` — centre-relative, so the matching fix is
+  a pure scale: repoint that one `fmul` operand (`0x0050436F`) to an adaptive
+  float, `768 × (w/h)`. **Only this site.** Three other sites share the same
+  constant (`0x00503985`, `0x0050C7EF`, `0x0050CAFC`) and patching them was
+  tried: they compute *widget positions*, not input, and repointing them moves
+  HUD elements (crew-morale icon, sailing-panel chrome). Leave them alone.
+- On frames where only the UI camera drew, the side strips contain stale
+  pixels; the `EndScene` hook clears exactly those strips to black. Frames
+  containing a full-screen 3D camera (4:3-ratio perspective, `_33 ≈ 1.0x`) are
+  exempt, so the world view is never touched.
 
-**Status: parked** as a documented future target. A real fix needs the per-frame
-render path (the same render hook that is still open elsewhere) plus a coordinated
-mouse-map change — a project of its own, not a single patch. The addresses above
-are recorded in `game.h` as the ground-truth for a future attempt.
+Measured camera inventory (useful for any future work): the UI camera in two
+variants (`_22 = 2·aspect` for page content, `_22 = 2.6667` for floating
+widgets), full-screen 3D cameras always at `_22/_11 = 1.3333` regardless of
+resolution, a 1:1 character-portrait camera, and an identity ortho.
+
+**Known limits, with causes:**
+
+- **3D stays 4:3-proportioned at 16:9** (mildly wide-stretched full-screen).
+  Widening the 3D cameras' `_11` was tried and *tears mixed-pipeline geometry
+  apart*: the engine feeds shader-drawn geometry its projection through
+  **vertex-shader constants**, not `SetTransform`, so scaling only one path
+  splits objects (ships) in two. True-widescreen 3D means handling
+  `SetVertexShaderConstantF` as well — a planned, separate effort.
+- **Floating widgets** (slider thumbs, the character-creation Continue button)
+  are drawn through the widget camera but hit-tested against rectangles that
+  scale with the width-fit layout, so at 16:9 their visuals and hotspots
+  disagree. Fixing this needs their draw path captured live (vertex-level),
+  not more matrix inference.
+- Tavern/interior scenes keep stale side strips (they contain a 3D camera, so
+  the bar-clear correctly stays away).
+
+**1440×1080 remains the zero-compromise mode** — a 4:3 mode the engine handles
+perfectly (crisp, correct UI, pixel-accurate mouse) for players who prefer no
+side bars over widescreen.
 
 ## Audio / Sound System
 

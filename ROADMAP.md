@@ -82,17 +82,23 @@ event-driven audio here before.
 ## Display & resolution
 
 - ✅ **Widescreen resolutions selectable** — the game's own menu filtered its list
-  to 4:3; a small patch unlocks every display mode (including 1920×1080). The 3D
-  world then renders in correct 16:9.
-- ✅ **Recommended 1080p: 1440×1080** — a 4:3 mode the engine handles flawlessly:
-  full 1080-line height, crisp, correct UI, pixel-accurate mouse. Better in
-  practice than existing widescreen fixes.
-- 💡 **2D UI at true 16:9 — parked research.** The 3D renders correctly at 16:9,
-  but the 2D interface (built around a fixed 4:3 space) stretches and the mouse is
-  offset. This is unsolved for this game generally; the mechanism is fully mapped
-  in [`docs/GAME_API.md`](docs/GAME_API.md) and needs the per-frame render path
-  (shared with the render-hook blocker) plus a mouse-map change — a future
-  dedicated effort.
+  to 4:3; a small patch unlocks every display mode (including 1920×1080).
+- ✅ **16:9 playable end-to-end** — via the device hook, the UI camera is
+  re-aspected every frame so the full interface is visible, centred and
+  correctly proportioned at 1920×1080, with the mouse landing where it looks
+  like it should. Side bars frame the 4:3 interface art (the honest floor for
+  4:3 artwork on a 16:9 screen), and UI-only frames get those bars cleaned to
+  black. Details in [`docs/GAME_API.md`](docs/GAME_API.md#resolution--widescreen).
+- ✅ **1440×1080 remains the zero-compromise mode** — a 4:3 mode the engine
+  handles flawlessly: crisp, correct UI, pixel-accurate mouse, no bars.
+- 🚧 **True-widescreen 3D (more world, not a stretch)** — the 3D cameras stay
+  4:3-proportioned; widening them through `SetTransform` alone tears
+  shader-drawn geometry (the engine also feeds projections through
+  vertex-shader constants). Needs both paths handled together — mapped,
+  understood, not yet built.
+- 🚧 **Floating-widget alignment at 16:9** — slider thumbs and the
+  character-creation Continue button draw and hit-test through different maps
+  at wide aspects. Needs their draw path captured live; next dedicated task.
 
 ## World & map
 
@@ -140,14 +146,16 @@ out to be far more open to modding than expected.
 
 ## Known blockers & things that need work
 
-### ⛔ Drawing our own visuals (the big one)
+### ✅→🚧 Drawing our own visuals — the door is open
 
-Right now PEMF can only show things through the game's existing dialog routines.
-Anything genuinely new on screen — the sailing "notice" text, a crew/officer
-count indicator, "LAND HO!" callouts, a proper roster panel — needs a hook into
-the game's rendering that we don't have yet. Two approaches were tried and ruled
-out; the current plan is to locate the renderer's device and hook it directly.
-Until this is solved, everything visual is on hold. Everything non-visual works.
+The blocker is broken: the framework now hooks **the game's own Direct3D
+device** (found through the renderer singleton) and sits inside every frame at
+`EndScene`, with a health check that survives the engine rebuilding its device
+state. This is the doorway for everything visual — the sailing "notice" text,
+indicators, callouts, panels. The widescreen work already runs through it in
+production. What remains is the drawing itself (staged deliberately: the
+per-frame entry is live and counting; text output through it is the next
+stage), so this moves from "research blocker" to "engineering to schedule".
 
 ### 🟡 Running on every version of the game
 
@@ -183,16 +191,19 @@ not a bug in the mod. The fix is code signing, which is in progress. See
 
 Rough order, subject to change:
 
-1. **Audio callouts** — an early, satisfying win that *isn't* gated by the render
-   work. Confirm the play-by-name path and fire a custom sound from an event.
-2. **Solve the render hook.** It's the gate in front of most of the interesting
-   *visual* work.
-3. **Code signing** so the mod loads cleanly on locked-down Windows installs.
-4. **On-screen notices** ("LAND HO!", lookout calls) — the first visual payoff
-   once drawing works. Pairs naturally with the audio callouts.
-5. **Officer roster** — data model first, then the panel once we can draw it.
-6. **Version detection** — broaden the set of game builds supported (GOG + Steam
-   first).
+1. **On-screen notices** ("LAND HO!", lookout calls) — the render hook is
+   solved, so this is now the nearest visual payoff: raise the frame hook one
+   stage and draw.
+2. **Audio callouts** — confirm the play-by-name path and fire a custom sound
+   from an event. Pairs naturally with the notices.
+3. **Widget alignment + true-widescreen 3D** — finish the two remaining 16:9
+   items (floating widgets; the vertex-shader projection path).
+4. **Code signing** so the mod loads cleanly on locked-down Windows installs
+   (application submitted, awaiting approval).
+5. **Officer roster** — data model first, then the panel now that drawing is
+   within reach.
+6. **Version detection** — broaden the set of game builds supported (GOG +
+   Steam are both live today from one codebase).
 
 ---
 

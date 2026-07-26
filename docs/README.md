@@ -108,38 +108,31 @@ levels are used throughout the docs:
 | `notice` event kind — visible on screen | **Blocked** on a render hook |
 | Dialogs presented over a fully drawn frame | **Blocked** on a render hook |
 
-### Known issue: no render hook yet
+### The render hook: SOLVED
 
-Redirecting the sailing-render call site black-screens the game on world entry
-and then crashes it. A controlled experiment settled the cause:
+The long-standing blocker is broken. After two instructive failures —
+redirecting the sailing-render call site (black screen even with a do-nothing
+callback: the redirection itself was the problem) and the throwaway-device
+vtable trick (the vtable is per-instance heap memory, freed with the throwaway
+device) — the working approach reads **the game's own `IDirect3DDevice9*`**:
+the renderer singleton at `0x00727C30` stores the device pointer at `+0x60`
+(established from the `CreateDevice` call sequence and confirmed by 19
+independent read sites). The framework polls that pointer from the safe point
+and patches the real vtable the moment the device exists.
 
-| Build | Callback does | Result |
-|---|---|---|
-| no hook | — | reaches the world, sails, stable |
-| hook installed | nothing but increment a counter | black screen, crash |
+Live and verified in-game on both supported builds:
 
-Since the callback does nothing, **the redirection itself is the problem** — not
-the work it was going to do. Calling convention and namespaced inline-asm
-symbols were both ruled out along the way.
+* `EndScene` (slot 42) — the per-frame entry, currently counting frames; the
+  doorway for notices and future custom drawing.
+* `Reset` (slot 16) — resolution changes tracked.
+* `SetTransform` (slot 44) — carries the whole widescreen fix (see
+  [`GAME_API.md`](GAME_API.md#resolution--widescreen)).
+* A per-frame **health check** re-verifies the hooks and re-installs them if
+  the vtable is rebuilt under us — observed happening in practice, and
+  recovered from automatically.
 
-The consequence is cosmetic: `notice` events fire correctly but are not drawn
-(the log says so explicitly when it happens), and dialogs present from the top of
-the frame, so the world behind them can look half-drawn.
-
-A second approach — hooking `IDirect3DDevice9::EndScene` by creating a throwaway
-device and patching its vtable — was also tried. It is **non-destructive** (the
-game ran normally throughout) but cannot work: after the throwaway device is
-released, its vtable address reports `MEM_RESERVE` and `VirtualProtect` fails
-with `ERROR_INVALID_ADDRESS`. The vtable is **per-instance heap memory**, freed
-with the device, not the shared table in `d3d9.dll` that the technique assumes.
-
-**Next attempt: find the game's own `IDirect3DDevice9*` and patch the real
-vtable.** The engine is Gamebryo/NiDX9, and `NiDX9Renderer` holds that pointer —
-locating it is ordinary reverse engineering of the same kind that found the text
-API.
-
-Both attempts are kept in the tree at stage 0, failing safely, so the next one
-starts from something rather than a blank page.
+The `notice` drawing itself is still staged off (stage 1: count only); raising
+it to stage 2 is now unblocked engineering rather than research.
 | Officer simulation | Not started |
 | Factions and divisions | Not started |
 

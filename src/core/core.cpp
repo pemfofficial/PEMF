@@ -283,19 +283,23 @@ static bool  g_loggedOtherThread = false;
 static volatile float g_mouseHitTestXScale = 1024.0f;
 static void UpdateMouseAspect()
 {
+    // The wide multiplier is only correct when the SetTransform pillarbox is
+    // actually engaged (the UI occupying the centred 4:3 region). Until the
+    // device hook is live the UI stretches full-width, and the game's own
+    // 1024.0 is what matches. 768*(w/h) == 1024 at 4:3, so this is a no-op on
+    // a 4:3 mode either way.
     int dw = *(int*)game::addr::DevWidth, dh = *(int*)game::addr::DevHeight;
-    if (dw > 0 && dh > 0)
-        g_mouseHitTestXScale = 768.0f * (float)dw / (float)dh;
+    float s = 1024.0f;
+    if (dw > 0 && dh > 0 && d3d9hook::Active())
+        s = 768.0f * (float)dw / (float)dh;
+    g_mouseHitTestXScale = s;
 }
 
-// Widescreen UI pillarbox toggle (Ctrl+Shift+3), on by default. Lets us A/B the
-// pillarbox against the game's default stretched ortho.
-// Widescreen 2D-UI pillarbox: RESEARCH PARKED (see docs/GAME_API.md). The UI
-// camera's fixed 4:3 frustum is heap-cached (FUN_00503CA0); patching its source
-// constants and rewriting the live frustum both failed to visibly pillarbox the
-// menu, and the memory scan destabilised the packed build. The widescreen
-// RESOLUTIONS (selectable, correct 3D 16:9) work and stay; the 2D-UI-at-16:9 fix
-// is a documented future-session target. 1440x1080 is the recommended 1080p.
+// Widescreen 2D-UI pillarbox: now done at the LAST point the projection passes
+// through -- IDirect3DDevice9::SetTransform (see d3d9hook.h). The earlier
+// source-side attempts (patching the frustum constants, rewriting the
+// heap-cached camera) all failed because the value is copied long before it
+// reaches the GPU; the device hook intercepts it on its way in, every frame.
 static DWORD g_tickCount         = 0;
 static DWORD g_safePointHits     = 0;
 static bool  g_safePointFound    = false;
@@ -322,20 +326,26 @@ static void RunSafePoint()
         Log("safe point reached (main loop PeekMessageA) -- deferred dispatch live");
     }
 
-    // On a resolution change, re-apply the aspect-dependent widescreen fixes and
-    // log the layout state. (The player picking a resolution rebuilds the UI, so
-    // the re-patched ortho immediates take effect on the next UI build.)
+    // The device only exists once the game has created it; poll from here (a
+    // few guarded reads per frame until it lands, then this is a no-op).
+    if (g_targetOK) d3d9hook::TryInstall();
+
+    // On a resolution change -- or the device hook coming alive -- re-apply the
+    // aspect-dependent widescreen state and log the layout.
     {
-        static int lastW = -1, lastH = -1;
+        static int  lastW = -1, lastH = -1;
+        static bool lastHooked = false;
         int devW = *(int*)game::addr::DevWidth, devH = *(int*)game::addr::DevHeight;
-        if (devW != lastW || devH != lastH) {
-            lastW = devW; lastH = devH;
-            UpdateMouseAspect();   // keep the hit-test X scale matched to the new aspect
-            Log("resstate: device=%dx%d  screen=%dx%d  ui=%dx%d  mouseXscale=%.1f",
+        bool hooked = d3d9hook::Active();
+        if (devW != lastW || devH != lastH || hooked != lastHooked) {
+            lastW = devW; lastH = devH; lastHooked = hooked;
+            d3d9hook::SetAspect(devW, devH);  // ortho pillarbox scale
+            UpdateMouseAspect();              // hit-test X scale, matched to it
+            Log("resstate: device=%dx%d  screen=%dx%d  ui=%dx%d  mouseXscale=%.1f  devhook=%d",
                 devW, devH,
                 *(int*)game::addr::ScreenW, *(int*)game::addr::ScreenH,
                 *(int*)game::addr::UIWidth, *(int*)game::addr::UIHeight,
-                (double)g_mouseHitTestXScale);
+                (double)g_mouseHitTestXScale, hooked ? 1 : 0);
         }
     }
 
@@ -592,22 +602,44 @@ static void PatchWidescreenResolutions()
 // ---------------------------------------------------- mouse aspect correction
 static void PatchMouseHitTestAspect()
 {
-    uint32_t* operand = (uint32_t*)game::addr::MouseHitTestXFmulOperand;  // 0x0050436F
-    if (!PageReadable(operand, sizeof(uint32_t))) { Log("mouse-aspect: operand not readable"); return; }
-    if (*operand != game::addr::MouseHitTestXConstAddr) {
-        Log("mouse-aspect: unexpected operand 0x%08X at 0x%08X -- NOT patching",
-            *operand, (unsigned)game::addr::MouseHitTestXFmulOperand);
-        return;
-    }
+    // All four screen->plane X conversions must agree (hit-test, drag, and
+    // the two other cursor consumers) -- see game.h. Each is validated the
+    // same way: the instruction must be `fmul dword ptr [imm]` (D8 0D) and
+    // the operand must point at a float equal to 1024.0, wherever that build
+    // keeps it. Validating by value keeps this immune to the packed build's
+    // shifted constants.
     UpdateMouseAspect();
-    DWORD old = 0;
-    if (!VirtualProtect(operand, sizeof(uint32_t), PAGE_EXECUTE_READWRITE, &old)) {
-        Log("mouse-aspect: VirtualProtect failed"); return;
+    int patched = 0;
+    for (uintptr_t opAddr : game::addr::MouseToPlaneXOperands) {
+        uint32_t* operand = (uint32_t*)opAddr;
+        BYTE*     opcode  = (BYTE*)operand - 2;
+        if (!PageReadable(opcode, 2 + sizeof(uint32_t))) {
+            Log("mouse-aspect: site 0x%08X not readable", (unsigned)opAddr); continue;
+        }
+        if (opcode[0] != 0xD8 || opcode[1] != 0x0D) {
+            Log("mouse-aspect: not an fmul at 0x%08X (%02X %02X) -- skipping",
+                (unsigned)(uintptr_t)opcode, opcode[0], opcode[1]);
+            continue;
+        }
+        if (*operand == (uint32_t)(uintptr_t)&g_mouseHitTestXScale) { ++patched; continue; }
+        float* cur = (float*)(uintptr_t)*operand;
+        if (!PageReadable(cur, sizeof(float)) || *cur != 1024.0f) {
+            Log("mouse-aspect: operand at 0x%08X does not point at 1024.0 -- skipping",
+                (unsigned)opAddr);
+            continue;
+        }
+        DWORD old = 0;
+        if (!VirtualProtect(operand, sizeof(uint32_t), PAGE_EXECUTE_READWRITE, &old)) {
+            Log("mouse-aspect: VirtualProtect failed at 0x%08X", (unsigned)opAddr); continue;
+        }
+        *operand = (uint32_t)(uintptr_t)&g_mouseHitTestXScale;   // repoint to our float
+        VirtualProtect(operand, sizeof(uint32_t), old, &old);
+        FlushInstructionCache(GetCurrentProcess(), operand, sizeof(uint32_t));
+        ++patched;
     }
-    *operand = (uint32_t)(uintptr_t)&g_mouseHitTestXScale;   // repoint to our float
-    VirtualProtect(operand, sizeof(uint32_t), old, &old);
-    FlushInstructionCache(GetCurrentProcess(), operand, sizeof(uint32_t));
-    Log("mouse-aspect: hit-test X repointed to aspect-adaptive scale (now %.1f)",
+    Log("mouse-aspect: %d/%d screen->plane X conversions on the adaptive scale (now %.1f)",
+        patched, (int)(sizeof(game::addr::MouseToPlaneXOperands) /
+                       sizeof(game::addr::MouseToPlaneXOperands[0])),
         (double)g_mouseHitTestXScale);
 }
 
@@ -687,10 +719,12 @@ static DWORD WINAPI Init(LPVOID)
     // it writes to the game's code.
     if (g_targetOK) render::Install();
 
-    // The D3D9 route. Done here, before the game creates its own device, so our
-    // throwaway one never coexists with a fullscreen device. Gated on a verified
-    // build for the same reason as the IAT hooks (passive load otherwise).
-    if (g_targetOK) d3d9hook::Install();
+    // The D3D9 device hook installs itself from the safe point, once the game
+    // has created its device (d3d9hook::TryInstall in RunSafePoint) -- nothing
+    // to do at init beyond announcing the configuration.
+    if (g_targetOK)
+        Log("d3d9: stage %d -- will hook the game's device from the safe point",
+            d3d9hook::kStage);
 
     Log("debug hotkeys: Ctrl+Shift+1 = event #0, Ctrl+Shift+2 = event #1");
     return 0;

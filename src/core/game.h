@@ -154,6 +154,17 @@ namespace addr {
     constexpr uintptr_t MouseHitTestXFmulOperand = 0x0050436F;
     constexpr uint32_t  MouseHitTestXConstAddr   = 0x007135C8;  // expected current operand
 
+    // There are FOUR sites of the shape `x / screenWidth * 1024.0` (fmul on
+    // [0x007135C8]): 0x0050436D (the click hit-test), 0x00503985, 0x0050C7EF
+    // and 0x0050CAFC. ONLY the hit-test may be made aspect-adaptive.
+    // Patching the other three was tried and MOVED HUD ELEMENTS in-game
+    // (crew-morale icon pushed out of view, sailing-panel button chrome
+    // broken, settings cursor off) -- they compute widget/element positions,
+    // not pointer input, and their consumers expect the fixed 1024 plane.
+    constexpr uintptr_t MouseToPlaneXOperands[] = {
+        0x0050436F,   // hit-test (FUN_00504310) -- input, adaptive
+    };
+
     // The 2D UI camera's orthographic frustum -- RESEARCH REFERENCE, not used.
     // FUN_00503CA0 sets a fixed 4:3 region: left/right -0.5/+0.5 (width 1.0),
     // top/bottom +0.375/-0.375 (height 0.75), 1.0/0.75 = 4:3, near/far
@@ -163,6 +174,18 @@ namespace addr {
     // docs/GAME_API.md). Kept here as the ground-truth for a future attempt.
     constexpr uintptr_t UIOrthoLeftImm  = 0x00503CEA;  // operand of push 0xBF000000 (-0.5)
     constexpr uintptr_t UIOrthoRightImm = 0x00503CE5;  // operand of push 0x3F000000 (+0.5)
+
+    // The renderer singleton and the real Direct3D device. The device-creation
+    // sequence (0x005C60E0 region) calls IDirect3D9::CreateDevice on the
+    // interface stored at 0x00728D74 and writes the returned device pointer
+    // into the renderer object at +0x60 ("lea edi,[esi+0x60]; push edi").
+    // 19 independent call sites read the device as [[0x00727C30]+0x60] and use
+    // it as a COM object, confirming both the global and the offset. This is
+    // the doorway to the per-frame render path: read the game's own device and
+    // hook its vtable -- no throwaway device, no creation race.
+    constexpr uintptr_t RendererPtr       = 0x00727C30;  // renderer object*
+    constexpr uintptr_t RendererDeviceOfs = 0x60;        // IDirect3DDevice9* at +0x60
+    constexpr uintptr_t D3D9Ptr           = 0x00728D74;  // IDirect3D9*
 }
 
 // ------------------------------------------------------------- state access
