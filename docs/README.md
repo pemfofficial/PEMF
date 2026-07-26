@@ -104,35 +104,39 @@ levels are used throughout the docs:
 | Firing a JSON event — card observed on screen | **Verified** |
 | `nearPort` trigger firing during play | **Verified** — fired at distance 3000, and re-armed correctly |
 | `notice` event kind — schema, validation, triggering | **Verified** |
-| Render-phase hook (call-site redirection) | **Does not work** — see below |
-| `notice` event kind — visible on screen | **Blocked** on a render hook |
-| Dialogs presented over a fully drawn frame | **Blocked** on a render hook |
+| Render-phase hook — the game's own D3D9 device | **Working** — live on both builds |
+| `notice` event kind — visible on screen | Next: raise the frame hook to stage 2 |
 
-### The render hook: SOLVED
+### The render hook — solved
 
-The long-standing blocker is broken. After two instructive failures —
-redirecting the sailing-render call site (black screen even with a do-nothing
-callback: the redirection itself was the problem) and the throwaway-device
-vtable trick (the vtable is per-instance heap memory, freed with the throwaway
-device) — the working approach reads **the game's own `IDirect3DDevice9*`**:
-the renderer singleton at `0x00727C30` stores the device pointer at `+0x60`
-(established from the `CreateDevice` call sequence and confirmed by 19
-independent read sites). The framework polls that pointer from the safe point
-and patches the real vtable the moment the device exists.
+The framework runs inside the frame, at `IDirect3DDevice9::EndScene` on the
+game's **own** Direct3D device. This is the way onto the screen for everything
+we want to draw ourselves: sailing notices, callouts, indicators, panels.
 
-Live and verified in-game on both supported builds:
+**How the device is found.** The renderer singleton at `0x00727C30` holds its
+`IDirect3DDevice9*` at `+0x60`. That came out of the device-creation sequence
+(the `CreateDevice` call writes the new device into `renderer+0x60`) and is
+confirmed by 19 independent sites that read `[[0x00727C30]+0x60]` and call COM
+methods on it. The framework polls that pointer from the safe point and patches
+the real vtable the moment the device exists — so nothing in the game's code is
+rewritten, and the hooks are on the vtable actually in use.
 
-* `EndScene` (slot 42) — the per-frame entry, currently counting frames; the
-  doorway for notices and future custom drawing.
-* `Reset` (slot 16) — resolution changes tracked.
-* `SetTransform` (slot 44) — carries the whole widescreen fix (see
-  [`GAME_API.md`](GAME_API.md#resolution--widescreen)).
-* A per-frame **health check** re-verifies the hooks and re-installs them if
-  the vtable is rebuilt under us — observed happening in practice, and
-  recovered from automatically.
+**The vtable gets rebuilt mid-session.** Observed repeatedly in-game, so the
+installer re-verifies its slots every safe point and re-installs when they have
+been shed. Without that the hook dies silently; with it, recovery is automatic
+and logged. A 15-second heartbeat means a dead hook can never look like a quiet
+one.
 
-The `notice` drawing itself is still staged off (stage 1: count only); raising
-it to stage 2 is now unblocked engineering rather than research.
+Two earlier approaches failed, and both are worth remembering:
+
+| Approach | Result |
+|---|---|
+| Redirect the sailing-render call site | Black screen **even with a do-nothing callback** — the redirection itself was the fault |
+| Throwaway device to read "the" vtable | Cannot work: the vtable is **per-instance heap memory**, freed with the throwaway device (`MEM_RESERVE` right after `Release`) |
+
+Currently at **stage 1** — the hook counts frames and calls the original,
+verified stable on both builds. Drawing through it (stage 2) is the next step,
+and is ordinary work now rather than research.
 | Officer simulation | Not started |
 | Factions and divisions | Not started |
 

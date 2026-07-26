@@ -127,62 +127,18 @@ namespace addr {
     constexpr uintptr_t SlotCreateFileA  = 0x006C0074;  // KERNEL32!CreateFileA
     constexpr uintptr_t SlotCreateFileW  = 0x006C0154;  // KERNEL32!CreateFileW
 
-    // Resolution. SetResolution (FUN_004D3AB0, cdecl(w,h)) is the game's own
-    // "switch to WxH": it resets the D3D device, resizes the window, and derives
-    // the projection aspect from height/width -- so 16:9 is a true widescreen
-    // view, not a 4:3 stretch. It copies ScreenW/H from UIWidth/UIHeight, which
-    // are therefore set first. This bypasses the menu's 4:3-only resolution list.
-    constexpr uintptr_t SetResolution = 0x004D3AB0;
-    constexpr uintptr_t UIWidth       = 0x0072637C;  // becomes ScreenW
-    constexpr uintptr_t UIHeight      = 0x00726380;  // becomes ScreenH
-    constexpr uintptr_t DevWidth      = 0x008CAC18;  // actual device/render width
-    constexpr uintptr_t DevHeight     = 0x008CAC1C;  // actual device/render height
-
-    // The resolution-list builder (FUN_004b2df0) keeps only 4:3 modes: after
-    // `cmp (height*100/width), 75` it does `jne skip`. NOP that jne (bytes
-    // 75 21 -> 90 90) and every display mode is listed -- widescreen included --
-    // so 1920x1080 becomes a normal, selectable, crash-free menu choice.
-    constexpr uintptr_t ResAspectFilterJne = 0x004B2E8A;
-
-    // Mouse hit-test aspect. The cursor->UI-plane transform (FUN_00504310)
-    // multiplies normalized X by a fixed 1024.0 and Y by 768.0 -- a hardcoded
-    // 4:3 plane, so at 16:9 the horizontal click position is compressed and
-    // clicks land off to the side. `fmul dword ptr [0x007135C8]` sits at
-    // 0x0050436D; its 4-byte operand (the absolute address 0x007135C8) is at
-    // 0x0050436F. We repoint just that operand to our own float so only this
-    // instruction changes (the 1024/768 constants are shared by other code).
-    constexpr uintptr_t MouseHitTestXFmulOperand = 0x0050436F;
-    constexpr uint32_t  MouseHitTestXConstAddr   = 0x007135C8;  // expected current operand
-
-    // There are FOUR sites of the shape `x / screenWidth * 1024.0` (fmul on
-    // [0x007135C8]): 0x0050436D (the click hit-test), 0x00503985, 0x0050C7EF
-    // and 0x0050CAFC. ONLY the hit-test may be made aspect-adaptive.
-    // Patching the other three was tried and MOVED HUD ELEMENTS in-game
-    // (crew-morale icon pushed out of view, sailing-panel button chrome
-    // broken, settings cursor off) -- they compute widget/element positions,
-    // not pointer input, and their consumers expect the fixed 1024 plane.
-    constexpr uintptr_t MouseToPlaneXOperands[] = {
-        0x0050436F,   // hit-test (FUN_00504310) -- input, adaptive
-    };
-
-    // The 2D UI camera's orthographic frustum -- RESEARCH REFERENCE, not used.
-    // FUN_00503CA0 sets a fixed 4:3 region: left/right -0.5/+0.5 (width 1.0),
-    // top/bottom +0.375/-0.375 (height 0.75), 1.0/0.75 = 4:3, near/far
-    // 921.6/1536.0. It is copied into a heap-allocated camera object once, so
-    // patching these immediates (or the live frustum) does not visibly pillarbox
-    // the menu at 16:9 -- the 2D-UI-at-widescreen fix is parked (see
-    // docs/GAME_API.md). Kept here as the ground-truth for a future attempt.
-    constexpr uintptr_t UIOrthoLeftImm  = 0x00503CEA;  // operand of push 0xBF000000 (-0.5)
-    constexpr uintptr_t UIOrthoRightImm = 0x00503CE5;  // operand of push 0x3F000000 (+0.5)
-
-    // The renderer singleton and the real Direct3D device. The device-creation
-    // sequence (0x005C60E0 region) calls IDirect3D9::CreateDevice on the
-    // interface stored at 0x00728D74 and writes the returned device pointer
-    // into the renderer object at +0x60 ("lea edi,[esi+0x60]; push edi").
-    // 19 independent call sites read the device as [[0x00727C30]+0x60] and use
-    // it as a COM object, confirming both the global and the offset. This is
-    // the doorway to the per-frame render path: read the game's own device and
-    // hook its vtable -- no throwaway device, no creation race.
+    // ---------------------------------------------------------- the renderer
+    // The renderer singleton, and the game's real IDirect3DDevice9 inside it.
+    // Found from the device-creation sequence around 0x005C60E0: it calls
+    // IDirect3D9::CreateDevice on the interface at 0x00728D74 and has it write
+    // the new device into renderer+0x60 ("lea edi,[esi+0x60]; push edi").
+    // Confirmed independently by 19 sites that read [[0x00727C30]+0x60] and
+    // call COM methods on it.
+    //
+    // This is how the framework gets inside the frame (see d3d9hook.h): read
+    // the game's own device, patch its vtable. No throwaway device (its vtable
+    // is per-instance heap memory and dies with it), and nothing in the game's
+    // code is rewritten.
     constexpr uintptr_t RendererPtr       = 0x00727C30;  // renderer object*
     constexpr uintptr_t RendererDeviceOfs = 0x60;        // IDirect3DDevice9* at +0x60
     constexpr uintptr_t D3D9Ptr           = 0x00728D74;  // IDirect3D9*
@@ -196,16 +152,6 @@ inline int32_t&  StateFlags()       { return *(int32_t*)addr::StateFlags; }
 
 typedef int (*GetMoraleLevel_t)();
 inline int GetMoraleLevel() { return ((GetMoraleLevel_t)addr::GetMoraleLevel)(); }
-
-// Force the game to a given resolution, bypassing the menu's 4:3-only list. Sets
-// the UI dimensions (which become ScreenW/H) then invokes the game's own switch.
-typedef void (__cdecl *SetResolution_t)(int w, int h);
-inline void ForceResolution(int w, int h)
-{
-    *(int32_t*)addr::UIWidth  = w;
-    *(int32_t*)addr::UIHeight = h;
-    ((SetResolution_t)addr::SetResolution)(w, h);
-}
 
 // ---------------------------------------------------------------- the shims
 //

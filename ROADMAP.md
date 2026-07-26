@@ -79,27 +79,6 @@ event-driven audio here before.
   are **not** blocked by the render work, so audio callouts can arrive before the
   on-screen versions.
 
-## Display & resolution
-
-- ✅ **Widescreen resolutions selectable** — the game's own menu filtered its list
-  to 4:3; a small patch unlocks every display mode (including 1920×1080).
-- ✅ **16:9 playable end-to-end** — via the device hook, the UI camera is
-  re-aspected every frame so the full interface is visible, centred and
-  correctly proportioned at 1920×1080, with the mouse landing where it looks
-  like it should. Side bars frame the 4:3 interface art (the honest floor for
-  4:3 artwork on a 16:9 screen), and UI-only frames get those bars cleaned to
-  black. Details in [`docs/GAME_API.md`](docs/GAME_API.md#resolution--widescreen).
-- ✅ **1440×1080 remains the zero-compromise mode** — a 4:3 mode the engine
-  handles flawlessly: crisp, correct UI, pixel-accurate mouse, no bars.
-- 🚧 **True-widescreen 3D (more world, not a stretch)** — the 3D cameras stay
-  4:3-proportioned; widening them through `SetTransform` alone tears
-  shader-drawn geometry (the engine also feeds projections through
-  vertex-shader constants). Needs both paths handled together — mapped,
-  understood, not yet built.
-- 🚧 **Floating-widget alignment at 16:9** — slider thumbs and the
-  character-creation Continue button draw and hit-test through different maps
-  at wide aspects. Needs their draw path captured live; next dedicated task.
-
 ## World & map
 
 Early exploration, scope deliberately open — but the reverse engineering here is
@@ -146,16 +125,18 @@ out to be far more open to modding than expected.
 
 ## Known blockers & things that need work
 
-### ✅→🚧 Drawing our own visuals — the door is open
+### 🚧 Drawing our own visuals — the way in is open
 
-The blocker is broken: the framework now hooks **the game's own Direct3D
-device** (found through the renderer singleton) and sits inside every frame at
-`EndScene`, with a health check that survives the engine rebuilding its device
-state. This is the doorway for everything visual — the sailing "notice" text,
-indicators, callouts, panels. The widescreen work already runs through it in
-production. What remains is the drawing itself (staged deliberately: the
-per-frame entry is live and counting; text output through it is the next
-stage), so this moves from "research blocker" to "engineering to schedule".
+The long-standing blocker is solved: PEMF now sits **inside the frame**, hooked
+onto the game's own Direct3D device at `EndScene`, live and stable on both
+supported builds. It also survives the engine rebuilding its device state,
+which it does mid-session — the hook re-verifies and re-installs itself, and a
+heartbeat in the log means a dead hook can never pass unnoticed.
+
+What is left is the drawing itself. The frame hook runs at stage 1 (counting
+frames); raising it to stage 2 puts the sailing "notice" text, "LAND HO!"
+callouts, indicators and panels on screen. That is ordinary engineering now
+rather than research. Details in [`docs/README.md`](docs/README.md).
 
 ### 🟡 Running on every version of the game
 
@@ -191,19 +172,18 @@ not a bug in the mod. The fix is code signing, which is in progress. See
 
 Rough order, subject to change:
 
-1. **On-screen notices** ("LAND HO!", lookout calls) — the render hook is
-   solved, so this is now the nearest visual payoff: raise the frame hook one
-   stage and draw.
-2. **Audio callouts** — confirm the play-by-name path and fire a custom sound
+1. **Draw through the frame hook** — raise it to stage 2 and put our own text on
+   screen. The hook is in place; this is the payoff.
+2. **On-screen notices** ("LAND HO!", lookout calls) — the first real feature
+   built on it.
+3. **Audio callouts** — confirm the play-by-name path and fire a custom sound
    from an event. Pairs naturally with the notices.
-3. **Widget alignment + true-widescreen 3D** — finish the two remaining 16:9
-   items (floating widgets; the vertex-shader projection path).
 4. **Code signing** so the mod loads cleanly on locked-down Windows installs
    (application submitted, awaiting approval).
-5. **Officer roster** — data model first, then the panel now that drawing is
+5. **Officer roster** — data model first, then the panel, now that drawing is
    within reach.
-6. **Version detection** — broaden the set of game builds supported (GOG +
-   Steam are both live today from one codebase).
+6. **Version detection** — broaden the set of game builds supported (GOG and
+   Steam both run from one codebase today).
 
 ---
 
