@@ -523,6 +523,83 @@ far more reliable choice than the literal minimum.
 
 ---
 
+## Ship-battle instance (naval combat)
+
+> **Confidence: decompiled, not yet run.** Field offsets are read from the code
+> and partially inferred; treat as a strong map, not a tested contract.
+
+Naval combat is the game's separate "instance," and it is the natural arena to
+reuse for new modes (a **race**, for example). Two findings make that practical.
+
+### It reuses the overworld sailing system
+
+The naval-combat sailing render is **`FUN_004612B0`** — the *same* sailing render
+function used on the overworld. Combat is not a separate engine; it is the sailing
+system with combatants and a win condition. So the physics, wind, camera, and ship
+rendering are all already there.
+
+### Ships are an array of fixed structs
+
+Each ship in a battle is a **`0x4A8`-byte struct**, in an array based around
+`0x008BC468`. Observed fields (offsets from the struct base):
+
+| Field (example global) | Meaning |
+|---|---|
+| `0x008BC46C` / `0x008BC470` | position (x, y) |
+| `0x008BC474` | heading / facing (drives the wind gauge) |
+| `0x008BC480`–`0x008BC488` | sails / rigging |
+| `0x008BC494` | hull damage (`100 - value` = %) |
+| `0x008BC498` | name / id |
+| `0x008BC4B0` | **AI command output** (see below) |
+
+The code indexes ships as `[i * 0x12A]` (dword stride = `0x4A8`), and the
+reference ship is reached at `base - i*0x4A8`. Ship speed is surfaced to the HUD as
+`"@NUM knots"`, and sail state toggles between **`Battle Sails`** and
+**`Full Sails`**.
+
+**Ship-to-ship distance uses the same octagonal approximation** as
+`FindNearestCity` — `(min + max*2)/2` — which `game::CityDistance()` already
+reproduces. So measuring "how far is ship A from point B" needs no new math.
+
+### The combat AI — `FUN_00478730`
+
+Per ship, the AI picks one of **Fire / Board / Flee / Strike / Escort** from the
+relative hull, sail, and position of the two ships, and writes the choice to the
+ship's command field (`+0x008BC4B0`). This is the decision a race would **override**
+— instead of choosing a combat action, steer the ship toward the next waypoint.
+
+### Designing a race mode on top of this
+
+A player-vs-AI race reuses the instance and needs surprisingly little that the
+engine does not already provide:
+
+| Piece | How | Needs the render hook? |
+|---|---|---|
+| Arena, physics, rendering | reuse the battle instance | No — the game draws it |
+| Ship positions & speed | read the `0x4A8` structs | No |
+| **Finish-line trigger** | octagonal distance from a ship to point B < threshold | No |
+| Win / standings | first ship under the threshold; announce via the event/notice system | No |
+| AI racers | override `FUN_00478730` so AI ships steer to waypoints instead of fighting | No |
+| **Visible course markers** | place an object the game already renders (an anchored ship / marker) at each waypoint, and use it as both marker and trigger | No, if an existing object is reused |
+
+So the race *logic* — start, finish detection, standings — needs **no drawing at
+all**. The only thing that wants rendering is a *visible* finish line, and that can
+likely be avoided by placing an object the game already knows how to draw (the same
+"reuse what the engine renders" approach used elsewhere), with audio cues as a
+fallback.
+
+### Still to find (next steps)
+
+- **The battle-entry path** — how the game enters a naval instance and populates
+  the ship array, so a mode can be started on demand with chosen ships and start
+  positions. Not yet located.
+- **Confirming the position offsets** inside the `0x4A8` struct.
+- **Steering an AI ship to a waypoint** — mapping the command field and heading to
+  directed movement.
+
+None of these need the render hook; they are ordinary reverse engineering of the
+combat setup, and player-vs-AI needs no networking.
+
 ## Audio / Sound System
 
 > **Confidence: decompiled, not yet run.** Recovered by byte analysis
