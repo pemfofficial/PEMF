@@ -51,31 +51,43 @@ void Log(const char* fmt, ...)
 }
 
 // ----------------------------------------------------------------- IAT hook
+// Memory-safety helpers (defined with the diagnostics below). Reading a
+// possibly-encrypted / mid-unpack import table must never fault -- a fault, even
+// caught, can disturb a DRM packer's own exception-based unpacking.
+static bool PageReadable(const void* p, size_t n);
+static bool SafeStr(const char* s, char* out, size_t outsz);
+
 static bool HookIAT(const char* dllName, const char* funcName,
                     void* replacement, void** original)
 {
-  // SEH guard: never let a malformed/encrypted import table (a packed host)
-  // fault here. Callers already gate on a verified build, but this is cheap.
+  // SEH guard as a backstop; the PageReadable/SafeStr checks below are what
+  // actually keep us from faulting on a packed/unrecognised host.
   __try {
     HMODULE base = GetModuleHandleA(NULL);
+    if (!PageReadable(base, sizeof(IMAGE_DOS_HEADER))) return false;
     auto* dos = (IMAGE_DOS_HEADER*)base;
     auto* nt  = (IMAGE_NT_HEADERS*)((BYTE*)base + dos->e_lfanew);
+    if (!PageReadable(nt, sizeof(IMAGE_NT_HEADERS))) return false;
 
     DWORD impRva = nt->OptionalHeader
                      .DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress;
     if (!impRva) return false;
 
     auto* desc = (IMAGE_IMPORT_DESCRIPTOR*)((BYTE*)base + impRva);
-    for (; desc->Name; ++desc) {
-        const char* name = (const char*)((BYTE*)base + desc->Name);
+    for (; PageReadable(desc, sizeof(IMAGE_IMPORT_DESCRIPTOR)) && desc->Name; ++desc) {
+        char name[64];
+        if (!SafeStr((const char*)((BYTE*)base + desc->Name), name, sizeof(name))) continue;
         if (_stricmp(name, dllName) != 0) continue;
 
         auto* oft = (IMAGE_THUNK_DATA*)((BYTE*)base + desc->OriginalFirstThunk);
         auto* ft  = (IMAGE_THUNK_DATA*)((BYTE*)base + desc->FirstThunk);
-        for (; oft->u1.AddressOfData; ++oft, ++ft) {
+        for (; PageReadable(oft, sizeof(IMAGE_THUNK_DATA)) && oft->u1.AddressOfData;
+               ++oft, ++ft) {
             if (oft->u1.Ordinal & IMAGE_ORDINAL_FLAG) continue;
             auto* ibn = (IMAGE_IMPORT_BY_NAME*)((BYTE*)base + oft->u1.AddressOfData);
-            if (strcmp((const char*)ibn->Name, funcName) != 0) continue;
+            char fn[96];
+            if (!SafeStr((const char*)((BYTE*)ibn + 2), fn, sizeof(fn))) continue;
+            if (strcmp(fn, funcName) != 0) continue;
 
             DWORD old = 0;
             if (!VirtualProtect(&ft->u1.Function, sizeof(void*),
@@ -101,49 +113,96 @@ static bool HookIAT(const char* dllName, const char* funcName,
 // at load time AND again a few seconds later shows whether -- and when -- the
 // real import table appears, which tells us if the injection vector survives the
 // packer and when our hooks could take. Harmless on a plain build.
+// True only if [p, p+n) is entirely committed and readable -- so we can inspect a
+// possibly-encrypted / mid-unpack image (a DRM-packed host) WITHOUT ever faulting.
+// A deliberate fault, even one caught by SEH, can interfere with a packer's own
+// exception-based unpacking (this corrupted the Steam build's character-creation
+// screen), so we avoid faulting entirely and check readability up front.
+static bool PageReadable(const void* p, size_t n)
+{
+    if (!p || n == 0) return false;
+    const BYTE* a   = (const BYTE*)p;
+    const BYTE* end = a + n;
+    while (a < end) {
+        MEMORY_BASIC_INFORMATION mbi;
+        if (VirtualQuery(a, &mbi, sizeof(mbi)) != sizeof(mbi)) return false;
+        if (mbi.State != MEM_COMMIT)                          return false;
+        if (mbi.Protect & (PAGE_NOACCESS | PAGE_GUARD))       return false;
+        if (mbi.Protect == PAGE_EXECUTE)                      return false;  // exec-only
+        a = (const BYTE*)mbi.BaseAddress + mbi.RegionSize;
+    }
+    return true;
+}
+
+// Copy a C string only from confirmed-readable memory, bounded. No faults.
+static bool SafeStr(const char* s, char* out, size_t outsz)
+{
+    if (!s || outsz == 0 || !PageReadable(s, 1)) { if (outsz) out[0] = 0; return false; }
+    size_t i = 0;
+    for (; i < outsz - 1; ++i) {
+        if (!PageReadable(s + i, 1)) break;
+        char c = s[i];
+        if (!c) break;
+        out[i] = c;
+    }
+    out[i] = 0;
+    return i > 0;
+}
+
 static void DiagnoseImage(const char* when)
 {
     HMODULE base = GetModuleHandleA(NULL);
-    if (!base) { Log("[diag %s] no module base", when); return; }
-    __try {
-        auto* dos = (IMAGE_DOS_HEADER*)base;
-        auto* nt  = (IMAGE_NT_HEADERS*)((BYTE*)base + dos->e_lfanew);
-        Log("[diag %s] base=%p entry=0x%08X sizeOfImage=0x%X sections=%u",
-            when, base, nt->OptionalHeader.AddressOfEntryPoint,
-            nt->OptionalHeader.SizeOfImage, nt->FileHeader.NumberOfSections);
+    if (!base || !PageReadable(base, sizeof(IMAGE_DOS_HEADER))) {
+        Log("[diag %s] module header not readable", when);
+        return;
+    }
+    auto* dos = (IMAGE_DOS_HEADER*)base;
+    auto* nt  = (IMAGE_NT_HEADERS*)((BYTE*)base + dos->e_lfanew);
+    if (!PageReadable(nt, sizeof(IMAGE_NT_HEADERS))) {
+        Log("[diag %s] NT header not readable", when);
+        return;
+    }
+    Log("[diag %s] base=%p entry=0x%08X sizeOfImage=0x%X sections=%u",
+        when, base, nt->OptionalHeader.AddressOfEntryPoint,
+        nt->OptionalHeader.SizeOfImage, nt->FileHeader.NumberOfSections);
 
-        DWORD impRva = nt->OptionalHeader
-            .DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress;
-        if (!impRva) { Log("[diag %s] no import directory", when); return; }
+    DWORD impRva = nt->OptionalHeader
+        .DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress;
+    if (!impRva) { Log("[diag %s] no import directory", when); return; }
 
-        auto* desc = (IMAGE_IMPORT_DESCRIPTOR*)((BYTE*)base + impRva);
-        int dllCount = 0;
-        // the three imports our hooks depend on
-        bool haveTimeGetTime = false, havePeekMessageA = false, haveCreateFileA = false;
-        for (; desc->Name && dllCount < 64; ++desc, ++dllCount) {
-            const char* dll = (const char*)((BYTE*)base + desc->Name);
-            auto* oft = (IMAGE_THUNK_DATA*)((BYTE*)base +
-                        (desc->OriginalFirstThunk ? desc->OriginalFirstThunk
-                                                  : desc->FirstThunk));
-            int fnCount = 0;
-            char first[96]; first[0] = 0;
-            for (; oft->u1.AddressOfData && fnCount < 4096; ++oft, ++fnCount) {
-                if (oft->u1.Ordinal & IMAGE_ORDINAL_FLAG) continue;
-                auto* ibn = (IMAGE_IMPORT_BY_NAME*)((BYTE*)base + oft->u1.AddressOfData);
-                const char* fn = (const char*)ibn->Name;
-                if (!first[0]) { strncpy_s(first, fn, _TRUNCATE); }
-                if (!_stricmp(dll, "WINMM.dll")    && !strcmp(fn, "timeGetTime"))  haveTimeGetTime = true;
-                if (!_stricmp(dll, "USER32.dll")   && !strcmp(fn, "PeekMessageA")) havePeekMessageA = true;
-                if (!_stricmp(dll, "KERNEL32.dll") && !strcmp(fn, "CreateFileA"))  haveCreateFileA = true;
-            }
-            Log("[diag %s]   %-16s %4d fn  e.g. %s", when, dll, fnCount, first);
+    auto* desc = (IMAGE_IMPORT_DESCRIPTOR*)((BYTE*)base + impRva);
+    if (!PageReadable(desc, sizeof(IMAGE_IMPORT_DESCRIPTOR))) {
+        Log("[diag %s] import table NOT READABLE (packed / mid-unpack)", when);
+        return;
+    }
+
+    int dllCount = 0;
+    bool haveTimeGetTime = false, havePeekMessageA = false, haveCreateFileA = false;
+    for (; dllCount < 64; ++desc, ++dllCount) {
+        if (!PageReadable(desc, sizeof(IMAGE_IMPORT_DESCRIPTOR)) || !desc->Name) break;
+        char dll[64];
+        if (!SafeStr((const char*)((BYTE*)base + desc->Name), dll, sizeof(dll))) break;
+
+        DWORD thunkRva = desc->OriginalFirstThunk ? desc->OriginalFirstThunk
+                                                  : desc->FirstThunk;
+        auto* oft = (IMAGE_THUNK_DATA*)((BYTE*)base + thunkRva);
+        int fnCount = 0;
+        char first[96]; first[0] = 0;
+        for (; fnCount < 4096; ++oft, ++fnCount) {
+            if (!PageReadable(oft, sizeof(IMAGE_THUNK_DATA)) || !oft->u1.AddressOfData) break;
+            if (oft->u1.Ordinal & IMAGE_ORDINAL_FLAG) continue;
+            auto* ibn = (IMAGE_IMPORT_BY_NAME*)((BYTE*)base + oft->u1.AddressOfData);
+            char fn[96];
+            if (!SafeStr((const char*)((BYTE*)ibn + 2), fn, sizeof(fn))) break;
+            if (!first[0]) strncpy_s(first, fn, _TRUNCATE);
+            if (!_stricmp(dll, "WINMM.dll")    && !strcmp(fn, "timeGetTime"))  haveTimeGetTime = true;
+            if (!_stricmp(dll, "USER32.dll")   && !strcmp(fn, "PeekMessageA")) havePeekMessageA = true;
+            if (!_stricmp(dll, "KERNEL32.dll") && !strcmp(fn, "CreateFileA"))  haveCreateFileA = true;
         }
-        Log("[diag %s] total DLLs=%d | hook targets present: timeGetTime=%d PeekMessageA=%d CreateFileA=%d",
-            when, dllCount, haveTimeGetTime, havePeekMessageA, haveCreateFileA);
+        Log("[diag %s]   %-16s %4d fn  e.g. %s", when, dll, fnCount, first);
     }
-    __except (EXCEPTION_EXECUTE_HANDLER) {
-        Log("[diag %s] EXCEPTION walking imports (image mid-unpack?)", when);
-    }
+    Log("[diag %s] DLLs=%d | hook targets: timeGetTime=%d PeekMessageA=%d CreateFileA=%d",
+        when, dllCount, haveTimeGetTime, havePeekMessageA, haveCreateFileA);
 }
 
 // Re-runs the diagnostic after the process has had time to unpack. Comparing the
