@@ -55,9 +55,12 @@ These are the load-bearing pieces everything else stands on. They work.
   reason in the log, so authors get real feedback.
 - ✅ **Triggers** — events can fire after a stretch of sailing or on approaching
   a port, with repeat-guards so they don't spam.
-- 🟡 **Two presentation styles** — the interrupting modal card works; the
-  non-interrupting on-screen "notice" (a lookout's call while sailing) is
-  designed and wired but **can't be drawn yet** (see the render blocker below).
+- ✅ **Two presentation styles** — the interrupting modal card, and the
+  non-interrupting on-screen "notice" (a lookout's call while sailing). Both
+  are drawn in-game.
+- ✅ **Notices anchored to your ship** — a notice can hang over the player's
+  vessel and track it as you sail, through the same facility the game uses for
+  other ships' speech, so it looks native. `"anchor": "ship"` on any notice.
 
 ## Audio
 
@@ -125,18 +128,20 @@ out to be far more open to modding than expected.
 
 ## Known blockers & things that need work
 
-### 🚧 Drawing our own visuals — the way in is open
+### ✅ Drawing our own visuals — solved
 
-The long-standing blocker is solved: PEMF now sits **inside the frame**, hooked
-onto the game's own Direct3D device at `EndScene`, live and stable on both
-supported builds. It also survives the engine rebuilding its device state,
-which it does mid-session — the hook re-verifies and re-installs itself, and a
-heartbeat in the log means a dead hook can never pass unnoticed.
+The long-standing blocker is gone. PEMF sits **inside the frame**, hooked onto
+the game's own Direct3D device, and draws its own text — at the top of the
+screen, or anchored in the world so it tracks the player's ship. It survives
+the engine rebuilding its device state mid-session (it re-verifies and
+re-installs itself), and a heartbeat in the log means a dead hook can never
+pass unnoticed. A draw that faults disables drawing for the session rather than
+repeating: a missing notice, never a crashing game.
 
-What is left is the drawing itself. The frame hook runs at stage 1 (counting
-frames); raising it to stage 2 puts the sailing "notice" text, "LAND HO!"
-callouts, indicators and panels on screen. That is ordinary engineering now
-rather than research. Details in [`docs/README.md`](docs/README.md).
+Text is done. Still open, and now ordinary work rather than research: drawing
+**shapes and art** of our own (panels, indicators, a roster), and presenting
+event cards from inside the frame. Details in
+[`docs/GAME_API.md`](docs/GAME_API.md#drawing-our-own-text--solved-and-how).
 
 ### 🟡 Running on every version of the game
 
@@ -172,12 +177,14 @@ not a bug in the mod. The fix is code signing, which is in progress. See
 
 Rough order, subject to change:
 
-1. **Draw through the frame hook** — raise it to stage 2 and put our own text on
-   screen. The hook is in place; this is the payoff.
-2. **On-screen notices** ("LAND HO!", lookout calls) — the first real feature
-   built on it.
-3. **Audio callouts** — confirm the play-by-name path and fire a custom sound
-   from an event. Pairs naturally with the notices.
+1. **Audio callouts** — confirm the play-by-name path and fire a custom sound
+   from an event. Pairs directly with the notices that now draw: the voice line
+   and the floating text together.
+2. **Event cards from inside the frame** (stage 3) — fixes the half-drawn
+   background behind dialogs.
+3. **Labels on world objects** — the anchored-text facility takes any map
+   position, not just the player's ship, so ports, rivals and waypoints can all
+   carry our own text.
 4. **Code signing** so the mod loads cleanly on locked-down Windows installs
    (application submitted, awaiting approval).
 5. **Officer roster** — data model first, then the panel, now that drawing is

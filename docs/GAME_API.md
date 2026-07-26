@@ -511,6 +511,74 @@ Call sites consistently push the arguments, then the buffer, then `xor eax, eax`
 > visible. Anything using it must re-issue the draw each frame and time the
 > expiry itself — which is what `content::DrawNotices()` does.
 
+## Drawing our own text — solved, and how
+
+> **Confidence: running in-game**, on both supported builds.
+
+Two facilities together make it work: a place to draw from, and the game's own
+text routines to draw with.
+
+### The frame hook
+
+The framework runs inside every frame at `IDirect3DDevice9::EndScene`, on the
+game's **own** device — the renderer singleton at `0x00727C30` holds the
+`IDirect3DDevice9*` at `+0x60`. Full account in
+[`README.md`](README.md#the-render-hook--solved). At that point the scene is
+complete and nothing has been presented, which is exactly when text must be
+drawn: the game paints the world over anything drawn earlier in the frame,
+which is why the safe point is right for *deciding* and wrong for *showing*.
+
+### The shared message buffer is a trap — and a discovery
+
+Composition (`ResetMessage` + `AddText`) writes into the game's **shared**
+message buffer at `0x00869B48`. Text left there does not simply sit idle: the
+game draws it **over the player's ship**, on its own, in its own style. Every
+notice appeared twice until this was understood — once where we drew it, once
+hanging on the vessel.
+
+So: **resolve once, when the notice is posted (at the safe point), copy the
+result out, and hand the buffer back empty.** Per-frame drawing then takes a
+plain string and touches no shared state. `game::ComposeText` does exactly this.
+
+That accident led straight to the next facility.
+
+### World-anchored text — `FUN_00488A80`
+
+The floating labels over ships (`'We're 2 days out of Antigua.'`) come from a
+general world-anchored text call with **51 call sites**:
+
+```
+FUN_00488A80(int kind, float wx, float wy, float wz,
+             int, int, int, int, int, float, int)      // cdecl
+```
+
+The sailing render passes `-1, -1, -1, -1, 0, -1.0f, -1` for the trailing
+arguments. It takes **no text pointer** — it draws whatever is composed in the
+message buffer at the time, which is precisely why stale text reappears over
+the ship.
+
+| Value | Meaning |
+|---|---|
+| `kind = 9` | the player's own ship (`0x00462775`) |
+| `kind = 10`, `11` | other ships' speech (`0x0046285C`) |
+| world x/y | map position × `0.001` (`fild [PlayerX]; fmul [0x00713590]`) |
+| world z | `0` at sea level |
+
+The player's map position is at `0x00814304` / `0x00814308`, so a label on the
+player's vessel is `(PlayerX * 0.001, PlayerY * 0.001, 0)` with kind 9. The
+label tracks the ship as the camera moves — no projection maths of our own, and
+it looks native because it *is* native.
+
+Any world position works, not just the player's: anything with a map coordinate
+can be labelled this way.
+
+### In the framework
+
+`notice` events take `"anchor"`: `"screen"` (default, a line at the top) or
+`"ship"` (hangs over the player's vessel). A draw that raises an exception
+latches drawing off for the session and says so in the log, rather than
+repeating the fault every frame.
+
 ## The render phase — `FUN_004612B0`
 
 The sailing render function: sea, ships, their floating name labels, and the HUD

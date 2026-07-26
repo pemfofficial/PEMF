@@ -317,6 +317,7 @@ static void RunSafePoint()
     // is known to be safe to log from.
     render::ReportFromSafePoint();
     d3d9hook::ReportFromSafePoint();
+    content::ReportDrawFromSafePoint();
 
     // Presenting only moves to the render phase once stage 3 is reached. Until
     // then it happens here, which works but can leave a half-drawn background
@@ -416,11 +417,28 @@ static DWORD WINAPI Hook_timeGetTime(void)
                 (GetAsyncKeyState(VK_SHIFT)   & 0x8000);
     bool k1 = mods && (GetAsyncKeyState('1') & 0x8000);
     bool k2 = mods && (GetAsyncKeyState('2') & 0x8000);
-    bool down = k1 || k2;
+    bool k3 = mods && (GetAsyncKeyState('3') & 0x8000);
+    bool k4 = mods && (GetAsyncKeyState('4') & 0x8000);
+    bool down = k1 || k2 || k3 || k4;
 
     bool rising = down && !g_prevKeyDown;
     g_prevKeyDown = down;
     if (!rising) return r;
+
+    // Ctrl+Shift+3 draws our own text with no authored event behind it -- the
+    // shortest possible test of the frame hook. Posting is all that happens
+    // here; the notice is drawn from inside the frame.
+    if (k3) {
+        content::PostDebugNotice("PEMF: drawing through the frame hook.", 8);
+        return r;
+    }
+    // Ctrl+Shift+4 hangs a line over the player's ship in the world, so it
+    // tracks the vessel as you sail -- the treatment the game gives other
+    // ships' speech.
+    if (k4) {
+        content::PostDebugNotice("Anchored to the ship.", 8, true);
+        return r;
+    }
 
     // POST only. The card is presented later, at the safe point.
     // Debug triggers fire content events by index. Ctrl+Shift+1 runs the first
@@ -605,7 +623,8 @@ static DWORD WINAPI Init(LPVOID)
         Log("d3d9: stage %d -- will hook the game's device from the safe point",
             d3d9hook::kStage);
 
-    Log("debug hotkeys: Ctrl+Shift+1 = event #0, Ctrl+Shift+2 = event #1");
+    Log("debug hotkeys: Ctrl+Shift+1 = event #0, Ctrl+Shift+2 = event #1, "
+        "Ctrl+Shift+3 = notice at the top, Ctrl+Shift+4 = notice on the ship");
     return 0;
 }
 

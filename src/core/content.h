@@ -112,6 +112,7 @@ struct Event {
     std::vector<Option> options;      // Choice only
     Trigger             trigger;
     int                 seconds = 4;  // Notice: how long it stays on screen
+    bool                anchorShip = false;  // Notice: track the player's ship
 };
 
 // ------------------------------------------------------------------ parsing
@@ -377,6 +378,17 @@ inline int LoadFile(const char* path)
                 fail("notice 'seconds' must be between 1 and 30");
                 continue;
             }
+            // "anchor": "screen" (default) pins the line to the top of the
+            // screen; "ship" hangs it over the player's vessel in the world,
+            // the way the game labels other ships, so it tracks as you sail.
+            {
+                std::string anchor = je.value("anchor", "screen");
+                if (anchor == "ship")        ev.anchorShip = true;
+                else if (anchor != "screen") {
+                    fail("notice 'anchor' must be \"screen\" or \"ship\"");
+                    continue;
+                }
+            }
             g_events.push_back(ev);
             continue;
         }
@@ -492,10 +504,9 @@ inline void ShowPendingOutcome(int)
 // HUD text works -- there is no timed-message call to borrow. The text is
 // composed once, here, and re-drawn from the render hook.
 struct ActiveNotice {
-    std::string text;
-    int         args[kMaxArgs] = {0};
-    int         argCount = 0;
-    DWORD       until = 0;
+    std::string resolved;          // @-tokens already substituted, at post time
+    DWORD       until  = 0;
+    bool        anchor = false;    // true: track the player's ship in the world
 };
 
 constexpr int kMaxNotices = 3;
@@ -509,24 +520,92 @@ inline void ClearNotices()
 
 // Called from the RENDER phase, every frame. Draws whatever is live and drops
 // whatever has expired.
+// Drawing state, reported from the safe point rather than logged in place --
+// the render hook stays free of allocation and file I/O.
+inline volatile LONG g_drawOk     = 0;   // notices drawn without incident
+inline volatile LONG g_drawFaults = 0;   // draws that raised an exception
+inline bool          g_drawOff    = false;  // latched off after a fault
+
+// Draw one line, either fixed at the top of the screen or anchored in the
+// world over the player's ship. Wrapped so the SEH frame contains nothing
+// with a destructor.
+inline bool DrawOneNotice(const char* text, int y, bool anchor)
+{
+    __try {
+        if (anchor) {
+            float wx = 0.0f, wy = 0.0f;
+            game::PlayerWorldPos(&wx, &wy);
+            game::ShowWorldNotice(text, wx, wy);
+        } else {
+            game::ShowNotice(text, y, game::kNoticeWhite);
+        }
+        return true;
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER) {
+        return false;
+    }
+}
+
+// Called from inside the frame (the D3D9 EndScene hook). Notices have no timer
+// of their own, so they are re-drawn every frame until they expire.
+//
+// A fault here latches drawing OFF for the rest of the session instead of
+// repeating every frame: one bad draw should cost a missing notice, never a
+// crashing game. The safe point reports it.
 inline void DrawNotices()
 {
+    if (g_drawOff || g_noticeCount <= 0) return;
+
     DWORD now = GetTickCount();
     int y = 8;
     int write = 0;
     for (int i = 0; i < g_noticeCount; ++i) {
         ActiveNotice& n = g_notices[i];
         if ((int)(now - n.until) >= 0) continue;          // expired
-        __try {
-            game::ShowNotice(n.text.c_str(), y, game::kNoticeWhite,
-                             n.args, n.argCount);
+        if (DrawOneNotice(n.resolved.c_str(), y, n.anchor)) {
+            InterlockedIncrement(&g_drawOk);
+        } else {
+            InterlockedIncrement(&g_drawFaults);
+            g_drawOff = true;
+            break;
         }
-        __except (EXCEPTION_EXECUTE_HANDLER) { }
-        y += 24;
+        if (!n.anchor) y += 24;      // anchored lines do not stack at the top
         if (write != i) g_notices[write] = n;
         ++write;
     }
-    g_noticeCount = write;
+    if (!g_drawOff) g_noticeCount = write;
+}
+
+// Safe-point reporting for the draw path: says plainly whether our own text
+// actually reached the screen, and stays quiet afterwards.
+inline void ReportDrawFromSafePoint()
+{
+    static bool okLogged = false, faultLogged = false;
+    if (!okLogged && g_drawOk > 0) {
+        okLogged = true;
+        Log("draw: notices are rendering through the frame hook (%ld draws)",
+            g_drawOk);
+    }
+    if (!faultLogged && g_drawFaults > 0) {
+        faultLogged = true;
+        Log("draw: a notice draw faulted -- drawing disabled for this session. "
+            "The trigger and queue are unaffected.");
+    }
+}
+
+// A notice with no authored event behind it, for exercising the draw path.
+inline void PostDebugNotice(const char* text, int seconds, bool anchor = false)
+{
+    if (g_noticeCount >= kMaxNotices) {
+        for (int i = 1; i < g_noticeCount; ++i) g_notices[i - 1] = g_notices[i];
+        --g_noticeCount;
+    }
+    ActiveNotice& n = g_notices[g_noticeCount++];
+    n.resolved = text;
+    n.anchor   = anchor;
+    n.until    = GetTickCount() + (DWORD)seconds * 1000;
+    Log("debug: notice posted -- '%s' for %d s (%s)", text, seconds,
+        anchor ? "anchored to the ship" : "top of screen");
 }
 
 inline void PostNotice(const Event& ev)
@@ -538,10 +617,17 @@ inline void PostNotice(const Event& ev)
         --g_noticeCount;
     }
     ActiveNotice& n = g_notices[g_noticeCount++];
-    n.text = ev.body;
-    n.argCount = 0;
+    // Resolve the text ONCE, here at the safe point, rather than every frame
+    // inside the render hook: composing uses the game's shared message buffer,
+    // which is not something to be touching mid-frame.
+    int  args[kMaxArgs] = {0};
+    int  argc = 0;
     for (size_t i = 0; i < ev.bodyArgs.size() && i < kMaxArgs; ++i)
-        n.args[n.argCount++] = ev.bodyArgs[i].Resolve();
+        args[argc++] = ev.bodyArgs[i].Resolve();
+    char buf[512];
+    game::ComposeText(ev.body.c_str(), args, argc, buf, sizeof(buf));
+    n.resolved = buf;
+    n.anchor   = ev.anchorShip;
     n.until = GetTickCount() + (DWORD)ev.seconds * 1000;
     Log("  notice '%s' for %d s", ev.id.c_str(), ev.seconds);
     if (!render::WantsNotices() && !d3d9hook::WantsNotices()) {

@@ -43,7 +43,7 @@
 #include "game.h"
 
 #ifndef PEMF_D3D9_STAGE
-#define PEMF_D3D9_STAGE 1
+#define PEMF_D3D9_STAGE 2
 #endif
 
 // IDirect3DDevice9 vtable indices. Fixed by the COM interface: IUnknown

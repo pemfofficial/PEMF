@@ -39,6 +39,26 @@ namespace addr {
     // holds esi across the whole compose->wrap->show sequence.
     constexpr uintptr_t MsgBufObject  = 0x008E9F58;
 
+    // World-anchored text: the floating labels that hang over ships and follow
+    // them ("'We're 2 days out of Antigua.'"), and the same treatment the game
+    // gives the player's own ship. 51 call sites use it, so it is a general
+    // facility rather than a special case.
+    //
+    //   FUN_00488A80(int kind, float wx, float wy, float wz,
+    //                int, int, int, int, int, float, int)   -- cdecl
+    //
+    // It takes NO text pointer: it draws whatever is currently composed in the
+    // shared message buffer, which is why text left in that buffer reappears
+    // over the player's ship on its own. Kinds seen in the sailing render:
+    // 9 for the player's ship, 10 and 11 for other ships' speech.
+    //
+    // World coordinates are the map position scaled by 0.001 (the game does
+    // `fild [PlayerX]; fmul [0x00713590]`), with z = 0 at sea level.
+    constexpr uintptr_t DrawWorldLabel = 0x00488A80;
+    constexpr float     kWorldScale    = 0.001f;
+    constexpr int       kLabelPlayer   = 9;
+    constexpr int       kLabelSpeech   = 10;
+
     // The actual message text, a plain NUL-terminated char buffer. WrapText
     // reads it via `mov ebx, 0x869B48` before calling the string-assign at
     // 0x00412F10, and the game's own event code resets it afterwards with
@@ -554,10 +574,18 @@ __declspec(naked) static void DrawHudTextRaw(const char* text, int x, int y,
     }
 }
 
-// Compose `text` (with @-tokens) and draw it centred at `y`.
-inline void ShowNotice(const char* text, int y, unsigned colour,
-                       const int* args = nullptr, int argCount = 0)
+// Resolve @-tokens into OUR OWN buffer, leaving the game's shared message
+// buffer empty behind us.
+//
+// This matters: the game draws whatever is left in that buffer over the
+// player's ship of its own accord, so composing there and walking away makes
+// our text appear a second time, in the game's own style, anchored to the
+// ship. Compose once when a notice is posted, keep the result, and hand the
+// buffer back empty.
+inline void ComposeText(const char* text, const int* args, int argCount,
+                        char* out, size_t outsz)
 {
+    if (!out || outsz == 0) return;
     int v[kMaxTextArgs] = {0};
     if (args) {
         int m = argCount < kMaxTextArgs ? argCount : kMaxTextArgs;
@@ -565,9 +593,38 @@ inline void ShowNotice(const char* text, int y, unsigned colour,
     }
     ResetMessage();
     AddText(text, v[0], v[1], v[2], v[3], v[4], v[5], v[6], v[7]);
+    strncpy_s(out, outsz, (const char*)addr::MessageText, _TRUNCATE);
+    ResetMessage();                      // leave nothing for the game to redraw
+}
+
+// Draw already-resolved text centred at `y`. Touches no shared buffer.
+inline void ShowNotice(const char* resolved, int y, unsigned colour)
+{
     *(int*)addr::HudTextStyle = kNoticeStyle;
-    DrawHudTextRaw((const char*)addr::MessageText, ScreenW() / 2, y,
-                   kNoticeStyle, colour, 4, -1, 0);
+    DrawHudTextRaw(resolved, ScreenW() / 2, y, kNoticeStyle, colour, 4, -1, 0);
+}
+
+typedef void (__cdecl *DrawWorldLabel_t)(int kind, float wx, float wy, float wz,
+                                         int, int, int, int, int, float, int);
+
+// Draw already-resolved text anchored in the world, so it tracks whatever it
+// is over as the camera moves -- the treatment the game gives ship speech.
+// The trailing arguments are exactly what the sailing render passes.
+inline void ShowWorldNotice(const char* resolved, float wx, float wy,
+                            float wz = 0.0f, int kind = addr::kLabelPlayer)
+{
+    ResetMessage();
+    AddText("%s", (int)(uintptr_t)resolved);
+    ((DrawWorldLabel_t)addr::DrawWorldLabel)(kind, wx, wy, wz,
+                                             -1, -1, -1, -1, 0, -1.0f, -1);
+    ResetMessage();
+}
+
+// The player ship's world position, in the units the label API expects.
+inline void PlayerWorldPos(float* wx, float* wy)
+{
+    *wx = (float)*(int*)addr::PlayerX * addr::kWorldScale;
+    *wy = (float)*(int*)addr::PlayerY * addr::kWorldScale;
 }
 
 // ------------------------------------------------------------ sanity checks

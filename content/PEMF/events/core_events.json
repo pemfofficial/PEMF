@@ -69,7 +69,8 @@
       "kind": "notice",
       "trigger": { "type": "nearPort", "distance": 3000, "rearm": 6000 },
       "body": "Land ho! Harbour off the bow!",
-      "seconds": 5
+      "seconds": 5,
+      "anchor": "ship"
     },
 
     {

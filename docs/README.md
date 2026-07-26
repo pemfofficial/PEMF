@@ -105,7 +105,8 @@ levels are used throughout the docs:
 | `nearPort` trigger firing during play | **Verified** — fired at distance 3000, and re-armed correctly |
 | `notice` event kind — schema, validation, triggering | **Verified** |
 | Render-phase hook — the game's own D3D9 device | **Working** — live on both builds |
-| `notice` event kind — visible on screen | Next: raise the frame hook to stage 2 |
+| `notice` event kind — visible on screen | **Verified** — drawn from inside the frame |
+| Notices anchored to the player's ship | **Verified** — tracks the vessel as you sail |
 
 ### The render hook — solved
 
@@ -134,9 +135,14 @@ Two earlier approaches failed, and both are worth remembering:
 | Redirect the sailing-render call site | Black screen **even with a do-nothing callback** — the redirection itself was the fault |
 | Throwaway device to read "the" vtable | Cannot work: the vtable is **per-instance heap memory**, freed with the throwaway device (`MEM_RESERVE` right after `Release`) |
 
-Currently at **stage 1** — the hook counts frames and calls the original,
-verified stable on both builds. Drawing through it (stage 2) is the next step,
-and is ordinary work now rather than research.
+Currently at **stage 2** — our own text is drawn from inside the frame, on both
+builds. Notices appear at the top of the screen, or hang over the player's ship
+in the world and track it as you sail, using the same facility the game uses for
+ship speech. How that works is in
+[`GAME_API.md`](GAME_API.md#drawing-our-own-text--solved-and-how).
+
+Stage 3 — presenting event cards from inside the frame, which fixes the
+half-drawn background behind dialogs — is the next step.
 | Officer simulation | Not started |
 | Factions and divisions | Not started |
 
