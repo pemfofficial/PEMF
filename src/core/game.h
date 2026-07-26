@@ -159,9 +159,34 @@ namespace addr {
     constexpr uintptr_t FindNearestCity = 0x0045FD40;
 
     // City tables it walks. Positions: stride 16 bytes, x at +0, y at +4.
-    // Records: stride 0x20, flags at +0, type at +4.
+    // Records: stride 0x20, flags at +0.
     constexpr uintptr_t CityPositions = 0x0085B170;
     constexpr uintptr_t CityRecords   = 0x00860B70;
+
+    // ------------------------------------------------- city text arguments
+    // What the engine's own text calls pass for a city. Recovered from the
+    // sailing render at 0x00462548-0x0046257A, which formats
+    // "'We're bound for @CITYNAME.' (@NATIONALITY @LOCTYPE)":
+    //
+    //   lea  ecx, [ebx + ebx*2]        ; ebx = city index
+    //   lea  edx, [ecx*4 + 0x8DBD08]   ; -> record base + index*12
+    //   mov  ecx, [edx] / [edx+4] / [edx+8]   ; THREE dwords, all pushed
+    //   mov  al,  [edx + 0x860B74]     ; nation, a SIGNED BYTE, stride 32
+    //   mov  ecx, ebx / shl ecx, 5
+    //   mov  edx, [ecx + 0x860B80]     ; location type, an int, stride 32
+    //
+    // The critical part is that **@CITYNAME consumes three arguments, not
+    // one** -- it is a three-word name record, not a string pointer. Passing
+    // one leaves the other two reading stack garbage.
+    constexpr uintptr_t CityNameRecords = 0x008DBD08;  // stride 12, 3 dwords
+    constexpr size_t    kCityNameStride = 12;
+    constexpr size_t    kCityNameWords  = 3;
+    constexpr uintptr_t CityNations     = 0x00860B74;  // signed byte, stride 32
+    constexpr uintptr_t CityLocTypes    = 0x00860B80;  // int, stride 32
+    constexpr size_t    kCityRecStride  = 32;
+
+    // The engine walks 128 settlement slots.
+    constexpr int       kMaxCities      = 128;
 
     // DEAD END -- do not re-investigate these as a screen enum.
     // They looked like a current-screen id and a screen-stack depth
@@ -574,6 +599,35 @@ inline int NearestCity(int maxDist)
     // City coordinates are 1/1000 of the player's units.
     return fn(PlayerX() / 1000, PlayerY() / 1000, 0xFFFFFFFFu, maxDist,
               0x80000000u);
+}
+
+// The three words of a city's name record, as @CITYNAME consumes them. Returns
+// false for an out-of-range index rather than reading a wild address, so a
+// stale or -1 city index costs an unsubstituted token, never a crash.
+inline bool CityNameWords(int cityIndex, int* out3)
+{
+    if (cityIndex < 0 || cityIndex >= addr::kMaxCities) return false;
+    const int* rec = (const int*)(addr::CityNameRecords +
+                                  (size_t)cityIndex * addr::kCityNameStride);
+    out3[0] = rec[0]; out3[1] = rec[1]; out3[2] = rec[2];
+    return true;
+}
+
+// The nation that holds a city, as @NATIONALITY consumes it. A SIGNED byte:
+// the engine does `movsx eax, al` before pushing it.
+inline int CityNation(int cityIndex)
+{
+    if (cityIndex < 0 || cityIndex >= addr::kMaxCities) return 0;
+    return *(const signed char*)(addr::CityNations +
+                                 (size_t)cityIndex * addr::kCityRecStride);
+}
+
+// Village / town / city, as @LOCTYPE consumes it.
+inline int CityLocType(int cityIndex)
+{
+    if (cityIndex < 0 || cityIndex >= addr::kMaxCities) return 0;
+    return *(const int*)(addr::CityLocTypes +
+                         (size_t)cityIndex * addr::kCityRecStride);
 }
 
 // Distance from the player to a given city, in city units, using the same

@@ -12,9 +12,10 @@
 //   * @-token count must exactly match the supplied argument count. The engine
 //     formatter consumes varargs positionally like printf; one token too many
 //     reads stack garbage. This is the single most dangerous authoring mistake.
-//   * only @NUM and @HAPPY are permitted. Other tokens exist (@CITYNAME,
-//     @NATIONALITY, ...) but we have not verified whether they consume an
-//     argument, so allowing them would be guessing with the stack.
+//   * only tokens whose vararg appetite has been READ OUT OF THE DISASSEMBLY
+//     are permitted: @NUM, @HAPPY, @CITYNAME, @NATIONALITY, @LOCTYPE. Others
+//     exist but would be guessing with the stack. Note @CITYNAME consumes
+//     THREE arguments, not one -- it is a three-word name record.
 //   * text must be 7-bit ASCII. The engine predates UTF-8; a curly quote or an
 //     accented character pasted from a word processor would render as garbage.
 //   * effect operations come from a fixed whitelist. An unknown op is a load
@@ -44,24 +45,93 @@ constexpr int kMaxArgs      = 8;      // must not exceed game::kMaxTextArgs
 constexpr int kMaxBodyChars = 1200;   // prompt budget shared with option lines
 
 // --------------------------------------------------------------- arg source
+// How far out to look when an event asks about "the port you are approaching".
+// Generous on purpose: the event has already decided it wants to talk about a
+// port, so the name should resolve even from further off than a nearPort
+// trigger would fire at.
+constexpr int kCityNameScanRadius = 20000;
+
 // Where a token's value comes from at fire time.
-enum class ArgSource { Literal, Crew, Morale, Plunder, Months };
+//
+// NOTE that a source does not always supply ONE value. @CITYNAME is a
+// three-word name record, so `nearestCity` fills three argument slots from one
+// authored entry. Everything downstream counts SLOTS, not entries.
+enum class ArgSource {
+    Literal, Crew, Morale, Plunder, Months,
+    NearestCity,        // 3 slots -- @CITYNAME
+    NearestCityNation,  // 1 slot  -- @NATIONALITY
+    NearestCityType,    // 1 slot  -- @LOCTYPE
+};
+
+// Resolved once per event, so every city token in one card refers to the same
+// port even if the ship moves between substitutions.
+inline int ResolveNearestCity()
+{
+    return game::NearestCity(kCityNameScanRadius);
+}
 
 struct Arg {
     ArgSource source = ArgSource::Literal;
     int       literal = 0;
 
-    int Resolve() const
+    // How many argument slots this entry supplies.
+    int Slots() const
+    {
+        return source == ArgSource::NearestCity
+                   ? (int)game::addr::kCityNameWords : 1;
+    }
+
+    // Write this entry's value(s) into `out`, returning how many were written.
+    // `city` is the index resolved once for the whole event.
+    int Resolve(int* out, int city) const
     {
         switch (source) {
-            case ArgSource::Crew:    return state::Crew();
-            case ArgSource::Morale:  return state::Morale();
-            case ArgSource::Plunder: return state::Plunder();
-            case ArgSource::Months:  return state::Months();
-            default:                 return literal;
+            case ArgSource::Crew:    out[0] = state::Crew();    return 1;
+            case ArgSource::Morale:  out[0] = state::Morale();  return 1;
+            case ArgSource::Plunder: out[0] = state::Plunder(); return 1;
+            case ArgSource::Months:  out[0] = state::Months();  return 1;
+            case ArgSource::NearestCityNation:
+                out[0] = game::CityNation(city); return 1;
+            case ArgSource::NearestCityType:
+                out[0] = game::CityLocType(city); return 1;
+            case ArgSource::NearestCity:
+                if (!game::CityNameWords(city, out)) out[0] = out[1] = out[2] = 0;
+                return (int)game::addr::kCityNameWords;
+            default:                 out[0] = literal;          return 1;
         }
     }
 };
+
+// Total slots a list of authored args supplies. This is what must match the
+// token count -- not the number of entries.
+inline size_t ArgSlots(const std::vector<Arg>& args)
+{
+    size_t n = 0;
+    for (const Arg& a : args) n += (size_t)a.Slots();
+    return n;
+}
+
+// Expand authored args into the flat vararg list the engine formatter reads,
+// and return how many slots were filled. The nearest city is resolved ONCE for
+// the whole list, so every city token in one piece of text names the same port.
+//
+// An entry that would overrun the buffer is dropped whole rather than in part:
+// half a three-word name is worse than none, because the remaining tokens
+// would then read whatever follows.
+inline int ResolveArgs(const std::vector<Arg>& args, int* out, int maxSlots)
+{
+    int city = -1, n = 0;
+    for (const Arg& a : args) {
+        const int need = a.Slots();
+        if (n + need > maxSlots) break;
+        if (city < 0 && (a.source == ArgSource::NearestCity ||
+                         a.source == ArgSource::NearestCityNation ||
+                         a.source == ArgSource::NearestCityType))
+            city = ResolveNearestCity();
+        n += a.Resolve(out + n, city);
+    }
+    return n;
+}
 
 // ------------------------------------------------------------------ effects
 enum class EffectOp { AddPlunder, SetPlunder, AddCrew, SetCrew };
@@ -146,15 +216,25 @@ inline bool IsAscii(const std::string& s, int* badIndex)
 // told rather than silently risking the stack.
 inline int CountTokens(const std::string& s, std::string* unknownToken)
 {
-    static const char* kConsuming[] = { "@NUM", "@HAPPY" };
+    // Token -> how many argument slots it consumes. @CITYNAME takes THREE:
+    // it is a three-word name record, not a string pointer. Longest first, so
+    // @NATIONALITY is never mistaken for a prefix of something shorter.
+    struct TokenSlots { const char* name; int slots; };
+    static const TokenSlots kConsuming[] = {
+        { "@NATIONALITY", 1 },
+        { "@CITYNAME",    3 },
+        { "@LOCTYPE",     1 },
+        { "@HAPPY",       1 },
+        { "@NUM",         1 },
+    };
     int count = 0;
     for (size_t i = 0; i < s.size(); ++i) {
         if (s[i] != '@') continue;
         bool matched = false;
-        for (const char* t : kConsuming) {
-            size_t len = strlen(t);
-            if (s.compare(i, len, t) == 0) {
-                ++count; i += len - 1; matched = true; break;
+        for (const TokenSlots& t : kConsuming) {
+            size_t len = strlen(t.name);
+            if (s.compare(i, len, t.name) == 0) {
+                count += t.slots; i += len - 1; matched = true; break;
             }
         }
         if (!matched) {
@@ -180,9 +260,13 @@ inline bool ParseArg(const json& j, Arg* out, std::string* err)
     else if (s == "morale")  out->source = ArgSource::Morale;
     else if (s == "plunder") out->source = ArgSource::Plunder;
     else if (s == "months")  out->source = ArgSource::Months;
+    else if (s == "nearestCity")       out->source = ArgSource::NearestCity;
+    else if (s == "nearestCityNation") out->source = ArgSource::NearestCityNation;
+    else if (s == "nearestCityType")   out->source = ArgSource::NearestCityType;
     else {
         *err = "unknown argument source '" + s +
-               "' (expected crew, morale, plunder, months, or an integer)";
+               "' (expected crew, morale, plunder, months, nearestCity, "
+               "nearestCityNation, nearestCityType, or an integer)";
         return false;
     }
     return true;
@@ -317,14 +401,28 @@ inline bool ValidateText(const std::string& what, const std::string& text,
     int tokens = CountTokens(text, &unknown);
     if (tokens < 0) {
         *err = what + ": token '" + unknown +
-               "' is not supported. Only @NUM and @HAPPY may be used -- other "
-               "tokens may consume a stack argument and have not been verified.";
+               "' is not supported. Use @NUM, @HAPPY, @CITYNAME, "
+               "@NATIONALITY or @LOCTYPE -- other tokens consume stack "
+               "arguments in ways that have not been verified.";
+        return false;
+    }
+    // The vararg buffer is fixed at kMaxArgs. Anything past it is silently
+    // dropped when the args are resolved, which would leave the trailing
+    // tokens reading stack garbage -- exactly what this validation exists to
+    // prevent. Easy to hit now that one @CITYNAME costs three slots, so it is
+    // checked rather than assumed.
+    if (tokens > kMaxArgs) {
+        *err = what + ": tokens need " + std::to_string(tokens) +
+               " argument slots, but at most " + std::to_string(kMaxArgs) +
+               " are available. Remember @CITYNAME costs three each.";
         return false;
     }
     if ((size_t)tokens != argCount) {
-        *err = what + ": " + std::to_string(tokens) + " token(s) but " +
-               std::to_string(argCount) + " arg(s) supplied. These must match "
-               "exactly -- a surplus token reads stack garbage.";
+        *err = what + ": tokens need " + std::to_string(tokens) +
+               " argument slot(s) but " + std::to_string(argCount) +
+               " were supplied. These must match exactly -- a surplus token "
+               "reads stack garbage. Note @CITYNAME needs THREE slots, which "
+               "one \"nearestCity\" arg supplies.";
         return false;
     }
     return true;
@@ -400,7 +498,7 @@ inline int LoadFile(const char* path)
         if (ev.body.empty())             { fail("missing 'body'"); continue; }
         if (!ParseArgs(je.contains("args") ? je["args"] : json(),
                        &ev.bodyArgs, &err)) { fail(err); continue; }
-        if (!ValidateText("body", ev.body, ev.bodyArgs.size(), &err)) {
+        if (!ValidateText("body", ev.body, ArgSlots(ev.bodyArgs), &err)) {
             fail(err); continue;
         }
 
@@ -472,7 +570,7 @@ inline int LoadFile(const char* path)
             if (!ParseArgs(jo.contains("outcomeArgs") ? jo["outcomeArgs"] : json(),
                            &op.outcomeArgs, &err)) { fail(err); ok = false; break; }
             if (!op.outcome.empty() &&
-                !ValidateText("outcome", op.outcome, op.outcomeArgs.size(), &err)) {
+                !ValidateText("outcome", op.outcome, ArgSlots(op.outcomeArgs), &err)) {
                 fail(err); ok = false; break;
             }
             ev.options.push_back(op);
@@ -732,9 +830,7 @@ inline void PostNotice(const Event& ev)
     // inside the render hook: composing uses the game's shared message buffer,
     // which is not something to be touching mid-frame.
     int  args[kMaxArgs] = {0};
-    int  argc = 0;
-    for (size_t i = 0; i < ev.bodyArgs.size() && i < kMaxArgs; ++i)
-        args[argc++] = ev.bodyArgs[i].Resolve();
+    int  argc = ResolveArgs(ev.bodyArgs, args, kMaxArgs);
     char buf[512];
     game::ComposeText(ev.body.c_str(), args, argc, buf, sizeof(buf));
     n.resolved = buf;
@@ -762,8 +858,7 @@ inline void Fire(int index)
         ev->id.c_str(), before.crew, before.morale, before.plunder);
 
     int args[kMaxArgs] = {0};
-    for (size_t i = 0; i < ev->bodyArgs.size() && i < kMaxArgs; ++i)
-        args[i] = ev->bodyArgs[i].Resolve();
+    const int argc = ResolveArgs(ev->bodyArgs, args, kMaxArgs);
 
     const char* opts[kMaxOptions] = {nullptr};
     int nOpts = 0;
@@ -773,7 +868,7 @@ inline void Fire(int index)
     }
 
     int choice = game::AskChoiceN(ev->body.c_str(), opts, nOpts,
-                                  args, (int)ev->bodyArgs.size(), 0x2C);
+                                  args, argc, 0x2C);
 
     if (choice < 0 || choice >= nOpts) {
         Log("  '%s': dismissed (returned %d)", ev->id.c_str(), choice);
@@ -804,9 +899,8 @@ inline void Fire(int index)
     // a frame in between.
     if (!picked.outcome.empty()) {
         g_outcome.text = picked.outcome;
-        g_outcome.argCount = 0;
-        for (size_t i = 0; i < picked.outcomeArgs.size() && i < kMaxArgs; ++i)
-            g_outcome.args[g_outcome.argCount++] = picked.outcomeArgs[i].Resolve();
+        g_outcome.argCount = ResolveArgs(picked.outcomeArgs, g_outcome.args,
+                                         kMaxArgs);
         events::PostFollowUp(&ShowPendingOutcome, 0, "outcome");
     }
 }
