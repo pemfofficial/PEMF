@@ -378,12 +378,11 @@ far more reliable choice than the literal minimum.
 
 ## Audio / Sound System
 
-> **Confidence: static analysis only.** Everything in this section was recovered
-> by dependency-free byte analysis of the binary (`re/scripts/find_sound_api.py`,
-> `trace_sound.py`, `trace_sound2.py`) — the function *roles* are solid, but the
-> exact signatures are **not yet decompiled or tested in-game**. Treat addresses
-> as leads to confirm, not as a settled contract. (Decompilation is currently
-> blocked on this machine; see the note at the end.)
+> **Confidence: decompiled, not yet run.** Recovered by byte analysis
+> (`re/scripts/find_sound_api.py`, `trace_sound.py`, `trace_sound2.py`) and then
+> **decompiled** (`re/scripts/DecompileTargets.java`). The architecture below is
+> read from the actual code, but **nothing here has been exercised in-game yet** —
+> treat it as a confirmed map, not a tested contract.
 
 ### Engine
 
@@ -397,71 +396,87 @@ through **71 imported `AIL_*` functions**. Their IAT slots are contiguous:
 Miles is called with ordinary `FF 15` indirect calls, all from one code module
 around `0x0052C000`–`0x0052F800` — the game's sound engine.
 
-### Sound-engine functions
+### Architecture
 
-| Address | Role | Miles calls it makes |
+The game has a single **audio manager** object (a global at `0x008ECD78`, a C++
+object with a vtable) and a **table of registered sounds** (`0x008ED4A0`, one
+`0x40`-byte record per sound). Game code plays a sound by its **numeric id**; the
+manager looks up the record and handles loading and playback.
+
+If the manager is not up, the game prints
+*"The audio manager has not been properly initialized yet"* — a handy landmark.
+
+### Functions
+
+| Address | Conv | Role |
 |---|---|---|
-| `0x0052D6D0` | **Sample loader.** Turns a file image into a playable sample. References `".wav"`. | `AIL_set_named_sample_file` |
-| `0x0052DD30` | **Play / stop dispatcher.** | `AIL_start_sample`, `AIL_start_3D_sample`, `AIL_start_stream`, `AIL_stop_sample`, EOS-callback registration |
-| `0x0052D880` | Audio init. | `AIL_startup`, `AIL_open_digital_driver`, `AIL_set_redist_directory` |
-| `0x0052D950` | Audio shutdown. | `AIL_close_digital_driver`, `AIL_shutdown` |
-| `0x0052F700` | **Higher-level entry**, called from ≥4 game-logic sites (`0x004A06C0`, `0x004A07C0`, `0x00528E70`, `0x00528EE0`). Likely the "play this sound" the game itself uses. | — (calls into the module above) |
-| `0x0052CA50`, `0x0052CDC0` | Filename front-ends — build `".wav"` paths. | — |
+| `0x0052F700` | (custom) | **Core play.** `param_1` = **numeric sound id** (`id*0x40 + 0x008ED4A0` indexes the table), `param_2` = volume (float), `param_3` = pan (`0x3F000000` = 0.5 centre). Loads if needed, applies volume/pan via the manager vtable, starts the sample. |
+| `0x004A06C0`, `0x00528E70` | fastcall | **Game-logic entries.** Thin wrappers: check the manager is initialised, then call `0x0052F700`. |
+| `0x0052CDC0` | cdecl | **Filename resolver.** `int (char* baseName)` — see below. |
+| `0x0052D6D0` | fastcall | **Sample loader** → `AIL_set_named_sample_file` with a `".wav"` or `".mp3"` format hint. |
+| `0x0052DD30` | thiscall | **Play/stop dispatcher** on the manager. `param_2` = channel (0 = 2D, 1 = 3D, 2/3 = stream), `param_3` = sample index → `AIL_start_sample` / `AIL_start_3D_sample` / `AIL_start_stream`. |
+| `0x0052D880` | fastcall | Audio init — sets Miles redist dir `".\Miles\win32"`, `AIL_startup`, `AIL_open_digital_driver`. |
+| `0x0052D950` | — | Audio shutdown. |
 
-### How sounds are addressed
+### How sounds are resolved — by constructed filename
 
-Sounds are referenced **by name**, exactly like text is composed by token. The
-dialog renderer (`0x00430190`) already takes a sound name and plays it internally
-— that is what `"snap"` is in the landing-party call site above.
+`FUN_0052CDC0(char* baseName)` builds candidate filenames and probes each until
+one loads, in this order:
 
-Filenames are constructed from a base name:
+```
+<base>-000.wav, <base>-001.wav, ...   (numbered variants)
+<base>.wav                            (single)
+<base>-000.mp3, <base>-001.mp3, ...
+<base>.mp3
+```
 
-| String (`.rdata`) | Use |
-|---|---|
-| `".wav"` @ `0x0070AB88` | appended to a base name |
-| `"-%03d.wav"` @ `0x00712F68` | numbered variants, e.g. `MerchFarsight-000.wav` |
+Two things this proves:
 
-On disk the sounds are **loose `.wav` files under `Assets/Sounds/`** (not sealed
-inside the `.FPK` archives). This is the same situation as the text overrides, so
-the loose-file mechanism is expected to let us **add or override `.wav` files by
-name** — to be confirmed.
+- **The game resolves sounds by building a filename at runtime, not from a fixed
+  compiled catalogue.** A file that matches the constructed name is picked up.
+- **MP3 is supported as well as WAV** (`".wav"` @ `0x0070AB88`, `".mp3"` @
+  `0x00712E74`, `"-%03d.wav"` @ `0x00712F68`).
+
+On disk the sounds are **loose files under `Assets/Sounds/`** (not sealed inside
+the `.FPK` archives) — the same situation as the text overrides.
 
 ### Known Miles signature (from the Miles SDK)
 
 ```c
-// loads a whole file already read into memory into a sample handle
 S32 AIL_set_named_sample_file(HSAMPLE S, const void* file_image,
                               S32 file_size, S32 file_format, S32 flags);
-S32 AIL_start_sample(HSAMPLE S);   // play it
+S32 AIL_start_sample(HSAMPLE S);
 ```
 
-`AIL_set_named_sample_file` takes a **memory image**, not a path — so the game
-reads the file bytes itself (via its asset system) and hands the buffer to Miles.
+`AIL_set_named_sample_file` takes a **memory image**, not a path — the game reads
+the file bytes itself and hands the buffer to Miles.
 
-### Two ways to add custom audio
+### What this means for adding custom audio
 
-1. **Native** — call the game's own sound function(s) so audio routes through the
-   game's mixer and honours its volume settings. Needs the play-by-name signature
-   confirmed, and may be build-specific like the other hooks.
-2. **Self-contained** — play sound directly from the mod via **XAudio2** (built
-   into Windows, no dependencies). Needs none of the game's internals, works on
-   any build, but mixes alongside the game rather than through it.
+The important nuance: the game's high-level play path plays **by numeric id from
+the pre-registered table** — not by an arbitrary filename at the call site. So:
 
-Audio does **not** depend on the render hook, so sound callouts (e.g. a spoken
-"land ho" on the `nearPort` trigger) can work before any on-screen drawing does.
+1. **Triggering an existing game sound** is the easy native case — find its id and
+   call `0x0052F700` (with the manager initialised). Good for reusing the game's
+   own SFX.
+2. **A brand-new custom clip** through the native path needs either a new table
+   record (id → base name) or a call into the lower-level filename path
+   (`0x0052CDC0` + loader) with our own base name and the manager `this`. Feasible,
+   but more moving parts.
+3. **Self-contained playback via XAudio2** (built into Windows, no dependencies)
+   needs none of the above, works on any build, and is fully under our control —
+   it just mixes alongside the game rather than through its mixer.
 
-### Still to confirm (blocked on decompilation)
+Recommended: **XAudio2 for our own custom clips first** (simplest, version-proof);
+the native id-based path for reusing existing game sounds. Either way, audio does
+**not** depend on the render hook, so a spoken callout (e.g. "land ho" on the
+`nearPort` trigger) can work before any on-screen drawing does.
 
-- Exact signature and calling convention of the play-by-name entry (`0x0052F700`
-  and friends): does it take a `char*` name, an integer id, volume/pan?
-- Whether a **new** sound name (one the game never shipped) loads, or whether
-  there is a fixed registry.
-- The in-game test itself.
+### Still to confirm (needs an in-game test)
 
-All three need the decompiler, which is currently blocked by Windows Smart App
-Control on the dev machine (it also blocks `capstone`). See `docs/SIGNING.md` for
-what Smart App Control is; the fix for the toolchain is to turn it off on the dev
-box. Structural byte analysis (how the above was found) still works regardless.
+- The cleanest callable entry for playing a **new** clip by name through the game
+  (tracing where `0x0052CDC0`'s loader stores the sample and how to start it).
+- Everything above read cleanly from decompilation but has **not** been run yet.
 
 ---
 
@@ -520,9 +535,10 @@ marked otherwise. Nothing here is inferred from disassembly alone unless said so
 | `ShowMessage` with `eax = 10` as a one-shot modal | **Disproven** — non-blocking, returns `-2` |
 | In-game event triggers | Not started |
 | Audio engine = Miles (`Mss32.dll`), 71-import IAT map | **Verified statically** — byte analysis of the import table |
-| Sound module + loader/player function roles | **Verified statically** — Miles call-site attribution |
-| Play-by-name signature / calling convention | **Unconfirmed** — needs decompilation (currently SAC-blocked) |
-| Adding a *new* `.wav` name the game never shipped | **Unconfirmed** — needs an in-game test |
+| Sound module + loader/player function roles | **Decompiled** — read from the actual code |
+| High-level play is **by numeric id** from a registered table (`0x008ED4A0`) | **Decompiled** — not yet exercised |
+| Filename resolution order (numbered `.wav` → `.wav` → `.mp3`); MP3 supported | **Decompiled** — not yet exercised |
+| Playing a *new* clip by name / adding to the table | **Unconfirmed** — needs an in-game test |
 
 ### Known unknowns
 
