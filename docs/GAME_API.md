@@ -688,16 +688,20 @@ directly, bypassing that list.
 
 `SetResolution` resets the D3D device, resizes the window, and — importantly —
 derives the projection aspect from `height / width`. So 1920×1080 yields a genuine
-**16:9 view (wider field of view), not a stretched 4:3**. Because it takes
-`ScreenW`/`ScreenH` from the UI-dimension globals, those are set first:
+**16:9 view (wider field of view), not a stretched 4:3**.
 
-```cpp
-game::ForceResolution(1920, 1080);   // sets UIWidth/UIHeight, then calls SetResolution
-```
+**Do not call `SetResolution` cold.** Invoking it outside the menu's own sequence
+(e.g. from the safe point at startup) reaches the device reset in a state the menu
+would have prepared, and the process crashes on the reset — verified. The
+`game::ForceResolution` wrapper exists and is correct as to *what* to write, but
+forcing it standalone is not viable.
 
-`game.h` wraps this; the core forces it once, shortly after the safe point goes
-live (so the render device is up before the reset). The engine lays out its UI as
-fractions of `ScreenW`/`ScreenH`, so the interface scales rather than breaking.
+**The correct approach is to add 1920×1080 to the menu's resolution list**, so the
+player selects it and the game runs its own complete, crash-free switch. The list
+is built from enumerated display modes filtered to 4:3; the table lives at
+`0x008CABF0` (12-byte entries, width at +4, height at +8) and is indexed by the
+slider. Widening that filter (or injecting a widescreen entry) is the pending
+piece.
 
 ## Audio / Sound System
 
