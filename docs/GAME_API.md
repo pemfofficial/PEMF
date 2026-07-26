@@ -541,6 +541,26 @@ meanwhile, is right for *deciding* and wrong for *showing*.
 At `BeginScene` the real method is called **first**, then our callback: the
 device has to be inside a scene before anything we do can contribute to it.
 
+### One displayed frame is several render passes
+
+`BeginScene`/`EndScene` pairs are **not** frames. The game runs more than one
+pass per displayed frame and they do not share a camera, so world-anchored text
+issued in every pass is drawn several times over, in different places. The
+symptom is a notice that appears twice: one copy correctly tracking the ship,
+one apparently stale copy drifting somewhere else.
+
+So `Present` (vtable 17) is hooked too — not to draw, but to mark where a
+displayed frame actually ends. The passes in each frame are counted, and world
+text is drawn only in the **last** one, which is the pass whose camera the
+player is looking through. The count carries over from the previous frame, so
+this self-tunes instead of assuming a number, and collapses to "the only pass"
+when there is just one.
+
+If the game ever presents through the swap chain rather than the device, this
+hook would never fire and every pass would look like the only pass — so that
+case is detected and warned about in the log rather than left to be
+rediscovered as a duplicate notice.
+
 ### The shared message buffer is a trap — and a discovery
 
 Composition (`ResetMessage` + `AddText`) writes into the game's **shared**

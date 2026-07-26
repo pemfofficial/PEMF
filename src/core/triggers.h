@@ -200,6 +200,52 @@ inline void Tick()
             break;
         }
 
+        case content::TriggerType::StateCrosses: {
+            // Not gated on sailing: a crew going hungry or a purse running dry
+            // is worth saying wherever it happens.
+            if (!s.inGame) break;
+
+            int value = 0;
+            const char* what = "";
+            switch (ev->trigger.field) {
+            case content::StateField::Crew:
+                value = state::Crew();    what = "crew";   break;
+            case content::StateField::Gold:
+                value = state::Plunder(); what = "gold";   break;
+            case content::StateField::Morale:
+                value = state::Morale();  what = "morale"; break;
+            case content::StateField::Months:
+                value = state::Months();  what = "months"; break;
+            }
+
+            const int  limit  = ev->trigger.useBelow ? ev->trigger.below
+                                                     : ev->trigger.above;
+            const bool inside = ev->trigger.useBelow ? (value <  limit)
+                                                     : (value >  limit);
+
+            // Edge-triggered, exactly as NearPort is: fire on crossing in, and
+            // re-arm only on crossing back out. A value that merely sits past
+            // the threshold must not fire every frame.
+            if (!rt.armed) {
+                if (!inside) {
+                    rt.armed = true;
+                    Log("trigger: '%s' re-armed (%s back to %d)",
+                        ev->id.c_str(), what, value);
+                }
+                break;
+            }
+            if (!inside) break;
+            if (!Eligible(*ev, rt, now)) break;
+
+            rt.armed = false;
+            rt.lastFired = now;
+            ++rt.fireCount;
+            Log("trigger: '%s' -- %s %s %d (now %d)", ev->id.c_str(), what,
+                ev->trigger.useBelow ? "below" : "above", limit, value);
+            events::Post([](int idx){ content::Fire(idx); }, i, ev->id.c_str());
+            break;
+        }
+
         default: break;
         }
     }

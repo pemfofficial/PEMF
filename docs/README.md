@@ -106,8 +106,11 @@ levels are used throughout the docs:
 | `notice` event kind — schema, validation, triggering | **Verified** |
 | Render-phase hook — the game's own D3D9 device | **Verified** — live on GOG and Steam |
 | `notice` event kind — visible on screen | **Verified** — drawn from inside the frame |
-| Notices anchored to the player's ship | **Built** — world-text call recovered; drawn at `BeginScene` |
+| Notices anchored to the player's ship | **Verified** — hangs over the vessel and follows it as you sail |
+| `stateCrosses` trigger — crew / gold / morale / months | **Built** |
 | Playing a named game sound with an event | **Verified** |
+| Officer simulation | Not started |
+| Factions and divisions | Not started |
 
 ### The render hook — solved
 
@@ -145,10 +148,14 @@ render walk then draws, so it must exist before the world does). How that works,
 and the exact call the ship labels use, is in
 [`GAME_API.md`](GAME_API.md#drawing-our-own-text--solved-and-how).
 
+**A displayed frame contains more than one render pass**, and they do not share
+a camera. World text drawn in every pass appears several times over in different
+places. `Present` is hooked purely to mark the real frame boundary, so anchored
+text is drawn once per frame, in the last pass — the one the player is looking
+through.
+
 Stage 3 — presenting event cards from inside the frame, which fixes the
 half-drawn background behind dialogs — is the next step.
-| Officer simulation | Not started |
-| Factions and divisions | Not started |
 
 The single most important verified result: **a custom event, written by us,
 rendered natively in-game with live state substituted into it** —

@@ -47,8 +47,9 @@
 #endif
 
 // IDirect3DDevice9 vtable indices. Fixed by the COM interface: IUnknown
-// occupies 0-2, Reset is 16, BeginScene 41, EndScene 42.
+// occupies 0-2, Reset is 16, Present 17, BeginScene 41, EndScene 42.
 #define PEMF_VTBL_RESET      16
+#define PEMF_VTBL_PRESENT    17
 #define PEMF_VTBL_BEGINSCENE 41
 #define PEMF_VTBL_ENDSCENE   42
 
@@ -56,16 +57,33 @@ extern "C" {
 
 typedef HRESULT (WINAPI *PemfEndScene_t)(void* device);
 typedef HRESULT (WINAPI *PemfBeginScene_t)(void* device);
+typedef HRESULT (WINAPI *PemfPresent_t)(void* device, const RECT*, const RECT*,
+                                        HWND, const void*);
 typedef HRESULT (WINAPI *PemfReset_t)(void* device, void* params);
 
 void*          g_pemfOrigEndScene   = nullptr;  // the real EndScene
 void*          g_pemfOrigBeginScene = nullptr;  // the real BeginScene
+void*          g_pemfOrigPresent    = nullptr;  // the real Present
 void*          g_pemfOrigReset      = nullptr;  // the real Reset
 void*          g_pemfGameDevice     = nullptr;  // the game's IDirect3DDevice9*
 void**         g_pemfDeviceVTable   = nullptr;  // its vtable
 volatile LONG  g_pemfEndSceneCalls  = 0;
 volatile LONG  g_pemfBeginSceneCalls = 0;
+volatile LONG  g_pemfPresentCalls   = 0;
 volatile LONG  g_pemfResetCount     = 0;
+
+// A displayed frame can contain SEVERAL BeginScene/EndScene pairs -- the game
+// renders more than one pass, and they do not share a camera. World-anchored
+// text drawn in every pass appears several times over, in different places,
+// which is exactly what a stale-looking duplicate turns out to be.
+//
+// So the frame boundary that matters is Present, not EndScene. We count the
+// passes in each displayed frame and draw world text only in the LAST one --
+// the pass whose camera is the one the player is looking through. The count is
+// carried from the previous frame, so this self-tunes rather than assuming a
+// number, and degrades to "the only pass" when there is just one.
+volatile LONG  g_pemfPassThisFrame  = 0;   // passes so far in the current frame
+volatile LONG  g_pemfPassesPerFrame = 1;   // what the last complete frame used
 
 // Both implemented in core.cpp.
 //
@@ -85,11 +103,28 @@ void __cdecl PemfOnEndScene(void* device);
 HRESULT WINAPI PemfBeginSceneHook(void* device)
 {
     InterlockedIncrement(&g_pemfBeginSceneCalls);
+    const LONG pass = InterlockedIncrement(&g_pemfPassThisFrame) - 1;
+
     // The real BeginScene runs FIRST: the device must be inside a scene
     // before anything we do can contribute geometry to it.
     HRESULT hr = ((PemfBeginScene_t)g_pemfOrigBeginScene)(device);
-    if (SUCCEEDED(hr)) PemfOnBeginScene(device);
+    if (FAILED(hr)) return hr;
+
+    LONG expected = g_pemfPassesPerFrame;
+    if (expected < 1) expected = 1;
+    if (pass == expected - 1) PemfOnBeginScene(device);
     return hr;
+}
+
+// The real frame boundary. Only used to close off the pass count -- nothing is
+// drawn here, because by Present the frame is finished and gone.
+HRESULT WINAPI PemfPresentHook(void* device, const RECT* src, const RECT* dst,
+                               HWND wnd, const void* dirty)
+{
+    InterlockedIncrement(&g_pemfPresentCalls);
+    const LONG passes = InterlockedExchange(&g_pemfPassThisFrame, 0);
+    if (passes > 0) g_pemfPassesPerFrame = passes;
+    return ((PemfPresent_t)g_pemfOrigPresent)(device, src, dst, wnd, dirty);
 }
 
 HRESULT WINAPI PemfEndSceneHook(void* device)
@@ -159,7 +194,8 @@ inline void TryInstall()
         if (vt == g_pemfDeviceVTable &&
             SlotReadable(&vt[PEMF_VTBL_ENDSCENE], sizeof(void*)) &&
             vt[PEMF_VTBL_ENDSCENE]   == (void*)&PemfEndSceneHook &&
-            vt[PEMF_VTBL_BEGINSCENE] == (void*)&PemfBeginSceneHook)
+            vt[PEMF_VTBL_BEGINSCENE] == (void*)&PemfBeginSceneHook &&
+            vt[PEMF_VTBL_PRESENT]    == (void*)&PemfPresentHook)
             return;
         Log("d3d9: hooks lost (vtable rebuilt under us) -- rehooking");
         g_installed = false;
@@ -175,7 +211,8 @@ inline void TryInstall()
     // already in the slot, re-hooking would capture our own hook as the
     // "original" and recurse -- just adopt the new device pointer.
     if (vtable[PEMF_VTBL_ENDSCENE]   == (void*)&PemfEndSceneHook ||
-        vtable[PEMF_VTBL_BEGINSCENE] == (void*)&PemfBeginSceneHook) {
+        vtable[PEMF_VTBL_BEGINSCENE] == (void*)&PemfBeginSceneHook ||
+        vtable[PEMF_VTBL_PRESENT]    == (void*)&PemfPresentHook) {
         Log("d3d9: new device 0x%p reuses the hooked vtable 0x%p", device, vtable);
         g_pemfGameDevice = device;
         g_installed = true;
@@ -196,16 +233,18 @@ inline void TryInstall()
     g_pemfOrigReset      = vtable[PEMF_VTBL_RESET];
     g_pemfOrigEndScene   = vtable[PEMF_VTBL_ENDSCENE];
     g_pemfOrigBeginScene = vtable[PEMF_VTBL_BEGINSCENE];
+    g_pemfOrigPresent    = vtable[PEMF_VTBL_PRESENT];
     vtable[PEMF_VTBL_RESET]      = (void*)&PemfResetHook;
     vtable[PEMF_VTBL_ENDSCENE]   = (void*)&PemfEndSceneHook;
     vtable[PEMF_VTBL_BEGINSCENE] = (void*)&PemfBeginSceneHook;
+    vtable[PEMF_VTBL_PRESENT]    = (void*)&PemfPresentHook;
     VirtualProtect(first, span, old, &old);
 
     g_installed = true;
     Log("d3d9: hooked the game's device 0x%p (vtable 0x%p, try %d) -- "
-        "BeginScene 0x%p  EndScene 0x%p  Reset 0x%p  STAGE %d",
+        "BeginScene 0x%p  EndScene 0x%p  Present 0x%p  Reset 0x%p  STAGE %d",
         device, vtable, g_tryCount, g_pemfOrigBeginScene, g_pemfOrigEndScene,
-        g_pemfOrigReset, kStage);
+        g_pemfOrigPresent, g_pemfOrigReset, kStage);
 }
 
 inline void Uninstall()
@@ -220,6 +259,7 @@ inline void Uninstall()
         if (g_pemfOrigReset)      vtable[PEMF_VTBL_RESET]      = g_pemfOrigReset;
         if (g_pemfOrigEndScene)   vtable[PEMF_VTBL_ENDSCENE]   = g_pemfOrigEndScene;
         if (g_pemfOrigBeginScene) vtable[PEMF_VTBL_BEGINSCENE] = g_pemfOrigBeginScene;
+        if (g_pemfOrigPresent)    vtable[PEMF_VTBL_PRESENT]    = g_pemfOrigPresent;
         VirtualProtect(first, span, old, &old);
     }
     g_installed = false;
@@ -238,6 +278,32 @@ inline void ReportFromSafePoint()
         Log("d3d9: STAGE %d alive -- %ld EndScene calls, game still running",
             kStage, g_pemfEndSceneCalls);
         return;
+    }
+
+    // How many render passes a displayed frame actually contains. Worth saying
+    // once: more than one means world text has to pick a pass, and picking
+    // wrong is what draws a notice twice in two different places.
+    static LONG loggedPasses = 0;
+    static bool noPresentLogged = false;
+    if (g_pemfPresentCalls > 0) {
+        LONG passes = g_pemfPassesPerFrame;
+        if (passes != loggedPasses) {
+            loggedPasses = passes;
+            Log("d3d9: %ld render pass(es) per displayed frame "
+                "(%ld BeginScene / %ld Present) -- world text draws in the "
+                "last one", passes, g_pemfBeginSceneCalls, g_pemfPresentCalls);
+        }
+    } else if (!noPresentLogged && g_pemfBeginSceneCalls > 100) {
+        // Present is how we know where one displayed frame ends. If the game
+        // presents through the swap chain instead of the device, this hook
+        // never fires, every pass looks like the only pass, and world text is
+        // drawn once per pass -- which looks like a duplicate notice. Worth
+        // saying plainly rather than leaving it to be rediscovered.
+        noPresentLogged = true;
+        Log("d3d9: WARNING -- %ld BeginScene calls but Present never fired. "
+            "Frame boundaries are unknown, so anchored notices may draw once "
+            "per render pass instead of once per frame.",
+            g_pemfBeginSceneCalls);
     }
     static DWORD lastT = 0;
     static LONG  lastCalls = 0;

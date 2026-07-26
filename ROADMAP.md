@@ -59,8 +59,15 @@ These are the load-bearing pieces everything else stands on. They work.
   non-interrupting on-screen "notice" (a lookout's call while sailing). Both
   are drawn in-game.
 - ✅ **Notices anchored to your ship** — a notice can hang over the player's
-  vessel and track it as you sail, through the same facility the game uses for
-  other ships' speech, so it looks native. `"anchor": "ship"` on any notice.
+  vessel and **follow it as you sail**, turning and moving with the ship, then
+  easing out at the end. It is drawn by the same routine the game uses for its
+  own ship labels, so it looks native because it is. `"anchor": "ship"` works on
+  **any** notice, whatever fired it — placement and trigger are independent.
+- ✅ **Triggers beyond time and place** — `stateCrosses` fires when a live value
+  crosses a threshold: crew, gold, morale or months at sea. Edge-triggered, so
+  it fires on crossing and re-arms on crossing back, rather than repeating while
+  a value sits past the line. One shape covers every readable value, so adding
+  the next one is a line of code rather than a new concept for authors.
 
 ## Audio
 

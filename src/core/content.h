@@ -85,6 +85,17 @@ enum class TriggerType {
     None,
     ElapsedSailing,   // N seconds of actual sailing in the overworld
     NearPort,         // came within N units of any port
+    StateCrosses,     // a live game value crossed a threshold
+};
+
+// Which live value a StateCrosses trigger watches. One trigger type covering
+// every readable value beats a trigger type per value: adding a new one is a
+// line here and a line in the name table, and authors learn one shape.
+enum class StateField {
+    Crew,
+    Gold,       // undivided plunder
+    Morale,     // 0 (mutinous) .. 4 (devoted)
+    Months,     // months at sea this voyage
 };
 
 struct Trigger {
@@ -92,6 +103,10 @@ struct Trigger {
     int  seconds  = 0;     // ElapsedSailing
     int  distance = 0;     // NearPort: fire inside this
     int  rearm    = 0;     // NearPort: re-arm once further out than this
+    StateField field = StateField::Crew;  // StateCrosses
+    int  below    = 0;     // StateCrosses: fire when the value drops under this
+    int  above    = 0;     // StateCrosses: ... or rises over this
+    bool useBelow = false; // which of the two was authored
     bool once     = false; // fire at most once per career
     int  cooldown = 0;     // seconds before this event may fire again
 };
@@ -220,9 +235,41 @@ inline bool ParseTrigger(const json& j, Trigger* out, std::string* err)
             *err = "trigger 'nearPort': 'rearm' must be greater than 'distance'";
             return false;
         }
+    } else if (type == "stateCrosses") {
+        out->type = TriggerType::StateCrosses;
+
+        const std::string field = j.value("field", "");
+        if      (field == "crew")   out->field = StateField::Crew;
+        else if (field == "gold")   out->field = StateField::Gold;
+        else if (field == "morale") out->field = StateField::Morale;
+        else if (field == "months") out->field = StateField::Months;
+        else {
+            *err = "trigger 'stateCrosses' needs a 'field' of crew, gold, "
+                   "morale or months (got '" + field + "')";
+            return false;
+        }
+
+        const bool hasBelow = j.contains("below"), hasAbove = j.contains("above");
+        if (hasBelow == hasAbove) {
+            *err = "trigger 'stateCrosses' needs exactly one of 'below' or "
+                   "'above'";
+            return false;
+        }
+        out->useBelow = hasBelow;
+        if (hasBelow) out->below = j.value("below", 0);
+        else          out->above = j.value("above", 0);
+
+        if (out->field == StateField::Morale) {
+            const int v = hasBelow ? out->below : out->above;
+            if (v < 0 || v > 4) {
+                *err = "trigger 'stateCrosses' on 'morale' takes 0..4 "
+                       "(0 mutinous, 4 devoted)";
+                return false;
+            }
+        }
     } else {
         *err = "unknown trigger type '" + type +
-               "' (expected elapsedSailing or nearPort)";
+               "' (expected elapsedSailing, nearPort or stateCrosses)";
         return false;
     }
     return true;
@@ -531,7 +578,8 @@ inline void ClearNotices()
 inline volatile LONG g_drawOk      = 0;  // screen notices drawn without incident
 inline volatile LONG g_drawWorldOk = 0;  // anchored notices drawn ditto
 inline volatile LONG g_drawFaults  = 0;  // draws that raised an exception
-inline bool          g_drawOff     = false;  // latched off after a fault
+inline bool          g_drawOff      = false; // screen phase latched off
+inline bool          g_drawWorldOff = false; // world phase latched off
 
 // Draw one line. Wrapped so the SEH frame contains nothing with a destructor.
 inline bool DrawScreenNotice(const char* text, int y)
@@ -546,7 +594,7 @@ inline bool DrawScreenNotice(const char* text, int y)
 // Anchored over the player's ship, at the ship's live map position, so it
 // follows the vessel for free -- the game re-projects the label every frame
 // from the world coordinates we hand it.
-inline bool DrawWorldNotice(const char* text, int fade)
+inline bool DrawOneWorldNotice(const char* text, int fade)
 {
     __try {
         int mx = 0, my = 0;
@@ -569,39 +617,42 @@ inline int NoticeFade(const ActiveNotice& n, DWORD now)
     return (int)((__int64)left * game::addr::kWorldTextA7Max / kNoticeFadeMs);
 }
 
-// Called from inside the frame (the D3D9 EndScene hook). Notices have no timer
-// of their own, so they are re-drawn every frame until they expire.
-//
-// A fault here latches drawing OFF for the rest of the session instead of
-// repeating every frame: one bad draw should cost a missing notice, never a
-// crashing game. The safe point reports it.
-// The world phase, issued at BeginScene: anchored notices only. They build
-// scene-graph nodes, so they have to exist before the render walk.
 // Set at the safe point: in a career, with the engine's label manager built.
 // World text drawn outside those conditions is at best invisible and at worst
 // touches a scene that does not exist yet.
 inline bool g_worldLive = false;
 
+// The world phase, issued at BeginScene in the last render pass of the frame.
+// Anchored notices only: they build scene-graph nodes, so they have to exist
+// before the render walk that draws them.
+//
+// A fault latches the WORLD phase off and leaves screen notices alone. The two
+// are latched separately on purpose -- screen text is long proven, world text
+// is newer, and one failing is no reason to lose the other.
 inline void DrawWorldNotices()
 {
-    if (g_drawOff || !g_worldLive || g_noticeCount <= 0) return;
+    if (g_drawWorldOff || !g_worldLive || g_noticeCount <= 0) return;
 
     DWORD now = GetTickCount();
     for (int i = 0; i < g_noticeCount; ++i) {
         ActiveNotice& n = g_notices[i];
         if (!n.anchor || (int)(now - n.until) >= 0) continue;
-        if (DrawWorldNotice(n.resolved.c_str(), NoticeFade(n, now))) {
+        if (DrawOneWorldNotice(n.resolved.c_str(), NoticeFade(n, now))) {
             InterlockedIncrement(&g_drawWorldOk);
         } else {
             InterlockedIncrement(&g_drawFaults);
-            g_drawOff = true;
+            g_drawWorldOff = true;
             return;
         }
     }
 }
 
 // The screen phase, issued at EndScene: fixed HUD lines, on top of everything.
-// Expiry is settled here, once per frame, after both phases have had the list.
+// Notices have no timer of their own, so they are re-drawn every frame until
+// they expire, and expiry is settled HERE -- once per frame, after both phases
+// have had the list. A fault latches the screen phase off for the session
+// rather than repeating every frame: one bad draw should cost a missing
+// notice, never a crashing game. The safe point reports it.
 inline void DrawNotices()
 {
     if (g_drawOff || g_noticeCount <= 0) return;
@@ -645,8 +696,10 @@ inline void ReportDrawFromSafePoint()
     }
     if (!faultLogged && g_drawFaults > 0) {
         faultLogged = true;
-        Log("draw: a notice draw faulted -- drawing disabled for this session. "
-            "The trigger and queue are unaffected.");
+        Log("draw: a notice draw faulted -- %s notices disabled for this "
+            "session. The trigger and queue are unaffected.",
+            g_drawWorldOff ? (g_drawOff ? "all" : "anchored")
+                           : "on-screen");
     }
 }
 

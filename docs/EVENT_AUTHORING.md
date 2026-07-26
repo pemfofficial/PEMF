@@ -70,7 +70,8 @@ answer — a lookout's call, a change in the weather, a passing observation.
   "kind": "notice",
   "trigger": { "type": "nearPort", "distance": 3000, "rearm": 6000 },
   "body": "Land ho! Harbour off the bow!",
-  "seconds": 5
+  "seconds": 5,
+  "anchor": "ship"
 }
 ```
 
@@ -78,10 +79,37 @@ answer — a lookout's call, a change in the weather, a passing observation.
 |---|---|
 | `body` | the text; `@NUM` / `@HAPPY` work as usual |
 | `seconds` | how long it stays up, 1–30, default 4 |
+| `anchor` | `"screen"` (default) or `"ship"` — see below |
 | `options` | **not allowed** — a notice never asks anything |
 
 Notices only appear while sailing the overworld, which is where the game draws
 its own. Up to three can be on screen at once; a fourth pushes the oldest off.
+
+#### `anchor` — where the notice sits
+
+**`"screen"`** (the default) puts the line at the top of the screen, where it
+stays put. Good for status: something that is true right now, not something
+happening in a particular place.
+
+**`"ship"`** hangs the line **over your vessel in the world**, and it *follows
+the ship* — it turns, moves, and drifts with the camera exactly like the labels
+the game puts over other ships, because it is drawn by the same routine. It
+eases out over its last second rather than blinking off. Good for anything that
+is happening *to your ship*: a lookout's call, a crew shout, a sighting.
+
+`anchor` is available on **every notice**, whatever fired it. It is a
+presentation choice and is completely independent of the trigger — a notice
+fired by `nearPort`, by `elapsedSailing`, by `stateCrosses`, or by hand can all
+be anchored.
+
+A few practical notes:
+
+- An anchored notice only draws while a career is loaded and the world exists.
+  Posted anywhere else it waits harmlessly and is dropped when it expires.
+- Anchored lines do not stack — several at once will overlap on the ship. If you
+  expect more than one at a time, put some on `"screen"`.
+- Keep anchored text short. It is drawn at world scale over open water, and a
+  long line will run past the edges of the screen.
 
 ---
 
@@ -160,8 +188,14 @@ hand with the debug hotkeys. Add one and it happens during play.
 }
 ```
 
-**Every trigger requires that you are sailing the overworld.** Events will not
-interrupt you in a town, a menu, a battle or a mini-game.
+Events will not interrupt you in a town, a menu, a battle or a mini-game.
+`elapsedSailing` and `nearPort` additionally require that you are **under way**
+in the overworld; `stateCrosses` only requires that a career is loaded, because
+a crew going hungry is worth saying wherever it happens.
+
+Three trigger types exist today — `elapsedSailing`, `nearPort` and
+`stateCrosses`. Any of them can fire either kind of event, and any of them can
+fire an anchored notice.
 
 ### `elapsedSailing`
 
@@ -198,6 +232,49 @@ is normally the only one you want: it stops an event firing over and over while
 you follow a coastline, but still lets it fire on every genuine approach. A
 `cooldown` on top of that would suppress legitimate arrivals, so omit it unless
 you specifically want a time limit.
+
+### `stateCrosses`
+
+Fires when a live game value **crosses** a threshold — your crew falling away,
+your purse running dry, morale souring, a voyage dragging on.
+
+```json
+{ "type": "stateCrosses", "field": "morale", "below": 2 }
+```
+
+| Field | Meaning |
+|---|---|
+| `field` | which value to watch: `crew`, `gold`, `morale` or `months` (required) |
+| `below` | fire when the value drops **under** this |
+| `above` | fire when the value rises **over** this |
+| `cooldown` | seconds before it may fire again |
+| `once` | `true` to fire at most once per career |
+
+Give **exactly one** of `below` or `above` — both, or neither, is rejected at
+load time.
+
+`morale` runs `0`–`4`: `0` mutinous, `1` angry, `2` content, `3` happy,
+`4` devoted. `gold` is undivided plunder — the share not yet split with the
+crew, not your total wealth. `months` is months at sea this voyage.
+
+**It is edge-triggered, like `nearPort`.** It fires on *crossing* the threshold,
+and cannot fire again until the value crosses back out. A value that merely sits
+past the line does not re-fire every frame, so you rarely need a `cooldown`.
+
+One consequence worth knowing: if a value is *already* past the threshold when a
+career loads, it fires straight away. If that is not what you want, pick a
+threshold play will cross rather than start behind, or add `"once": true`.
+
+```json
+{
+  "id": "purse_running_dry",
+  "kind": "notice",
+  "trigger": { "type": "stateCrosses", "field": "gold", "below": 100 },
+  "body": "The purse is near empty, Captain.",
+  "seconds": 5,
+  "anchor": "ship"
+}
+```
 
 ### Choosing a distance
 
