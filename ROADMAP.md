@@ -144,12 +144,15 @@ any build it doesn't recognise rather than risk your game.
 The build landscape, now measured:
 
 - **GOG** — fully supported. Plain executable, analysed, every address mapped.
-- **Steam** — **DRM-packed.** The executable is compressed/encrypted on disk and
-  only unpacks in memory at launch, so its addresses can't be read from the file
-  the way GOG's were. Supporting it is a separate, larger effort: run it, dump the
-  unpacked image from memory, check whether the underlying build matches GOG (if so,
-  the map rebases cheaply), and adapt the hooks to install after the unpacker runs.
-  Details in [`docs/GAME_API.md`](docs/GAME_API.md#build-support-gog-vs-steam).
+- **Steam** — **DRM-packed, but tractable.** The executable is encrypted on disk and
+  unpacks in memory at launch. A runtime probe established the important facts: the
+  mod **coexists cleanly with the DRM** (once image inspection is fault-free), the
+  **underlying build is GOG** (so the whole offset map transfers — no re-mapping),
+  and although the packer wrecks the import name tables (so hooking by name fails),
+  the actual import slots are populated at their known addresses. So Steam support is
+  a focused job: wait for the game to unpack, then hook the import slots **by absolute
+  address** rather than by name. Details in
+  [`docs/GAME_API.md`](docs/GAME_API.md#build-support-gog-vs-steam).
 - **Challenge Pack / retail disc** — different builds again; out of scope for now.
 
 ### 🟡 Windows Smart App Control

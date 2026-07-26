@@ -48,22 +48,36 @@ decompresses the real code at launch, and rebuilds the import table in memory. T
 real game imports (`timeGetTime`, `PeekMessageA`, `CreateFileA`, …) are **not on
 disk**.
 
-Consequences:
+**What the runtime probe established** (mod deployed to the Steam copy and run):
 
-- **Static analysis of the Steam file is not possible** — offsets cannot be derived
-  from it the way the GOG map was. It would require running the game and dumping the
-  **unpacked** image from memory, then analysing that dump.
-- **IAT hooking is uncertain on Steam** — the import table our hooks target is
-  rebuilt at runtime by the unpacker, so hook installation timing (and whether the
-  packer clobbers it) has to be tested, not assumed.
-- Good news: it is still x86, `ImageBase 0x400000`, **no ASLR** — so once unpacked
-  in memory, addresses are stable per run, same as GOG.
+- **The mod coexists with the DRM.** The `version.dll` proxy loads, the core loads,
+  and the game runs normally — *provided the core never faults while inspecting the
+  packed image*. Deliberately faulting on encrypted/mid-unpack memory (even with the
+  fault caught) disturbs the packer's own exception-based unpacking and corrupts the
+  on-demand unpack of later screens (it blanked character creation). The core now
+  checks every pointer with `VirtualQuery` before reading — see `PageReadable` — so
+  image inspection is fault-free.
+- **The underlying build is GOG.** Once the code unpacks, `VerifyTarget`'s byte
+  probes at the GOG addresses **match** — so the whole offset map transfers. No dump
+  or re-reverse-engineering is needed.
+- **The import *directory* is destroyed** — even fully unpacked, walking the PE
+  import descriptors yields garbage, so finding an import **by name** (our normal
+  `HookIAT`) does not work on Steam.
+- **But the IAT *slots* are populated.** The game runs, so `timeGetTime`,
+  `PeekMessageA` and friends *are* resolved — the packer fills the actual slots (at
+  their GOG addresses, since there is no ASLR) even though it wrecks the name tables.
 
-**Practical stance:** the framework targets **DRM-free builds (GOG)**. Steam support
-is a separate, larger effort — dump the unpacked image, check whether the underlying
-build matches GOG (if so, offsets rebase cheaply), and adapt hook installation to run
-after the unpacker. Until then, `VerifyTarget` will simply refuse the Steam build
-rather than risk it.
+**So the Steam path is smaller than a dump-and-re-map:**
+
+1. Detect the packed host and **poll until it has unpacked** (loop until `VerifyTarget`
+   passes) — the timing is nondeterministic.
+2. **Hook the IAT slots by absolute address** (the known GOG slot VAs, e.g.
+   `WINMM!timeGetTime` at `0x006C0430`), instead of searching the ruined import
+   directory by name.
+3. Everything else — offsets, structures, logic — transfers from GOG unchanged.
+
+Until that Steam hook path is built, `VerifyTarget` still governs behaviour and the
+core loads passively on Steam (no hooks, no memory writes), which is harmless.
 
 ---
 
