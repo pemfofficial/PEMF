@@ -288,10 +288,11 @@ static void UpdateMouseAspect()
         g_mouseHitTestXScale = 768.0f * (float)dw / (float)dh;
 }
 
-// Widescreen-UI research toggle (Ctrl+Shift+3). When on, the safe point forces
-// the UI logical dimensions (ScreenW/H and UIWidth/H) to the device resolution,
-// to test whether the UI then fills the screen at the correct scale.
-static bool g_forceUIDims = false;
+// Widescreen UI pillarbox toggle (Ctrl+Shift+3), on by default. Lets us A/B the
+// pillarbox against the game's default stretched ortho.
+static bool g_pillarboxEnabled = true;
+static bool g_orthoVerified    = false;   // defined here; used by RunSafePoint + hotkey
+static void PatchUIOrtho();                // defined below Init
 static DWORD g_tickCount         = 0;
 static DWORD g_safePointHits     = 0;
 static bool  g_safePointFound    = false;
@@ -318,29 +319,16 @@ static void RunSafePoint()
         Log("safe point reached (main loop PeekMessageA) -- deferred dispatch live");
     }
 
-    // Widescreen-UI experiment: while the toggle is on, force the UI logical
-    // dimensions to the device resolution every frame (the game keeps resetting
-    // them to 640x480). Lets us see live whether the UI fills the screen and the
-    // mouse aligns. Experimental -- opt-in via Ctrl+Shift+3.
-    if (g_forceUIDims) {
-        int dw = *(int*)game::addr::DevWidth, dh = *(int*)game::addr::DevHeight;
-        if (dw > 0 && dh > 0) {
-            *(int*)game::addr::ScreenW  = dw;
-            *(int*)game::addr::ScreenH  = dh;
-            *(int*)game::addr::UIWidth  = dw;
-            *(int*)game::addr::UIHeight = dh;
-        }
-    }
-
-    // Resolution diagnostic: log the layout globals whenever the device size
-    // changes (e.g. the player picks a resolution), so a mismatch between the
-    // render size and the UI/mouse coordinate space is visible.
+    // On a resolution change, re-apply the aspect-dependent widescreen fixes and
+    // log the layout state. (The player picking a resolution rebuilds the UI, so
+    // the re-patched ortho immediates take effect on the next UI build.)
     {
         static int lastW = -1, lastH = -1;
         int devW = *(int*)game::addr::DevWidth, devH = *(int*)game::addr::DevHeight;
         if (devW != lastW || devH != lastH) {
             lastW = devW; lastH = devH;
             UpdateMouseAspect();   // keep the hit-test X scale matched to the new aspect
+            if (g_targetOK) PatchUIOrtho();
             Log("resstate: device=%dx%d  screen=%dx%d  ui=%dx%d  mouseXscale=%.1f",
                 devW, devH,
                 *(int*)game::addr::ScreenW, *(int*)game::addr::ScreenH,
@@ -466,12 +454,14 @@ static DWORD WINAPI Hook_timeGetTime(void)
     g_prevKeyDown = down;
     if (!rising) return r;
 
-    // Ctrl+Shift+3: widescreen-UI research toggle. Flips whether the safe point
-    // forces the UI logical dimensions to the device resolution, so we can see
-    // live at the menu how the UI and mouse respond. Purely experimental.
+    // Ctrl+Shift+3: toggle the widescreen UI pillarbox (A/B against the game's
+    // default stretched ortho). Re-applies immediately; visible on the next UI
+    // build (e.g. moving between menu screens).
     if (k3) {
-        g_forceUIDims = !g_forceUIDims;
-        Log("ws-experiment: force UI dims = %s", g_forceUIDims ? "ON" : "OFF");
+        g_pillarboxEnabled = !g_pillarboxEnabled;
+        g_orthoVerified = true;   // already verified once; allow re-apply
+        PatchUIOrtho();
+        Log("ui-ortho: pillarbox toggled %s", g_pillarboxEnabled ? "ON" : "OFF");
         return r;
     }
 
@@ -609,6 +599,50 @@ static void PatchWidescreenResolutions()
         (unsigned)game::addr::ResAspectFilterJne);
 }
 
+// ------------------------------------------------- widescreen UI (pillarbox)
+// Widen the 2D UI camera's ortho left/right by aspect/(4:3) so the 4:3 interface
+// is pillarboxed (centred with side bars) at 16:9 instead of stretched. The two
+// values are `push` immediates in FUN_00503CA0; we rewrite them, and re-apply on
+// resolution change. At 4:3 the scale is 1.0 so the values stay -0.5/+0.5.
+static void PatchUIOrtho()
+{
+    int dw = *(int*)game::addr::DevWidth, dh = *(int*)game::addr::DevHeight;
+    if (dw <= 0 || dh <= 0) return;
+
+    uint32_t* pL = (uint32_t*)game::addr::UIOrthoLeftImm;
+    uint32_t* pR = (uint32_t*)game::addr::UIOrthoRightImm;
+    if (!PageReadable(pL, 4) || !PageReadable(pR, 4)) { Log("ui-ortho: operands not readable"); return; }
+
+    // On the first patch, confirm the known 4:3 defaults are there; afterwards we
+    // re-apply freely (the values are then our own computed ones).
+    if (!g_orthoVerified) {
+        if (*pL != game::addr::UIOrthoLeftDefault || *pR != game::addr::UIOrthoRightDefault) {
+            Log("ui-ortho: unexpected operands L=0x%08X R=0x%08X -- NOT patching", *pL, *pR);
+            return;
+        }
+        g_orthoVerified = true;
+    }
+
+    // Pillarbox when enabled; otherwise restore the game's 4:3 default (stretch).
+    float aspectScale = g_pillarboxEnabled
+        ? ((float)dw / (float)dh) / (4.0f / 3.0f)
+        : 1.0f;
+    float halfW = 0.5f * aspectScale;
+    float left = -halfW, right = halfW;
+
+    DWORD old = 0;
+    if (VirtualProtect(pL, 4, PAGE_EXECUTE_READWRITE, &old)) {
+        memcpy(pL, &left, 4);  VirtualProtect(pL, 4, old, &old);
+        FlushInstructionCache(GetCurrentProcess(), pL, 4);
+    }
+    if (VirtualProtect(pR, 4, PAGE_EXECUTE_READWRITE, &old)) {
+        memcpy(pR, &right, 4); VirtualProtect(pR, 4, old, &old);
+        FlushInstructionCache(GetCurrentProcess(), pR, 4);
+    }
+    Log("ui-ortho: pillarbox set L=%.4f R=%.4f (aspectScale=%.3f, %dx%d)",
+        (double)left, (double)right, (double)aspectScale, dw, dh);
+}
+
 // ---------------------------------------------------- mouse aspect correction
 static void PatchMouseHitTestAspect()
 {
@@ -702,6 +736,9 @@ static DWORD WINAPI Init(LPVOID)
 
     // Correct the mouse hit-test for the actual aspect ratio (code patch).
     if (g_targetOK) PatchMouseHitTestAspect();
+
+    // Pillarbox the 2D UI at widescreen (code patch; re-applied on res change).
+    if (g_targetOK) PatchUIOrtho();
 
     // The render-phase hook. Only attempted once the target is verified, since
     // it writes to the game's code.

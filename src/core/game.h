@@ -153,6 +153,17 @@ namespace addr {
     // instruction changes (the 1024/768 constants are shared by other code).
     constexpr uintptr_t MouseHitTestXFmulOperand = 0x0050436F;
     constexpr uint32_t  MouseHitTestXConstAddr   = 0x007135C8;  // expected current operand
+
+    // The 2D UI camera's orthographic frustum. FUN_00503CA0 sets it to a fixed
+    // 4:3 region -- left/right = -0.5/+0.5 (width 1.0), top/bottom = +0.375/-0.375
+    // (height 0.75), 1.0/0.75 = 4:3 -- which the renderer stretches to fill the
+    // viewport, so at 16:9 the whole UI stretches. Widening left/right (the two
+    // `push` immediates below) by aspect/(4:3) pillarboxes it: unchanged at 4:3,
+    // centred with side bars at 16:9.
+    constexpr uintptr_t UIOrthoLeftImm  = 0x00503CEA;  // operand of push 0xBF000000 (-0.5)
+    constexpr uintptr_t UIOrthoRightImm = 0x00503CE5;  // operand of push 0x3F000000 (+0.5)
+    constexpr uint32_t  UIOrthoLeftDefault  = 0xBF000000;  // -0.5f
+    constexpr uint32_t  UIOrthoRightDefault = 0x3F000000;  // +0.5f
 }
 
 // ------------------------------------------------------------- state access
