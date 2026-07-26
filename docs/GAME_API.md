@@ -67,17 +67,23 @@ disk**.
   `PeekMessageA` and friends *are* resolved — the packer fills the actual slots (at
   their GOG addresses, since there is no ASLR) even though it wrecks the name tables.
 
-**So the Steam path is smaller than a dump-and-re-map:**
+**So the Steam path is smaller than a dump-and-re-map — and it is now implemented
+and verified in-game on both builds:**
 
 1. Detect the packed host and **poll until it has unpacked** (loop until `VerifyTarget`
-   passes) — the timing is nondeterministic.
-2. **Hook the IAT slots by absolute address** (the known GOG slot VAs, e.g.
-   `WINMM!timeGetTime` at `0x006C0430`), instead of searching the ruined import
-   directory by name.
+   passes) — the timing is nondeterministic; the Steam build typically unpacks within
+   ~100 ms of the core loading.
+2. **Hook the IAT slots by absolute address** (the known GOG slot VAs — see
+   `game::addr::Slot*`, e.g. `WINMM!timeGetTime` at `0x006C0430`), retrying until the
+   slot holds a real pointer into the expected module. The core tries the name-based
+   walk first (GOG, unchanged) and falls back to the by-address patch (Steam).
 3. Everything else — offsets, structures, logic — transfers from GOG unchanged.
 
-Until that Steam hook path is built, `VerifyTarget` still governs behaviour and the
-core loads passively on Steam (no hooks, no memory writes), which is harmless.
+Verified: on GOG all four hooks install by name instantly; on Steam they install by
+address after the short unpack wait, and both reach the safe point and run save/load.
+The whole framework runs on both distributions from one codebase. The one caveat to
+watch is a packer that re-populates a slot *after* we hook it (not observed in the
+retry window); if it ever appears, a periodic re-hook watchdog covers it.
 
 ---
 
