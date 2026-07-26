@@ -272,6 +272,95 @@ inline bool ParseArg(const json& j, Arg* out, std::string* err)
     return true;
 }
 
+// ------------------------------------------------------------- placeholders
+// The authoring layer PEMF puts over the engine's own tokens.
+//
+// Writing directly against the engine means knowing that @HAPPY wants a 0-4
+// mood value, that @CITYNAME wants three arguments rather than one, and that
+// getting either wrong reads stack garbage. That is a reasonable thing to ask
+// of this codebase and an unreasonable thing to ask of someone writing a line
+// of dialogue. So an author can instead write:
+//
+//     "body": "Land ho! {port} off the bow!"
+//
+// with NO args at all. Each placeholder carries both halves of the contract --
+// the engine token and where its value comes from -- so the slot arithmetic
+// stops being the author's problem. {port} expanding to three arguments is
+// invisible from the outside, which is the point.
+struct Placeholder {
+    const char* name;
+    const char* token;
+    ArgSource   source;
+};
+
+inline const Placeholder kPlaceholders[] = {
+    { "crew",       "@NUM",         ArgSource::Crew              },
+    { "morale",     "@HAPPY",       ArgSource::Morale            },
+    { "gold",       "@NUM",         ArgSource::Plunder           },
+    { "months",     "@NUM",         ArgSource::Months            },
+    { "port",       "@CITYNAME",    ArgSource::NearestCity       },
+    { "portNation", "@NATIONALITY", ArgSource::NearestCityNation },
+    { "portType",   "@LOCTYPE",     ArgSource::NearestCityType   },
+};
+
+inline std::string PlaceholderNames()
+{
+    std::string s;
+    for (const Placeholder& p : kPlaceholders) {
+        if (!s.empty()) s += ", ";
+        s += "{"; s += p.name; s += "}";
+    }
+    return s;
+}
+
+// Rewrite {placeholders} into engine tokens, building the argument list as we
+// go so the two cannot fall out of step. Returns false with a precise reason.
+//
+// `{{` is a literal brace, so text that genuinely wants one is still writable.
+inline bool ExpandPlaceholders(const std::string& what, std::string* text,
+                               std::vector<Arg>* args, std::string* err)
+{
+    const bool hadExplicitArgs = !args->empty();
+    std::string out;
+    std::vector<Arg> built;
+    out.reserve(text->size());
+
+    for (size_t i = 0; i < text->size(); ) {
+        if ((*text)[i] != '{') { out += (*text)[i++]; continue; }
+        if (i + 1 < text->size() && (*text)[i + 1] == '{') {
+            out += '{'; i += 2; continue;             // escaped brace
+        }
+        const size_t end = text->find('}', i);
+        if (end == std::string::npos) {
+            *err = what + ": unclosed '{' -- write '{{' for a literal brace";
+            return false;
+        }
+        const std::string name = text->substr(i + 1, end - i - 1);
+        const Placeholder* found = nullptr;
+        for (const Placeholder& p : kPlaceholders)
+            if (name == p.name) { found = &p; break; }
+        if (!found) {
+            *err = what + ": unknown placeholder '{" + name + "}'. Available: " +
+                   PlaceholderNames();
+            return false;
+        }
+        out += found->token;
+        Arg a; a.source = found->source;
+        built.push_back(a);
+        i = end + 1;
+    }
+
+    if (built.empty()) return true;          // nothing to do; leave text alone
+    if (hadExplicitArgs) {
+        *err = what + ": don't mix {placeholders} with an explicit 'args' list "
+               "-- placeholders supply their own values. Use one or the other.";
+        return false;
+    }
+    *text = out;
+    *args = built;
+    return true;
+}
+
 inline bool ParseArgs(const json& j, std::vector<Arg>* out, std::string* err)
 {
     if (j.is_null()) return true;
@@ -498,6 +587,9 @@ inline int LoadFile(const char* path)
         if (ev.body.empty())             { fail("missing 'body'"); continue; }
         if (!ParseArgs(je.contains("args") ? je["args"] : json(),
                        &ev.bodyArgs, &err)) { fail(err); continue; }
+        if (!ExpandPlaceholders("body", &ev.body, &ev.bodyArgs, &err)) {
+            fail(err); continue;
+        }
         if (!ValidateText("body", ev.body, ArgSlots(ev.bodyArgs), &err)) {
             fail(err); continue;
         }
@@ -569,6 +661,8 @@ inline int LoadFile(const char* path)
             op.outcome = jo.value("outcome", "");
             if (!ParseArgs(jo.contains("outcomeArgs") ? jo["outcomeArgs"] : json(),
                            &op.outcomeArgs, &err)) { fail(err); ok = false; break; }
+            if (!ExpandPlaceholders("outcome", &op.outcome, &op.outcomeArgs,
+                                    &err)) { fail(err); ok = false; break; }
             if (!op.outcome.empty() &&
                 !ValidateText("outcome", op.outcome, ArgSlots(op.outcomeArgs), &err)) {
                 fail(err); ok = false; break;
@@ -715,9 +809,13 @@ inline int NoticeFade(const ActiveNotice& n, DWORD now)
     return (int)((__int64)left * game::addr::kWorldTextA7Max / kNoticeFadeMs);
 }
 
-// Set at the safe point: in a career, with the engine's label manager built.
-// World text drawn outside those conditions is at best invisible and at worst
-// touches a scene that does not exist yet.
+// Set at the safe point: the overworld is on screen, with the engine's label
+// manager built. Gates BOTH phases -- a notice belongs to the sailing view, and
+// one painted over the Load/Save screen or the pause menu is a bug whether it
+// is anchored in the world or pinned to the top of the screen.
+//
+// Notices keep expiring while this is false, so a notice posted just before a
+// menu is opened does not come back afterwards; it simply goes unseen.
 inline bool g_worldLive = false;
 
 // The world phase, issued at BeginScene in the last render pass of the frame.
@@ -753,7 +851,7 @@ inline void DrawWorldNotices()
 // notice, never a crashing game. The safe point reports it.
 inline void DrawNotices()
 {
-    if (g_drawOff || g_noticeCount <= 0) return;
+    if (g_drawOff || !g_worldLive || g_noticeCount <= 0) return;
 
     DWORD now = GetTickCount();
     int y = 8;

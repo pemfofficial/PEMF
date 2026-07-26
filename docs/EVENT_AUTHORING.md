@@ -26,8 +26,7 @@ formal guarantee.
   "events": [
     {
       "id": "hush_on_deck",
-      "body": "A hush falls over the deck. Your crew of @NUM stands @HAPPY.",
-      "args": ["crew", "morale"],
+      "body": "A hush falls over the deck. Your crew of {crew} stands {morale}.",
       "options": [
         { "text": "Say nothing and hold your course." }
       ]
@@ -36,8 +35,9 @@ formal guarantee.
 }
 ```
 
-In game that renders as a card in the game's own style, with `@NUM` replaced by
-your crew size and `@HAPPY` by their mood.
+In game that renders as a card in the game's own style, with `{crew}` replaced
+by your crew size and `{morale}` by their mood. You do not declare those
+anywhere — see [Placeholders](#placeholders--the-easy-way).
 
 ---
 
@@ -69,8 +69,7 @@ answer — a lookout's call, a change in the weather, a passing observation.
   "id": "landfall_sighted",
   "kind": "notice",
   "trigger": { "type": "nearPort", "distance": 3000, "rearm": 6000 },
-  "body": "Land ho! @CITYNAME off the bow!",
-  "args": ["nearestCity"],
+  "body": "Land ho! {port} off the bow!",
   "seconds": 5,
   "anchor": "ship"
 }
@@ -78,7 +77,7 @@ answer — a lookout's call, a change in the weather, a passing observation.
 
 | Field | Notice |
 |---|---|
-| `body` | the text; all [tokens](#tokens) work as usual |
+| `body` | the text; [placeholders](#placeholders--the-easy-way) work as usual |
 | `seconds` | how long it stays up, 1–30, default 4 |
 | `anchor` | `"screen"` (default) or `"ship"` — see below |
 | `options` | **not allowed** — a notice never asks anything |
@@ -123,7 +122,7 @@ A few practical notes:
 | `id` | yes | Unique name. Used in logs and save data. |
 | `kind` | no | `"choice"` (default) or `"notice"` — see above. |
 | `body` | yes | The prose shown at the top of the card. |
-| `args` | if body has tokens | Values for the tokens, in order. See [Tokens](#tokens) — `@CITYNAME` needs three slots. |
+| `args` | rarely | Only needed if you write `@` tokens by hand instead of `{placeholders}`. |
 | `options` | yes | 1–6 choices. Three have been tested in game; more than three is permitted but untried. |
 
 ### Option
@@ -133,105 +132,127 @@ A few practical notes:
 | `text` | yes | The selectable line. A leading space is added for you. Plain text only — tokens are not substituted here. |
 | `effects` | no | What happens to the game if picked. |
 | `outcome` | no | Follow-up text shown after the choice, as another page of the same card with a Continue. |
-| `outcomeArgs` | if outcome has tokens | Values for the outcome's tokens. |
+| `outcomeArgs` | rarely | As `args`, for the outcome text. Placeholders work here too. |
 
 ---
 
-## Tokens
+## Placeholders — the easy way
 
-A token is a placeholder in your text that the game fills in when the event
-fires. You supply the values in `args`, in the order the tokens appear.
-
-| Token | Becomes | Slots | Supply it with |
-|---|---|---|---|
-| `@NUM` | a number | 1 | `"crew"`, `"months"`, an integer… |
-| `@HAPPY` | the crew's mood word — `DEVOTED`, `CONTENT`, … | 1 | `"morale"` |
-| `@CITYNAME` | a port's name — `Barbados`, `Port Royale`, … | **3** | `"nearestCity"` |
-| `@NATIONALITY` | the nation adjective — `Spanish`, `English`, … | 1 | `"nearestCityNation"` |
-| `@LOCTYPE` | `village`, `town`, `city`… | 1 | `"nearestCityType"` |
+Write a `{placeholder}` in your text and PEMF fills it in. **No `args`, no
+counting, nothing else to get right.**
 
 ```json
-"body": "Port! @CITYNAME ahead!",
+{
+  "id": "landfall_sighted",
+  "kind": "notice",
+  "trigger": { "type": "nearPort", "distance": 3000 },
+  "body": "Land ho! {port} off the bow!",
+  "anchor": "ship"
+}
+```
+
+> *"Land ho! Nevis off the bow!"*
+
+| Placeholder | Becomes |
+|---|---|
+| `{crew}` | your crew size |
+| `{morale}` | the crew's mood — `DEVOTED`, `CONTENT`, … |
+| `{gold}` | undivided plunder — the share not yet split, not your total wealth |
+| `{months}` | months at sea this voyage |
+| `{port}` | the nearest port's name — `Nevis`, `Port Royale`, … |
+| `{portNation}` | who holds it — `Spanish`, `English`, … |
+| `{portType}` | `village`, `town`, `city`, … |
+
+Use as many as you like, in any order:
+
+```json
+"body": "The {portNation} {portType} of {port} lies ahead, and your crew of {crew} stands {morale}."
+```
+
+Two small rules:
+
+- **The `{port…}` placeholders name the port nearest your ship** when the event
+  fires — not the one you are steering for. They pair naturally with the
+  `nearPort` trigger, where those are the same thing. With no port in range they
+  come out blank, so word the line to survive that, or use `nearPort`.
+- Need a literal `{`? Write `{{`.
+
+That is the whole of it. **If you only read one section, read this one** — the
+rest of this page is the machinery underneath, which you need only if you want
+it.
+
+---
+
+## Tokens — the engine underneath
+
+Placeholders compile down to the game's own `@` tokens, which you may also
+write directly. There is no advantage to doing so, and one real hazard, but it
+is documented because the log talks in these terms when something is wrong.
+
+| Token | Slots | Supply with |
+|---|---|---|
+| `@NUM` | 1 | `"crew"`, `"gold"`, `"months"`, or an integer |
+| `@HAPPY` | 1 | `"morale"` |
+| `@CITYNAME` | **3** | `"nearestCity"` |
+| `@NATIONALITY` | 1 | `"nearestCityNation"` |
+| `@LOCTYPE` | 1 | `"nearestCityType"` |
+
+```json
+"body": "Land ho! @CITYNAME off the bow!",
 "args": ["nearestCity"]
 ```
 
-> *"Port! Barbados ahead!"*
+**The number of argument slots the tokens need must match `args` exactly.** The
+engine reads arguments positionally, like `printf`; a token with nothing behind
+it reads whatever happens to be in memory. The loader refuses the event rather
+than allow it, and tells you both numbers.
 
-### The one rule: slots must match exactly
+### Why `@CITYNAME` costs three
 
-**The number of argument slots the tokens need must exactly match the number
-`args` supplies.** The engine reads arguments positionally, like `printf`, and a
-token with nothing behind it reads whatever happens to be in memory. The loader
-refuses the event rather than let that happen, and tells you both numbers.
-
-Most tokens cost one slot, so usually this is just "one token, one arg".
-
-### `@CITYNAME` costs three slots
-
-`@CITYNAME` is the exception, and it is worth understanding rather than
-memorising. A city's name is not stored as a piece of text — it is a **record of
-three values** that the engine assembles into a name. So `@CITYNAME` consumes
-**three** arguments, not one.
-
-You do not have to supply three things. **One `"nearestCity"` arg fills all
-three slots**, because it expands to that whole record:
+A city's name is not text — it is a **record of three values** the engine
+assembles into a name. So `@CITYNAME` consumes three arguments. One
+`"nearestCity"` arg supplies all three, so this is correct:
 
 ```json
 "body": "The @NATIONALITY @LOCTYPE of @CITYNAME lies ahead.",
 "args": ["nearestCityNation", "nearestCityType", "nearestCity"]
 ```
 
-Three tokens, three args — but **five slots**: 1 + 1 + 3. The loader counts
-slots, so this is correct and will load. If you ever see an error mentioning
-slots, this is why.
+Three tokens, three args, **five slots**. The loader counts slots. A maximum of
+**8 slots** is available in one piece of text.
 
-### The city tokens name the nearest port
+This is exactly the sort of detail `{port}` exists to spare you.
 
-`nearestCity`, `nearestCityNation` and `nearestCityType` all resolve against
-**the port nearest your ship at the moment the event fires**, and all three
-agree with each other — the port is resolved once per piece of text, so it
-cannot change halfway through a sentence.
+### Don't mix the two
 
-They pair naturally with the `nearPort` trigger, where "nearest port" is the one
-you are approaching, but they work with any trigger. A couple of things to know:
-
-- If **no port is within range**, the tokens resolve blank rather than to
-  nonsense. Word the text so it still reads if that happens, or use `nearPort`
-  so a port is guaranteed nearby.
-- They name the nearest port, **not** the one you are heading for. Sailing past
-  one town toward another will name the one you are closest to.
+Placeholders supply their own values, so an event using `{...}` must not also
+give an `args` list. The loader rejects that rather than guess at the order.
 
 ### Other tokens
 
-The game has more tokens — ship names, pirate names, dates. They are **not
-permitted yet**, and the loader will reject them by name.
+The game has more — ship names, pirate names, dates. They are **not permitted**,
+and the loader rejects them by name.
 
-This is not caution for its own sake. Each token consumes a specific number of
-arguments, and that number is only knowable by reading the game's own code:
-`@CITYNAME` needing three rather than one is exactly the sort of thing that
-looks fine, loads fine, and then reads stack garbage. Tokens are enabled here
-once that count has been read out of the disassembly and confirmed — never
-guessed.
+Each token consumes a specific number of arguments, and that number is only
+knowable by reading the game's own code. `@CITYNAME` needing three rather than
+one is precisely the sort of thing that looks fine, loads fine, and then reads
+stack garbage. A token is enabled here once its appetite has been read out of
+the disassembly — never guessed. When one is, it gets a `{placeholder}` too.
 
 ## Argument values
+
+Only needed when writing `@` tokens by hand.
 
 | Value | Slots | Meaning |
 |---|---|---|
 | `"crew"` | 1 | current crew size |
 | `"morale"` | 1 | crew mood, 0–4 (use with `@HAPPY`) |
-| `"plunder"` | 1 | undivided plunder — the share not yet split, not your total wealth |
+| `"plunder"` | 1 | undivided plunder |
 | `"months"` | 1 | months at sea |
-| `"nearestCity"` | **3** | the nearest port's name record (use with `@CITYNAME`) |
-| `"nearestCityNation"` | 1 | which nation holds it (use with `@NATIONALITY`) |
-| `"nearestCityType"` | 1 | village / town / city (use with `@LOCTYPE`) |
+| `"nearestCity"` | **3** | the nearest port's name record |
+| `"nearestCityNation"` | 1 | which nation holds it |
+| `"nearestCityType"` | 1 | village / town / city |
 | any integer | 1 | that literal number |
-
-```json
-"body": "You have @NUM mouths to feed after @NUM months at sea.",
-"args": ["crew", "months"]
-```
-
-An event may use at most **8 argument slots** in one piece of text.
 
 ---
 

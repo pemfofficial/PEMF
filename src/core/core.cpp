@@ -312,7 +312,12 @@ static void RunSafePoint()
     // safe once the engine's label manager exists. The render hook cannot work
     // that out for itself without sampling the world, so it is decided here and
     // published for BeginScene to read.
-    content::g_worldLive = state::InGame() &&
+    // Not just "in a career": world text drawn from a menu is projected onto
+    // whatever that screen happens to be showing, which put a lookout's call
+    // across the Load/Save map. The ship being under way is the same
+    // playtest-validated test the triggers use, and it is false in every menu
+    // because the position is frozen there.
+    content::g_worldLive = state::InGame() && triggers::WorldOnScreen() &&
                            *(void**)game::addr::WorldLabelManager != nullptr;
 
     // The game's Direct3D device only exists once the game has created it, and

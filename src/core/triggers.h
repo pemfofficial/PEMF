@@ -41,6 +41,20 @@ struct WorldSample {
     int  screenDepth = 0;   // diagnostic only
 };
 
+// Drawing wants a TIGHTER test than firing does. kMovingWindowMs deliberately
+// tolerates a stationary moment so a trigger is not lost to one frozen frame;
+// for drawing that same tolerance is a bug, because opening a menu freezes the
+// ship and the notice would go on being painted over the menu for the whole
+// window. A notice leaking onto a menu for two seconds is very visible, and
+// losing a few frames of a notice while becalmed is not.
+constexpr DWORD kDrawWindowMs = 350;
+
+// Is the overworld actually on screen right now? This is a heuristic, like
+// Sailing() -- the game's obvious screen-id globals turned out to be
+// pointer-like rather than an enum (see game.h). It holds because every menu
+// and town screen freezes the ship's position.
+inline bool WorldOnScreen();
+
 inline int   g_lastX = 0, g_lastY = 0;
 inline DWORD g_lastMovedAt = 0;
 inline bool  g_havePos = false;
@@ -94,6 +108,12 @@ inline WorldSample Sample()
 inline bool Sailing(const WorldSample& s)
 {
     return s.inGame && s.moving;
+}
+
+inline bool WorldOnScreen()
+{
+    if (!g_havePos) return false;
+    return (GetTickCount() - g_lastMovedAt) < kDrawWindowMs;
 }
 
 // ------------------------------------------------------- per-event runtime

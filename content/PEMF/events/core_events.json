@@ -5,13 +5,16 @@
     "Drop your own .json files in this folder; every one of them is loaded.",
     "",
     "RULES (all enforced at load time -- see pemf.log if an event is rejected):",
-    "  * 'body' and 'outcome' may use @NUM, @HAPPY, @CITYNAME, @NATIONALITY",
-    "    and @LOCTYPE.",
-    "  * @CITYNAME COSTS THREE ARGUMENT SLOTS -- it is a three-word name",
+    "  * EASIEST WAY -- write a {placeholder} and supply NO args at all:",
+    "      {crew} {morale} {gold} {months} {port} {portNation} {portType}",
+    "      e.g. \"body\": \"Land ho! {port} off the bow!\"",
+    "      The {port...} ones name the port NEAREST the ship when the event",
+    "      fires, and read blank if none is in range. Write {{ for a literal",
+    "      brace. Do not mix placeholders with an explicit args list.",
+    "  * The hard way, if you want it: the engine's own tokens @NUM, @HAPPY,",
+    "    @CITYNAME, @NATIONALITY, @LOCTYPE with a matching args list.",
+    "    @CITYNAME COSTS THREE ARGUMENT SLOTS -- it is a three-word name",
     "    record, not a string. One \"nearestCity\" arg supplies all three.",
-    "    @NATIONALITY and @LOCTYPE cost one each (nearestCityNation /",
-    "    nearestCityType). Naming a city needs a city to name: these resolve",
-    "    against the nearest port, and read blank if none is in range.",
     "  * The number of tokens must EXACTLY match the number of args supplied.",
     "    A surplus token reads stack garbage from a 2004 engine.",
     "  * args may be: \"crew\", \"morale\", \"plunder\", \"months\",",
@@ -62,8 +65,7 @@
     {
       "id": "bosun_asks_for_rum",
       "trigger": { "type": "elapsedSailing", "seconds": 120, "cooldown": 600 },
-      "body": "The bosun corners you below decks, hat in hand and eyes hard. Your crew of @NUM has gone @HAPPY, and the men have been counting the days since the plunder was last divided.",
-      "args": ["crew", "morale"],
+      "body": "The bosun corners you below decks, hat in hand and eyes hard. Your crew of {crew} has gone {morale}, and the men have been counting the days since the plunder was last divided.",
       "options": [
         {
           "text": "Send him back to his post.",
@@ -79,8 +81,7 @@
         {
           "text": "Divide the plunder here and now.",
           "effects": [ { "op": "setPlunder", "value": 0 } ],
-          "outcome": "You call the hands aft and split the take where every man can see it counted. Your crew of @NUM goes back to work satisfied, and the hold is emptier for it.",
-          "outcomeArgs": ["crew"]
+          "outcome": "You call the hands aft and split the take where every man can see it counted. Your crew of {crew} goes back to work satisfied, and the hold is emptier for it."
         }
       ]
     },
@@ -89,8 +90,7 @@
       "id": "landfall_sighted",
       "kind": "notice",
       "trigger": { "type": "nearPort", "distance": 3000, "rearm": 6000 },
-      "body": "Land ho! @CITYNAME off the bow!",
-      "args": ["nearestCity"],
+      "body": "Land ho! {port} off the bow!",
       "seconds": 5,
       "anchor": "ship"
     },
@@ -106,8 +106,7 @@
 
     {
       "id": "hush_on_deck",
-      "body": "A hush falls over the deck. Your crew of @NUM stands @HAPPY, and word spreads that something has changed aboard this ship.",
-      "args": ["crew", "morale"],
+      "body": "A hush falls over the deck. Your crew of {crew} stands {morale}, and word spreads that something has changed aboard this ship.",
       "options": [
         { "text": "Say nothing and hold your course." }
       ]
@@ -116,8 +115,7 @@
     {
       "id": "short_rations",
       "trigger": { "type": "elapsedSailing", "seconds": 300, "once": true },
-      "body": "The cook reports the salt pork is turning. You have @NUM mouths to feed and @NUM months of sailing behind you, and the men have noticed the smell before you did.",
-      "args": ["crew", "months"],
+      "body": "The cook reports the salt pork is turning. You have {crew} mouths to feed and {months} months of sailing behind you, and the men have noticed the smell before you did.",
       "options": [
         {
           "text": "Put the men on short rations.",
