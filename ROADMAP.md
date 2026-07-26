@@ -79,6 +79,21 @@ event-driven audio here before.
   are **not** blocked by the render work, so audio callouts can arrive before the
   on-screen versions.
 
+## Display & resolution
+
+- ✅ **Widescreen resolutions selectable** — the game's own menu filtered its list
+  to 4:3; a small patch unlocks every display mode (including 1920×1080). The 3D
+  world then renders in correct 16:9.
+- ✅ **Recommended 1080p: 1440×1080** — a 4:3 mode the engine handles flawlessly:
+  full 1080-line height, crisp, correct UI, pixel-accurate mouse. Better in
+  practice than existing widescreen fixes.
+- 💡 **2D UI at true 16:9 — parked research.** The 3D renders correctly at 16:9,
+  but the 2D interface (built around a fixed 4:3 space) stretches and the mouse is
+  offset. This is unsolved for this game generally; the mechanism is fully mapped
+  in [`docs/GAME_API.md`](docs/GAME_API.md) and needs the per-frame render path
+  (shared with the render-hook blocker) plus a mouse-map change — a future
+  dedicated effort.
+
 ## World & map
 
 Early exploration, scope deliberately open — but the reverse engineering here is

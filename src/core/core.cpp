@@ -290,14 +290,12 @@ static void UpdateMouseAspect()
 
 // Widescreen UI pillarbox toggle (Ctrl+Shift+3), on by default. Lets us A/B the
 // pillarbox against the game's default stretched ortho.
-// Widescreen 2D-UI pillarbox: RESEARCH PARKED. The UI camera's fixed 4:3 frustum
-// is heap-cached (FUN_00503CA0), and both patching its source constants and
-// rewriting the live frustum in memory failed to visibly pillarbox the menu UI
-// (the memory scan also lagged the intro and black-screened the packed build).
-// The widescreen RESOLUTIONS (selectable, correct 3D 16:9) work and stay; the
-// 2D-UI-at-16:9 fix is documented as a future-session research target. This
-// toggle/flag is kept inert for now.
-static bool g_pillarboxEnabled = true;
+// Widescreen 2D-UI pillarbox: RESEARCH PARKED (see docs/GAME_API.md). The UI
+// camera's fixed 4:3 frustum is heap-cached (FUN_00503CA0); patching its source
+// constants and rewriting the live frustum both failed to visibly pillarbox the
+// menu, and the memory scan destabilised the packed build. The widescreen
+// RESOLUTIONS (selectable, correct 3D 16:9) work and stay; the 2D-UI-at-16:9 fix
+// is a documented future-session target. 1440x1080 is the recommended 1080p.
 static DWORD g_tickCount         = 0;
 static DWORD g_safePointHits     = 0;
 static bool  g_safePointFound    = false;
@@ -451,20 +449,11 @@ static DWORD WINAPI Hook_timeGetTime(void)
                 (GetAsyncKeyState(VK_SHIFT)   & 0x8000);
     bool k1 = mods && (GetAsyncKeyState('1') & 0x8000);
     bool k2 = mods && (GetAsyncKeyState('2') & 0x8000);
-    bool k3 = mods && (GetAsyncKeyState('3') & 0x8000);
-    bool down = k1 || k2 || k3;
+    bool down = k1 || k2;
 
     bool rising = down && !g_prevKeyDown;
     g_prevKeyDown = down;
     if (!rising) return r;
-
-    // Ctrl+Shift+3: toggle the widescreen UI pillarbox (A/B against the game's
-    // default stretched ortho). Re-applies immediately; visible on the next UI
-    // build (e.g. moving between menu screens).
-    if (k3) {
-        Log("ws: Ctrl+Shift+3 (widescreen-UI research toggle currently inert)");
-        return r;
-    }
 
     // POST only. The card is presented later, at the safe point.
     // Debug triggers fire content events by index. Ctrl+Shift+1 runs the first

@@ -707,21 +707,36 @@ two-pass count-then-fill, so the count stays consistent.
 **Result: 1920×1080 is selectable and the 3D world renders in true 16:9** (the
 projection aspect comes from the resolution).
 
-### The 4:3 UI at 16:9 — an open problem
+### The 4:3 UI at 16:9 — a parked research problem
 
-The game renders its 2D UI in a **fixed 640×480 logical space** — `ScreenW`/`ScreenH`
-(and their sources `UIWidth`/`UIHeight`) stay `640×480` for *every* resolution;
-only the device size changes. At a 4:3 device that logical space scales up
-uniformly and everything lines up. At 16:9 (1920×1080) the horizontal scale
-diverges from the vertical, so the 2D UI stretches and the **mouse is offset
-horizontally** over menu items.
+**Recommended 1080p: 1440×1080.** It is a 4:3 mode the engine handles perfectly —
+crisp, full 1080-line height, correct UI, pixel-accurate mouse. This is the
+flagship "1080p" for the mod; it is better in practice than every existing
+widescreen fix, which trade a working UI/mouse for a 16:9 aspect.
 
-The mouse maps through `FUN_005025D0` (`ScreenToClient`) → `FUN_005045A0` →
-`FUN_00504310` (the client→UI transform). A proper fix pillarboxes the 2D UI (keep
-the 4:3 interface centred with side bars, keep the 3D at 16:9) and adjusts the
-mouse mapping for the offset. That is the pending piece; forcing `ScreenW`/`ScreenH`
-to the device size is *not* a safe shortcut, since the 2D pipeline is built around
-the 640×480 logical space.
+**16:9 (e.g. 1920×1080) is selectable and the 3D world renders correctly**, but the
+**2D UI does not** — it stretches/overflows and the mouse is offset over menu
+items. This is a genuinely hard, still-unsolved problem for this game (the
+established widescreen fixes leave the same UI/mouse limitation). What we mapped:
+
+- The 2D UI is drawn in a fixed **4:3 logical space** that the renderer stretches
+  to fill the viewport. Confirmed empirically (forcing `ScreenW`/`ScreenH` to the
+  device size double-scales the UI — it is not the lever).
+- The UI camera's 4:3 frustum is set in **`FUN_00503CA0`** via
+  `FUN_0054AA00(left,right,top,bottom,near,far)` = `-0.5,+0.5,+0.375,-0.375,921.6,1536.0`.
+- **But it is copied once into a heap-allocated camera object**, so neither
+  patching the source `push` immediates nor rewriting the live frustum in memory
+  visibly pillarboxed the menu — the 2D layer is driven further down still
+  (the per-frame render path). A full-memory scan for the live frustum also lagged
+  the intro and destabilised the DRM-packed build.
+- The mouse hit-test (`FUN_00504310`) projects the cursor into a fixed **1024×768
+  (4:3) plane** (`fmul [0x007135C8]=1024.0` X, `fmul [0x007135C4]=768.0` Y) — the
+  root of the horizontal click offset.
+
+**Status: parked** as a documented future target. A real fix needs the per-frame
+render path (the same render hook that is still open elsewhere) plus a coordinated
+mouse-map change — a project of its own, not a single patch. The addresses above
+are recorded in `game.h` as the ground-truth for a future attempt.
 
 ## Audio / Sound System
 
