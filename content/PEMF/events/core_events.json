@@ -1,0 +1,104 @@
+{
+  "_comment": [
+    "PEMF -- core narrative events.",
+    "",
+    "Drop your own .json files in this folder; every one of them is loaded.",
+    "",
+    "RULES (all enforced at load time -- see pemf.log if an event is rejected):",
+    "  * 'body' and 'outcome' may use @NUM and @HAPPY only.",
+    "  * The number of tokens must EXACTLY match the number of args supplied.",
+    "    A surplus token reads stack garbage from a 2004 engine.",
+    "  * args may be: \"crew\", \"morale\", \"plunder\", \"months\", or an integer.",
+    "  * text must be plain 7-bit ASCII -- no smart quotes, no accents.",
+    "  * effect ops: addPlunder, setPlunder, addCrew, setCrew.",
+    "  * 1 to 6 options per event.",
+    "",
+    "KINDS:",
+    "  \"kind\": \"choice\"  (default) a modal card that asks the player to decide.",
+    "  \"kind\": \"notice\"  on-screen text while sailing -- the same look as the",
+    "      game's own 'Press r to return to ship'. Never interrupts, has no",
+    "      options, and takes \"seconds\" (1-30, default 4) instead.",
+    "",
+    "TRIGGERS (optional -- without one an event only fires by hand):",
+    "  { \"type\": \"elapsedSailing\", \"seconds\": 120, \"cooldown\": 600 }",
+    "      fires after that many seconds of ACTUAL SAILING. Time in port, in",
+    "      menus, or on any other screen does not count toward it.",
+    "  { \"type\": \"nearPort\", \"distance\": 3000, \"rearm\": 6000 }",
+    "      fires on coming within 'distance' of any port. Re-arms only once",
+    "      further out than 'rearm', so hugging a coast cannot spam it.",
+    "      Measured over two sessions: the closest the ship came to a port was",
+    "      988 once and 1620 another time -- it depends entirely on the route.",
+    "      ~3000 is 'harbour in sight'; ~1000 only fires if you sail right in.",
+    "      pemf.log reports live distances and 'closestEver' for tuning.",
+    "  Both also accept \"once\": true and \"cooldown\": <seconds>.",
+    "  Every trigger additionally requires that you are sailing the overworld.",
+    "",
+    "A '%' is safe here: the engine formatter is @-token based and never calls",
+    "printf, so there is no format-string hazard."
+  ],
+
+  "events": [
+    {
+      "id": "bosun_asks_for_rum",
+      "trigger": { "type": "elapsedSailing", "seconds": 120, "cooldown": 600 },
+      "body": "The bosun corners you below decks, hat in hand and eyes hard. Your crew of @NUM has gone @HAPPY, and the men have been counting the days since the plunder was last divided.",
+      "args": ["crew", "morale"],
+      "options": [
+        {
+          "text": "Send him back to his post.",
+          "effects": [],
+          "outcome": "You send him back to his post empty handed. The bosun says nothing, but word of it runs the length of the ship before the watch is out."
+        },
+        {
+          "text": "Break open the rum. (200 gold)",
+          "effects": [ { "op": "addPlunder", "value": -200 } ],
+          "outcome": "The rum goes round and the deck turns loud. It costs you @NUM pieces of eight, but your crew of @NUM drinks your health and means it.",
+          "outcomeArgs": [200, "crew"]
+        },
+        {
+          "text": "Divide the plunder here and now.",
+          "effects": [ { "op": "setPlunder", "value": 0 } ],
+          "outcome": "You call the hands aft and split the take where every man can see it counted. Your crew of @NUM goes back to work satisfied, and the hold is emptier for it.",
+          "outcomeArgs": ["crew"]
+        }
+      ]
+    },
+
+    {
+      "id": "landfall_sighted",
+      "kind": "notice",
+      "trigger": { "type": "nearPort", "distance": 3000, "rearm": 6000 },
+      "body": "Land ho! Harbour off the bow!",
+      "seconds": 5
+    },
+
+    {
+      "id": "hush_on_deck",
+      "body": "A hush falls over the deck. Your crew of @NUM stands @HAPPY, and word spreads that something has changed aboard this ship.",
+      "args": ["crew", "morale"],
+      "options": [
+        { "text": "Say nothing and hold your course." }
+      ]
+    },
+
+    {
+      "id": "short_rations",
+      "trigger": { "type": "elapsedSailing", "seconds": 300, "once": true },
+      "body": "The cook reports the salt pork is turning. You have @NUM mouths to feed and @NUM months of sailing behind you, and the men have noticed the smell before you did.",
+      "args": ["crew", "months"],
+      "options": [
+        {
+          "text": "Put the men on short rations.",
+          "effects": [],
+          "outcome": "The ration is cut and nobody thanks you for it. The hands eat in silence and watch the horizon for landfall."
+        },
+        {
+          "text": "Throw the spoiled stores overboard and make for port.",
+          "effects": [ { "op": "addPlunder", "value": -100 } ],
+          "outcome": "The barrels go over the side. It costs you @NUM in stores, but the air below decks is fit to breathe again.",
+          "outcomeArgs": [100]
+        }
+      ]
+    }
+  ]
+}

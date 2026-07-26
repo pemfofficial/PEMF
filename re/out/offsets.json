@@ -1,0 +1,70 @@
+{
+  "_comment": "Address map for Sid Meier's Pirates! (2004). Verified against the binary named below. No ASLR (DllCharacteristics=0, ImageBase 0x400000) so these are absolute runtime VAs.",
+  "target": {
+    "file": "Pirates!.exe.gog-original",
+    "sha256_prefix": "6E88B90E4E2E3024",
+    "size": 3323288,
+    "imagebase": "0x400000",
+    "machine": "x86-32",
+    "linker": "MSVC 7.1",
+    "engine": "Gamebryo 10.1.0.0 / NiDX9",
+    "aslr": false
+  },
+
+  "text_api": {
+    "_comment": "printf-style formatter with named tokens (@NUM, @HAPPY, @NAME, @CITYNAME, @NATIONALITY, @CITYTYPE, @MONTH, @DIFFICULTY, @SHARE). Tokens consume varargs left-to-right exactly like printf. IMPORTANT: esi must equal 0x008E9F58 (the message-buffer object) before calling; the wrappers do not set it themselves.",
+    "AddText_mode0": {
+      "va": "0x004F6090",
+      "sig": "void (const char* fmt, ...)  // esi = msgbuf, internal flag 0",
+      "xref_count": 114
+    },
+    "AddText_mode1": {
+      "va": "0x004F60B0",
+      "sig": "void (const char* fmt, ...)  // esi = msgbuf, internal flag 1",
+      "xref_count": 42
+    },
+    "Formatter_core": {
+      "va": "0x004F60D0",
+      "sig": "__fastcall(ecx = fmt)(void* varargs, int flag)  // esi = msgbuf object"
+    },
+    "msgbuf_object": "0x008E9F58"
+  },
+
+  "crew": {
+    "_comment": "Discovered via the mutiny and 'Your crew of @NUM is @HAPPY' call sites.",
+    "crew_count":        { "va": "0x00869AB0", "type": "int32" },
+    "unknown_869AB4":    { "va": "0x00869AB4", "type": "int32", "note": "read in morale calc, +0x1F4 applied; gold or food?" },
+    "months_at_sea":     { "va": "0x00869B1A", "type": "int16", "note": "used by mutiny message" },
+    "morale_byte_869B27":{ "va": "0x00869B27", "type": "int8",  "note": "shl 2 then subtracted in morale calc" },
+    "flags_869B34":      { "va": "0x00869B34", "type": "int32", "note": "bit 0x80 tested in morale calc" },
+    "unknown_869A76":    { "va": "0x00869A76", "type": "int16", "note": "morale calc input" },
+    "unknown_85A158":    { "va": "0x0085A158", "type": "int32", "note": "morale calc input" }
+  },
+
+  "functions": {
+    "GetCrewMoodString": {
+      "va": "0x00404810",
+      "sig": "const char* ()",
+      "note": "Returns the @HAPPY substitution string. Internally computes a score clamped to [1, 999] (0x3E7)."
+    },
+    "ShowMessageCard": {
+      "va": "0x004879F0",
+      "sig": "(int id, int flag)  // CANDIDATE - not yet confirmed",
+      "note": "Called right after AddText at both the mutiny (id=0x2C) and crew-status (id=0x64) sites. Likely commits the composed buffer to a presented card."
+    }
+  },
+
+  "call_sites": {
+    "mutiny_message":  "0x004125A0",
+    "crew_status":     "0x00443DC0",
+    "divide_plunder":  "0x00410321",
+    "morale_delta":    ["0x00437A5B", "0x00437CA6"],
+    "starving":        "0x004608E0"
+  },
+
+  "code_cave": {
+    "_comment": "Present only in the cp-base/Challenge-Pack exe, NOT in gog-original. Empty (all zero) in cp-base.",
+    "modCode": { "va": "0x004F3000", "size": 4096, "prot": "RWX" },
+    "modData": { "va": "0x004F4000", "size": 4096, "prot": "RW" }
+  }
+}

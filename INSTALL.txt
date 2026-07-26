@@ -1,0 +1,102 @@
+PEMF - Pirates! Expanded Modding Framework
+==========================================
+
+INSTALL
+-------
+
+1. Copy everything in this archive into your Sid Meier's Pirates! (2004) folder,
+   next to Pirates!.exe.  Typically:
+
+       C:\GOG Games\Sid Meier's Pirates\
+
+   You should end up with:
+
+       Pirates!.exe          (already there)
+       version.dll           <- new
+       pemf_core.dll         <- new
+       PEMF\                 <- new
+           events\
+               core_events.json
+           docs\
+
+2. Start the game normally.  That is the whole install.
+
+Nothing is patched and no game file is modified.  Your saves are untouched.
+
+
+REQUIREMENTS
+------------
+
+* Sid Meier's Pirates! (2004), GOG edition
+* The STOCK Pirates!.exe
+
+If you have used mods that patch Pirates!.exe - the Challenge Pack in particular
+- restore the original executable first.  PEMF checks on startup and will
+disable itself rather than risk your game if it does not recognise the build.
+
+
+DID IT WORK?
+------------
+
+PEMF writes pemf.log next to Pirates!.exe.  A healthy start looks like:
+
+    === PEMF loaded ===
+    target verified: offsets match the expected build
+    content: 3 event(s) from 1 file(s)
+    safe point reached (main loop PeekMessageA) -- deferred dispatch live
+
+While the trigger system is being built, events are fired by hand.  Load a game,
+get sailing, then:
+
+    Ctrl+Shift+1    fire the first event
+    Ctrl+Shift+2    fire the second
+
+These hotkeys are temporary and will go away once events fire from play.
+
+
+UNINSTALL
+---------
+
+Delete version.dll, pemf_core.dll and the PEMF folder.  The game is back to
+stock immediately.
+
+PEMF keeps its own state in a small file beside each save (<name>.pemf).  Those
+are harmless to leave, and safe to delete.
+
+
+WRITING YOUR OWN EVENTS
+-----------------------
+
+Drop a .json file into PEMF\events\.  Every file in that folder is loaded, so
+add-ons live side by side and a broken one is skipped rather than breaking the
+rest.
+
+There are two kinds of event:
+
+    "kind": "choice"   a card that stops you and asks something.  Options,
+                       consequences, an outcome.  This is the default.
+
+    "kind": "notice"   a line of text while sailing that never interrupts -
+                       a lookout's call, a passing observation.  It fades on
+                       its own.
+
+Events fire while you are sailing the overworld, either after a stretch of
+sailing or on approaching a port.
+
+See PEMF\docs\EVENT_AUTHORING.md for the full format.
+
+
+TROUBLESHOOTING
+---------------
+
+No pemf.log at all
+    version.dll is not next to Pirates!.exe.
+
+"TARGET MISMATCH" in the log
+    Your Pirates!.exe is not the stock GOG build.  Restore the original.
+
+"no event files found"
+    The PEMF\events folder did not come across.  Check the layout above.
+
+An event of yours did not appear
+    Look for "REJECTED" in pemf.log - it names the event and the exact problem.

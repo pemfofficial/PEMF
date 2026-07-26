@@ -1,0 +1,44 @@
+# ---------------------------------------------------------------------------
+# COPYRIGHT: never commit the game or anything derived wholesale from it.
+# PEMF ships no game files. RE for interoperability is fine; redistributing
+# the copyrighted binary or a full decompilation of it is not.
+# ---------------------------------------------------------------------------
+# Pirates_gog.exe / Pirates_cp.exe -- the game itself
+re/bin/
+# Ghidra database = disassembly of the copyrighted exe
+re/ghidra_proj/
+# wholesale decompilation dumps (derivative works). offsets.json is kept.
+re/out/*.c
+# game-exe backups + prior third-party mod data
+backups/
+
+# ---------------------------------------------------------------------------
+# Build output & artifacts
+# ---------------------------------------------------------------------------
+build/
+dist/
+*.obj
+*.exp
+*.lib
+*.ilk
+*.pdb
+*.res
+
+# ---------------------------------------------------------------------------
+# Signing material -- NEVER commit private keys
+# ---------------------------------------------------------------------------
+*.pfx
+*.p12
+*.key
+*.snk
+
+# ---------------------------------------------------------------------------
+# Local / editor / OS
+# ---------------------------------------------------------------------------
+__pycache__/
+*.pyc
+.vs/
+.vscode/
+*.user
+Thumbs.db
+desktop.ini
