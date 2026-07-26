@@ -403,6 +403,10 @@ extern "C" void __cdecl PemfAfterSailingRender(void)
 // -------------------------------------------------------------- the hooks
 typedef DWORD (WINAPI *timeGetTime_t)(void);
 typedef BOOL  (WINAPI *PeekMessageA_t)(LPMSG, HWND, UINT, UINT, UINT);
+// Defined with the file hooks below; used by the hotkey poll above them.
+static void ProbeItemNames(int first, int last);
+extern bool g_fileProbe;
+
 typedef HANDLE(WINAPI *CreateFileA_t)(LPCSTR, DWORD, DWORD, LPSECURITY_ATTRIBUTES,
                                       DWORD, DWORD, HANDLE);
 typedef HANDLE(WINAPI *CreateFileW_t)(LPCWSTR, DWORD, DWORD, LPSECURITY_ATTRIBUTES,
@@ -448,7 +452,10 @@ static DWORD WINAPI Hook_timeGetTime(void)
     bool k2 = mods && (GetAsyncKeyState('2') & 0x8000);
     bool k3 = mods && (GetAsyncKeyState('3') & 0x8000);
     bool k4 = mods && (GetAsyncKeyState('4') & 0x8000);
-    bool down = k1 || k2 || k3 || k4;
+    bool k5 = mods && (GetAsyncKeyState('5') & 0x8000);
+    bool k6 = mods && (GetAsyncKeyState('6') & 0x8000);
+    bool k7 = mods && (GetAsyncKeyState('7') & 0x8000);
+    bool down = k1 || k2 || k3 || k4 || k5 || k6 || k7;
 
     bool rising = down && !g_prevKeyDown;
     g_prevKeyDown = down;
@@ -466,6 +473,38 @@ static DWORD WINAPI Hook_timeGetTime(void)
     // ships' speech.
     if (k4) {
         content::PostDebugNotice("Anchored to the ship.", 8, true);
+        return r;
+    }
+
+    // Ctrl+Shift+5 asks the engine what it thinks the trade goods are called,
+    // for indices 0-6. Those are the known list, so this doubles as a check
+    // that the probe itself is sound before anything is concluded from it.
+    if (k5) {
+        ProbeItemNames(0, 6);
+        content::PostDebugNotice("Item names 0-6 written to pemf.log.", 6);
+        return r;
+    }
+    // Ctrl+Shift+6 asks for index 7 -- PAST the end of the stock list. Kept on
+    // its own key deliberately: the engine's lookup may well not be bounds
+    // checked, so this is the one that could misbehave, and nobody should hit
+    // it by accident while testing the others.
+    if (k6) {
+        Log("itemprobe: index 7 is PAST the end of the stock [ITEM] list. "
+            "If text.ini has not been extended, expect empty or a fault.");
+        ProbeItemNames(7, 7);
+        content::PostDebugNotice("Item index 7 probed -- see pemf.log.", 6);
+        return r;
+    }
+    // Ctrl+Shift+7 logs every data file the game opens OR FAILS to open. The
+    // misses are the point: a probe for a loose file that is not there is the
+    // evidence that dropping one in would be picked up.
+    if (k7) {
+        g_fileProbe = !g_fileProbe;
+        Log("fileprobe: %s", g_fileProbe ? "ON -- .ini/.txt/.csv/.fpk opens and "
+                                           "misses will be logged"
+                                         : "off");
+        content::PostDebugNotice(g_fileProbe ? "File probe ON."
+                                             : "File probe off.", 5);
         return r;
     }
 
@@ -529,11 +568,70 @@ static void HandleSaveFile(const char* path, bool forWrite)
     }
 }
 
+// ------------------------------------------------------------- file probing
+// Where does the game LOOK for a file, and in what order? The answer decides
+// whether a loose text.ini can override the packed one, and it is not knowable
+// from the binary alone -- but every candidate path goes through CreateFile,
+// including the ones that fail.
+//
+// The FAILURES are the interesting half: a probe for a loose file that is not
+// there is exactly the evidence that dropping one in would be picked up. The
+// save-detection hook ignores failed opens, so this is separate.
+//
+// Off by default. Ctrl+Shift+7 turns it on, so it costs nothing until asked
+// for, and it is capped so a game that opens thousands of files cannot fill
+// the log.
+bool         g_fileProbe      = false;
+inline int   g_fileProbeCount = 0;
+constexpr int kFileProbeMax   = 400;
+
+static void LogFileProbe(const char* path, bool opened)
+{
+    if (!g_fileProbe || !path) return;
+    if (g_fileProbeCount >= kFileProbeMax) return;
+
+    // Data files only. Textures and meshes would drown the signal.
+    const char* dot = strrchr(path, '.');
+    if (!dot) return;
+    if (_stricmp(dot, ".ini") && _stricmp(dot, ".txt") &&
+        _stricmp(dot, ".csv") && _stricmp(dot, ".fpk")) return;
+
+    ++g_fileProbeCount;
+    Log("fileprobe: %-5s %s", opened ? "OPEN" : "MISS", path);
+    if (g_fileProbeCount == kFileProbeMax)
+        Log("fileprobe: cap reached (%d) -- no more will be logged",
+            kFileProbeMax);
+}
+
+// ------------------------------------------------------- trade-good probing
+// Read back the engine's own name for each item index. Indices 0-6 are the
+// known list, so they double as a check that the probe itself is sound: if
+// they come back Gold/Food/Luxuries/Goods/Spice/Sugar/Cannon, the probe works
+// and anything it says about index 7 can be believed.
+static void ProbeItemNames(int first, int last)
+{
+    Log("itemprobe: reading @ITEM for indices %d..%d", first, last);
+    for (int i = first; i <= last; ++i) {
+        char name[128] = {0};
+        bool ok = false;
+        __try {
+            ok = game::ItemName(i, name, sizeof(name));
+        }
+        __except (EXCEPTION_EXECUTE_HANDLER) {
+            Log("itemprobe: [%d] EXCEPTION 0x%08X -- the lookup is NOT bounds "
+                "checked past the end of the list", i, GetExceptionCode());
+            return;
+        }
+        Log("itemprobe: [%d] %s", i, ok ? name : "(empty)");
+    }
+}
+
 static HANDLE WINAPI Hook_CreateFileA(LPCSTR name, DWORD access, DWORD share,
                                       LPSECURITY_ATTRIBUTES sa, DWORD disp,
                                       DWORD flags, HANDLE tmpl)
 {
     HANDLE h = g_origCreateFile(name, access, share, sa, disp, flags, tmpl);
+    LogFileProbe(name, h != INVALID_HANDLE_VALUE);
     if (h != INVALID_HANDLE_VALUE)
         HandleSaveFile(name, (access & GENERIC_WRITE) != 0);
     return h;
@@ -653,7 +751,9 @@ static DWORD WINAPI Init(LPVOID)
             d3d9hook::kStage);
 
     Log("debug hotkeys: Ctrl+Shift+1 = event #0, Ctrl+Shift+2 = event #1, "
-        "Ctrl+Shift+3 = notice at the top, Ctrl+Shift+4 = notice on the ship");
+        "Ctrl+Shift+3 = notice at the top, Ctrl+Shift+4 = notice on the ship, "
+        "Ctrl+Shift+5 = probe item names 0-6, Ctrl+Shift+6 = probe item 7 "
+        "(past the stock list), Ctrl+Shift+7 = toggle the data-file probe");
     return 0;
 }
 

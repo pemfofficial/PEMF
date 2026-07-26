@@ -806,6 +806,27 @@ inline void ShowWorldText(const char* resolved, int mapX, int mapY,
                      0);
 }
 
+// ------------------------------------------------------- trade-good probing
+// Resolve the engine's own name for a trade good, by asking its text system to
+// substitute @ITEM. That token is a __VAR lookup into the [ITEM] list parsed
+// from text.ini at runtime, so this reads back exactly what the game believes
+// the item list to be -- which is the only honest way to find out whether the
+// list length is the file's or the engine's.
+//
+// Returns false if nothing came back. NOTE that an index past the end of the
+// list is, as far as we know, unguarded inside the engine: this is a probe, not
+// something to call in normal operation.
+inline bool ItemName(int index, char* out, size_t outsz)
+{
+    if (!out || outsz == 0) return false;
+    out[0] = '\0';
+    ResetMessage();
+    AddText("@ITEM", index);
+    strncpy_s(out, outsz, (const char*)addr::MessageText, _TRUNCATE);
+    ResetMessage();
+    return out[0] != '\0';
+}
+
 // The player ship's map position, in the units the world-text API expects:
 // the raw milli-unit globals divided by 1000, exactly as the game does it.
 inline void PlayerMapPos(int* mx, int* my)
