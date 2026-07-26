@@ -524,6 +524,33 @@ static bool InstallOneHook(const HookSpec& h)
     return HookSlotByAddr(h.slot, h.dll, h.hook, h.orig);
 }
 
+// Enable every display resolution -- including widescreen like 1920x1080 -- in
+// the game's own Options -> Resolution list, by NOPing the 4:3 filter's `jne`.
+// The game's native switch then applies the chosen mode correctly (it derives
+// the projection aspect from the resolution), so this is crash-free, unlike
+// forcing a switch cold. One verified 2-byte code patch; identical on both
+// builds since the code matches.
+static void PatchWidescreenResolutions()
+{
+    BYTE* p = (BYTE*)game::addr::ResAspectFilterJne;   // 0x004B2E8A
+    if (!PageReadable(p, 2)) { Log("widescreen: filter site not readable"); return; }
+    if (p[0] == 0x90 && p[1] == 0x90) { Log("widescreen: already enabled"); return; }
+    if (p[0] != 0x75 || p[1] != 0x21) {
+        Log("widescreen: unexpected bytes %02X %02X at 0x%08X -- NOT patching",
+            p[0], p[1], (unsigned)game::addr::ResAspectFilterJne);
+        return;
+    }
+    DWORD old = 0;
+    if (!VirtualProtect(p, 2, PAGE_EXECUTE_READWRITE, &old)) {
+        Log("widescreen: VirtualProtect failed"); return;
+    }
+    p[0] = 0x90; p[1] = 0x90;                            // jne -> nop nop
+    VirtualProtect(p, 2, old, &old);
+    FlushInstructionCache(GetCurrentProcess(), p, 2);
+    Log("widescreen: all resolutions enabled (4:3 filter patched at 0x%08X)",
+        (unsigned)game::addr::ResAspectFilterJne);
+}
+
 // --------------------------------------------------------------- entry point
 static DWORD WINAPI Init(LPVOID)
 {
@@ -589,6 +616,9 @@ static DWORD WINAPI Init(LPVOID)
                 "%s\\PEMF\\events", dir);
     content::LoadFolder(contentDir);
     triggers::Reset("startup");
+
+    // Enable widescreen resolutions in the game's own Options menu (code patch).
+    if (g_targetOK) PatchWidescreenResolutions();
 
     // The render-phase hook. Only attempted once the target is verified, since
     // it writes to the game's code.

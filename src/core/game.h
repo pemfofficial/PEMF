@@ -135,6 +135,12 @@ namespace addr {
     constexpr uintptr_t SetResolution = 0x004D3AB0;
     constexpr uintptr_t UIWidth       = 0x0072637C;  // becomes ScreenW
     constexpr uintptr_t UIHeight      = 0x00726380;  // becomes ScreenH
+
+    // The resolution-list builder (FUN_004b2df0) keeps only 4:3 modes: after
+    // `cmp (height*100/width), 75` it does `jne skip`. NOP that jne (bytes
+    // 75 21 -> 90 90) and every display mode is listed -- widescreen included --
+    // so 1920x1080 becomes a normal, selectable, crash-free menu choice.
+    constexpr uintptr_t ResAspectFilterJne = 0x004B2E8A;
 }
 
 // ------------------------------------------------------------- state access
