@@ -18,6 +18,8 @@
 #include <stdio.h>
 #include <stdarg.h>
 #include <intrin.h>
+#include <shlwapi.h>
+#pragma comment(lib, "shlwapi.lib")
 
 #include "log.h"
 #include "game.h"
@@ -590,11 +592,17 @@ static void LogFileProbe(const char* path, bool opened)
     if (!g_fileProbe || !path) return;
     if (g_fileProbeCount >= kFileProbeMax) return;
 
-    // Data files only. Textures and meshes would drown the signal.
-    const char* dot = strrchr(path, '.');
-    if (!dot) return;
-    if (_stricmp(dot, ".ini") && _stricmp(dot, ".txt") &&
-        _stricmp(dot, ".csv") && _stricmp(dot, ".fpk")) return;
+    // Data files only. Textures and meshes would drown the signal. Anything
+    // named "text" is kept whatever its extension, since that is the file the
+    // whole exercise is about and we should not assume how it is named.
+    const char* dot  = strrchr(path, '.');
+    const char* leaf = strrchr(path, '\\');
+    leaf = leaf ? leaf + 1 : path;
+    const bool interesting =
+        (dot && (!_stricmp(dot, ".ini") || !_stricmp(dot, ".txt") ||
+                 !_stricmp(dot, ".csv") || !_stricmp(dot, ".fpk"))) ||
+        (StrStrIA(leaf, "text") != nullptr);
+    if (!interesting) return;
 
     ++g_fileProbeCount;
     Log("fileprobe: %-5s %s", opened ? "OPEN" : "MISS", path);
@@ -691,6 +699,23 @@ static DWORD WINAPI Init(LPVOID)
         GetCurrentProcessId(), st.wYear, st.wMonth, st.wDay,
         st.wHour, st.wMinute, st.wSecond);
     Log("host: %s", dir);
+
+    // The file probe has to be armed BEFORE the game opens anything, because
+    // the text and asset systems load during startup -- long before a hotkey
+    // could be pressed. Toggling it in-game shows only the handful of files
+    // touched afterwards, which is how the first attempt found nothing but
+    // Config.ini. So: drop a marker file next to the exe and it is on from the
+    // first open.
+    {
+        char marker[MAX_PATH];
+        _snprintf_s(marker, sizeof(marker), _TRUNCATE,
+                    "%s\\PEMF\\fileprobe.on", dir);
+        if (GetFileAttributesA(marker) != INVALID_FILE_ATTRIBUTES) {
+            g_fileProbe = true;
+            Log("fileprobe: ARMED AT STARTUP (found %s) -- every .ini/.txt/"
+                ".csv/.fpk open and miss will be logged from here", marker);
+        }
+    }
 
     // Build diagnostics -- at load, and again after any unpacker has run.
     DiagnoseImage("at-load");

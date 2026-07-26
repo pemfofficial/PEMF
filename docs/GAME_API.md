@@ -415,8 +415,13 @@ seventh-slot fight worth having.
 
 - **Item names are not in the exe.** `text.ini` is parsed at runtime: `@ITEM`
   (`0x006FAE1C`) and `__VAR` (`0x007107E0`) are strings in the binary, while
-  `[ITEM]` is not — group names come from the file. The list length is the
-  file's, not the engine's.
+  `[ITEM]` is not — group names come from the file.
+- ⚠️ **`@ITEM` is NOT bounds checked.** Asking for an index past the end of the
+  list access-violates (`0xC0000005`), confirmed in a running game. **Never emit
+  `@ITEM` with an index the live list does not contain**, and bounds-check any
+  future `{item}` placeholder against the list's real length rather than a
+  constant. Same class of hazard as the token argument counts: the engine does
+  not check, so we must.
 - **Loose files override packed ones.** The exe carries a `custom` path string
   (`0x0070C168`) and the shipped `custom\` folder overrides art without
   touching a `.FPK`.

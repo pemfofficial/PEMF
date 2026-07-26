@@ -39,19 +39,46 @@ checked. Expect one of:
 
 | Result | Means |
 |---|---|
-| `itemprobe: [7] (empty)` | the lookup is bounded and fails softly — ideal |
+| `itemprobe: [7] (empty)` | the lookup is bounded and fails softly |
 | `itemprobe: [7] <garbage>` | it reads past the end of the list |
 | `itemprobe: [7] EXCEPTION` | not bounds checked at all |
 
-This is the **control**. Record it. Without it, a name appearing in step 4
-proves nothing — it could have been reading adjacent memory all along.
+This is the **control**. Without it, a name appearing in step 4 proves nothing —
+it could have been reading adjacent memory all along.
+
+### Result, 2026-07-26
+
+```
+itemprobe: [0] Gold  [1] Food  [2] Luxuries  [3] Goods
+           [4] Spice [5] Sugar [6] Cannon              <- probe is sound
+itemprobe: [7] EXCEPTION 0xC0000005 -- the lookup is NOT bounds checked
+```
+
+**`@ITEM` past the end of the list access-violates.** Our SEH caught it and the
+game carried on, twice, but the constraint is real and general:
+
+> **Never emit `@ITEM` with an index the list does not contain.** Any future
+> `{item}` placeholder must be bounds checked against the live list length, not
+> against a constant. This is the same class of hazard as the token argument
+> counts — the engine does not check, so we must.
+
+It is *consistent with* the list being sized from the file: with seven values,
+index 7 reads one past the parsed array and dereferences whatever follows. If
+the file supplied eight, index 7 would be inside it. So the question is still
+open, and step 4 still decides it — but the control now says clearly that a
+crash means "not loaded", not "loaded and empty".
 
 ## Step 3 — where does the game look for `text.ini`?
 
-Press **Ctrl+Shift+7** to arm the file probe, then load a career (the text
-system initialises early, so a restart with the probe armed may be needed —
-see below). The log records every `.ini` / `.txt` / `.csv` / `.fpk` the game
-opens **and every one it fails to open**:
+**Arm it before the game starts.** Create `PEMF\fileprobe.on` next to the exe
+and the probe is live from the first file the game opens. The hotkey toggle
+exists too, but it is nearly useless here: the text and asset systems load
+during startup, long before a key can be pressed. The first attempt at this
+found nothing but `Config.ini` for exactly that reason.
+
+The log records every `.ini` / `.txt` / `.csv` / `.fpk` — and anything named
+"text", whatever its extension — that the game opens **and every one it fails
+to open**:
 
 ```
 fileprobe: MISS  C:\...\Sid Meier's Pirates\text.ini
@@ -63,9 +90,12 @@ evidence that dropping one in would be picked up. The game already overrides
 packed art with loose files from `custom\`, and the exe carries a `custom` path
 string, so a loose override path exists — this identifies exactly which one.
 
-If nothing appears, the text system loads before our hooks install. In that
-case set the probe on and restart, or check whether the paths appear during a
-later load.
+Delete `PEMF\fileprobe.on` to stop logging.
+
+If nothing appears even armed at startup, the hooks are installing after the
+text system has already read its file — on the DRM-packed Steam build the
+by-address hooks only take once the unpacker has run. Try the GOG copy, where
+the hooks install by name immediately.
 
 ## Step 4 — put the modified file where step 3 said
 
