@@ -293,6 +293,9 @@ static void UpdateMouseAspect()
 static bool g_pillarboxEnabled = true;
 static bool g_orthoVerified    = false;   // defined here; used by RunSafePoint + hotkey
 static void PatchUIOrtho();                // defined below Init
+static float* g_liveFrustum = nullptr;    // cached live UI-camera frustum
+static bool FindAndPatchLiveFrustum();     // defined below Init
+static void ApplyFrustumPillarbox(float* f);
 static DWORD g_tickCount         = 0;
 static DWORD g_safePointHits     = 0;
 static bool  g_safePointFound    = false;
@@ -319,6 +322,15 @@ static void RunSafePoint()
         Log("safe point reached (main loop PeekMessageA) -- deferred dispatch live");
     }
 
+    // Live UI-frustum pillarbox: the UI camera is heap-allocated once, so we find
+    // its frustum in memory and rewrite it directly. Scan (throttled) until found;
+    // afterwards the pointer is cached and re-applies are cheap.
+    if (g_targetOK && !g_liveFrustum && g_safePointHits > 20) {
+        static DWORD lastScan = 0;
+        DWORD now = GetTickCount();
+        if (now - lastScan > 1000) { lastScan = now; FindAndPatchLiveFrustum(); }
+    }
+
     // On a resolution change, re-apply the aspect-dependent widescreen fixes and
     // log the layout state. (The player picking a resolution rebuilds the UI, so
     // the re-patched ortho immediates take effect on the next UI build.)
@@ -329,6 +341,8 @@ static void RunSafePoint()
             lastW = devW; lastH = devH;
             UpdateMouseAspect();   // keep the hit-test X scale matched to the new aspect
             if (g_targetOK) PatchUIOrtho();
+            if (g_liveFrustum) ApplyFrustumPillarbox(g_liveFrustum);  // re-apply for new aspect
+            g_liveFrustum = nullptr;  // camera may have been rebuilt; re-find
             Log("resstate: device=%dx%d  screen=%dx%d  ui=%dx%d  mouseXscale=%.1f",
                 devW, devH,
                 *(int*)game::addr::ScreenW, *(int*)game::addr::ScreenH,
@@ -461,7 +475,8 @@ static DWORD WINAPI Hook_timeGetTime(void)
         g_pillarboxEnabled = !g_pillarboxEnabled;
         g_orthoVerified = true;   // already verified once; allow re-apply
         PatchUIOrtho();
-        Log("ui-ortho: pillarbox toggled %s", g_pillarboxEnabled ? "ON" : "OFF");
+        if (g_liveFrustum) ApplyFrustumPillarbox(g_liveFrustum);
+        Log("ui-frustum: pillarbox toggled %s", g_pillarboxEnabled ? "ON" : "OFF");
         return r;
     }
 
@@ -641,6 +656,74 @@ static void PatchUIOrtho()
     }
     Log("ui-ortho: pillarbox set L=%.4f R=%.4f (aspectScale=%.3f, %dx%d)",
         (double)left, (double)right, (double)aspectScale, dw, dh);
+}
+
+// --------------------------------------------- live UI frustum (pillarbox v2)
+// The UI camera is heap-allocated and its 4:3 frustum is baked in once at build
+// time, so patching the source constants does nothing. Instead we find the live
+// frustum in memory by its exact float signature and rewrite left/right. The
+// frustum is 6 consecutive floats: left,right,top,bottom,near,far =
+// -0.5, +0.5, +0.375, -0.375, 921.6, 1536.0. We match left/right/top/bottom and
+// the near/far pair to avoid false positives, then pillarbox left/right.
+static bool FrustumMatches(const float* f)
+{
+    // top(+0.375), bottom(-0.375), near, far are invariant; left/right may be
+    // the default (-0.5/+0.5) or our own already-applied values.
+    if (f[2] != 0.375f || f[3] != -0.375f) return false;
+    if (f[4] != 921.6f || f[5] != 1536.0f) return false;
+    // left negative ~[-1,-0.4], right positive ~[0.4,1], symmetric
+    if (!(f[0] < -0.4f && f[0] > -1.01f)) return false;
+    if (!(f[1] >  0.4f && f[1] <  1.01f)) return false;
+    return true;
+}
+
+static void ApplyFrustumPillarbox(float* f)
+{
+    int dw = *(int*)game::addr::DevWidth, dh = *(int*)game::addr::DevHeight;
+    if (dw <= 0 || dh <= 0) return;
+    float scale = g_pillarboxEnabled ? ((float)dw / (float)dh) / (4.0f / 3.0f) : 1.0f;
+    float half = 0.5f * scale;
+    DWORD old = 0;
+    if (VirtualProtect(f, 8, PAGE_READWRITE, &old)) {
+        f[0] = -half; f[1] = half;
+        VirtualProtect(f, 8, old, &old);
+    }
+}
+
+// Scan committed memory for the frustum signature. One-shot; caches the pointer.
+static bool FindAndPatchLiveFrustum()
+{
+    if (g_liveFrustum) { ApplyFrustumPillarbox(g_liveFrustum); return true; }
+
+    SYSTEM_INFO si; GetSystemInfo(&si);
+    BYTE* addr = (BYTE*)si.lpMinimumApplicationAddress;
+    BYTE* maxA = (BYTE*)si.lpMaximumApplicationAddress;
+    MEMORY_BASIC_INFORMATION mbi;
+    int scanned = 0;
+    while (addr < maxA && VirtualQuery(addr, &mbi, sizeof(mbi)) == sizeof(mbi)) {
+        BYTE* next = (BYTE*)mbi.BaseAddress + mbi.RegionSize;
+        bool readable = mbi.State == MEM_COMMIT &&
+                        !(mbi.Protect & (PAGE_NOACCESS | PAGE_GUARD)) &&
+                        (mbi.Protect & (PAGE_READWRITE | PAGE_READONLY | PAGE_WRITECOPY |
+                                        PAGE_EXECUTE_READ | PAGE_EXECUTE_READWRITE));
+        // heap frustum lives in a normal read/write data region
+        if (readable && (mbi.Protect & (PAGE_READWRITE | PAGE_WRITECOPY)) &&
+            mbi.RegionSize < 0x4000000) {
+            BYTE* p   = (BYTE*)mbi.BaseAddress;
+            BYTE* end = next - 24;
+            for (; p < end; p += 4) {   // floats are 4-aligned
+                if (FrustumMatches((const float*)p)) {
+                    g_liveFrustum = (float*)p;
+                    ApplyFrustumPillarbox(g_liveFrustum);
+                    Log("ui-frustum: live frustum found at %p and pillarboxed", (void*)p);
+                    return true;
+                }
+            }
+            ++scanned;
+        }
+        addr = next;
+    }
+    return false;
 }
 
 // ---------------------------------------------------- mouse aspect correction
