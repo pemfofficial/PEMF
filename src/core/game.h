@@ -103,6 +103,25 @@ namespace addr {
     constexpr unsigned  kWorldTextColour = 0xFF000000; // what both sites pass
     constexpr int       kWorldTextA7Max  = 500;
     constexpr int       kWorldTextA8     = 12;
+    constexpr int       kWorldTextZ      = 625;        // the name label's height
+
+    // The scene-graph label manager the drawer attaches to when a9 is 0. Null
+    // before the world exists, which is the cheap test for "is it safe to draw
+    // world text at all".
+    constexpr uintptr_t WorldLabelManager = 0x008C9DD8;
+
+    // `a5` is an ANGLE, not a length: 0x00713600 holds 2^32/360, the classic
+    // degrees-to-binary-angle constant, so the game is passing -70 or -90
+    // degrees as a full-circle fixed-point value. Worth knowing before anyone
+    // tries to "fix" the absurd-looking integer this produces.
+    constexpr double    kDegToBam       = 11930464.711111112;
+
+    // The game's own labels are sized by camera distance through this global,
+    // recomputed every frame. We draw at BeginScene, before the sailing render
+    // touches it, so we set it ourselves. The game's ship labels sit near 50
+    // at a normal camera height; 100 (what the render leaves behind) is roughly
+    // twice the size a notice wants.
+    constexpr int       kWorldTextSize  = 34;
 
     // The actual message text, a plain NUL-terminated char buffer. WrapText
     // reads it via `mov ebx, 0x869B48` before calling the string-assign at
@@ -702,23 +721,32 @@ __declspec(naked) inline void DrawWorldTextRaw(
 // `fade` is the game's seventh argument, which it ramps 200 -> 500 while a
 // ship's line is up. We drive it the other way to bring a notice down.
 inline void ShowWorldText(const char* resolved, int mapX, int mapY,
-                          int fade, int height = 500,
+                          int fade, int size = addr::kWorldTextSize,
                           unsigned colour = addr::kWorldTextColour)
 {
     if (!resolved || !*resolved) return;
+    if (!*(void**)addr::WorldLabelManager) return;   // no world to hang it in
 
-    // The camera-relative tilt, computed the way the sailing render computes
-    // it every frame.
-    const int  flags = *(int*)addr::ViewFlags;
-    const int  base  = (flags & addr::kViewFlagClose) ? -90 : -70;
-    const double k   = *(double*)addr::WorldTextTilt;
-    const int    a5  = (int)(base * k);
+    const int flags  = *(int*)addr::ViewFlags;
+    const int camera = *(int*)addr::WorldTextCamera;
+
+    // The tilt, as an angle in binary-angle units.
+    const int base = (flags & addr::kViewFlagClose) ? -90 : -70;
+    const int a5   = (int)(base * addr::kDegToBam);
+
+    // The ship-name label lifts itself by 500 map units only when the camera
+    // global is zero -- `setne bl; dec ebx; and ebx, 0x1F4; sub ecx, ebx` at
+    // 0x004622C2. Reproduced rather than approximated, because getting it
+    // wrong puts the text below the hull instead of above it.
+    const int lift = camera ? 0 : 500;
+
+    *(int*)addr::WorldTextSize = size;
 
     DrawWorldTextRaw(resolved, colour,
-                     mapX, mapY, height,
+                     mapX, mapY - lift, addr::kWorldTextZ,
                      0,
                      a5,
-                     *(int*)addr::WorldTextCamera,
+                     camera,
                      fade,
                      addr::kWorldTextA8,
                      0);

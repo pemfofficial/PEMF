@@ -551,8 +551,9 @@ inline bool DrawWorldNotice(const char* text, int fade)
     __try {
         int mx = 0, my = 0;
         game::PlayerMapPos(&mx, &my);
-        // Lifted clear of the hull, the way the game lifts ship speech.
-        game::ShowWorldText(text, mx, my - 500, fade);
+        // The lift above the hull is part of the label geometry, so it lives
+        // with the rest of it in ShowWorldText.
+        game::ShowWorldText(text, mx, my, fade);
         return true;
     }
     __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
@@ -576,9 +577,14 @@ inline int NoticeFade(const ActiveNotice& n, DWORD now)
 // crashing game. The safe point reports it.
 // The world phase, issued at BeginScene: anchored notices only. They build
 // scene-graph nodes, so they have to exist before the render walk.
+// Set at the safe point: in a career, with the engine's label manager built.
+// World text drawn outside those conditions is at best invisible and at worst
+// touches a scene that does not exist yet.
+inline bool g_worldLive = false;
+
 inline void DrawWorldNotices()
 {
-    if (g_drawOff || g_noticeCount <= 0) return;
+    if (g_drawOff || !g_worldLive || g_noticeCount <= 0) return;
 
     DWORD now = GetTickCount();
     for (int i = 0; i < g_noticeCount; ++i) {

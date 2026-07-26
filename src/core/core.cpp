@@ -308,6 +308,13 @@ static void RunSafePoint()
 
     triggers::Tick();       // may Post(); never presents anything
 
+    // World-anchored drawing is only meaningful in the sailing view, and only
+    // safe once the engine's label manager exists. The render hook cannot work
+    // that out for itself without sampling the world, so it is decided here and
+    // published for BeginScene to read.
+    content::g_worldLive = state::InGame() &&
+                           *(void**)game::addr::WorldLabelManager != nullptr;
+
     // The game's Direct3D device only exists once the game has created it, and
     // the engine has been seen rebuilding its vtable mid-session -- so the hook
     // installs and re-verifies itself from here. A few guarded reads per frame.
