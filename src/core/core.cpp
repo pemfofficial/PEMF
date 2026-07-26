@@ -301,6 +301,21 @@ static void RunSafePoint()
         Log("safe point reached (main loop PeekMessageA) -- deferred dispatch live");
     }
 
+    // Resolution diagnostic: log the layout globals whenever the device size
+    // changes (e.g. the player picks a resolution), so a mismatch between the
+    // render size and the UI/mouse coordinate space is visible.
+    {
+        static int lastW = -1, lastH = -1;
+        int devW = *(int*)game::addr::DevWidth, devH = *(int*)game::addr::DevHeight;
+        if (devW != lastW || devH != lastH) {
+            lastW = devW; lastH = devH;
+            Log("resstate: device=%dx%d  screen=%dx%d  ui=%dx%d",
+                devW, devH,
+                *(int*)game::addr::ScreenW, *(int*)game::addr::ScreenH,
+                *(int*)game::addr::UIWidth, *(int*)game::addr::UIHeight);
+        }
+    }
+
     // A career starting, ending, or being loaded invalidates all trigger
     // progress -- accumulated sailing time and armed/disarmed state belong to
     // the career they were earned in.

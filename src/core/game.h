@@ -135,6 +135,8 @@ namespace addr {
     constexpr uintptr_t SetResolution = 0x004D3AB0;
     constexpr uintptr_t UIWidth       = 0x0072637C;  // becomes ScreenW
     constexpr uintptr_t UIHeight      = 0x00726380;  // becomes ScreenH
+    constexpr uintptr_t DevWidth      = 0x008CAC18;  // actual device/render width
+    constexpr uintptr_t DevHeight     = 0x008CAC1C;  // actual device/render height
 
     // The resolution-list builder (FUN_004b2df0) keeps only 4:3 modes: after
     // `cmp (height*100/width), 75` it does `jne skip`. NOP that jne (bytes
