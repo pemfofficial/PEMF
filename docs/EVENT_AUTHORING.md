@@ -58,6 +58,12 @@ On-screen text while sailing, in the same style as the game's own
 it fades on its own. Use it for things the player should notice but not have to
 answer — a lookout's call, a change in the weather, a passing observation.
 
+> **Planned — sound on events.** A `"sound"` field is being worked on, so an event
+> or notice can play a custom `.wav` (a voice line, a callout, a sting) when it
+> fires. The audio side of the engine is mapped; this field is not live yet. When
+> it lands it will be documented here with the exact format. Until then, `"sound"`
+> is ignored if present.
+
 ```json
 {
   "id": "landfall_sighted",

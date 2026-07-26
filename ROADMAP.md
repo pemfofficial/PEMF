@@ -59,6 +59,26 @@ These are the load-bearing pieces everything else stands on. They work.
   non-interrupting on-screen "notice" (a lookout's call while sailing) is
   designed and wired but **can't be drawn yet** (see the render blocker below).
 
+## Audio
+
+Custom sound is a first-class pillar, not a nice-to-have. Existing mods for this
+game can only *replace* the built-in sounds by swapping files; because PEMF runs
+live code inside the game, it can **add** new sounds and play them on cue — tied
+to events, triggers, and game state. As far as we can tell, nobody has done
+event-driven audio here before.
+
+- ✅ **Sound engine mapped** — the game uses Miles Sound System; its whole audio
+  import surface and the in-game load/play functions are located.
+- 🟡 **Play-by-name details** — the exact way to trigger a named sound is mapped
+  structurally but needs final confirmation (see the tooling note under Blockers).
+- 📐 **Custom clips added, not just swapped** — drop a new `.wav` in and play it;
+  the game already loads loose `.wav` files by name, which is the groundwork.
+- 📐 **Sound on events** — an event or notice names a clip to play when it fires
+  (a voice line, a callout, a sting). Slots straight into the JSON schema.
+- 💡 **Spoken callouts** — "land ho", lookout calls, crew reactions. Notably these
+  are **not** blocked by the render work, so audio callouts can arrive before the
+  on-screen versions.
+
 ## Crew & morale
 
 - ✅ **Morale model understood** — the game's own crew-happiness math is mapped
@@ -105,13 +125,16 @@ not a bug in the mod. The fix is code signing, which is in progress. See
 
 Rough order, subject to change:
 
-1. **Solve the render hook.** It's the gate in front of most of the interesting
-   UI work, so it comes first.
-2. **Code signing** so the mod loads cleanly on locked-down Windows installs.
-3. **On-screen notices** ("LAND HO!", lookout calls) — the first payoff once
-   drawing works.
-4. **Officer roster** — data model first, then the panel once we can draw it.
-5. **Version detection / launcher** — broaden the set of game builds supported.
+1. **Audio callouts** — an early, satisfying win that *isn't* gated by the render
+   work. Confirm the play-by-name path and fire a custom sound from an event.
+2. **Solve the render hook.** It's the gate in front of most of the interesting
+   *visual* work.
+3. **Code signing** so the mod loads cleanly on locked-down Windows installs.
+4. **On-screen notices** ("LAND HO!", lookout calls) — the first visual payoff
+   once drawing works. Pairs naturally with the audio callouts.
+5. **Officer roster** — data model first, then the panel once we can draw it.
+6. **Version detection** — broaden the set of game builds supported (GOG + Steam
+   first).
 
 ---
 
