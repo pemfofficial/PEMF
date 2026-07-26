@@ -97,29 +97,61 @@ text system has already read its file — on the DRM-packed Steam build the
 by-address hooks only take once the unpacker has run. Try the GOG copy, where
 the hooks install by name immediately.
 
-## Step 4 — put the modified file where step 3 said
+### Result, 2026-07-26 — answered
 
-`text.ini` here is the stock file with **one line added**: `Value = Rum` as the
-eighth `[ITEM]` entry.
+Armed at startup, the log shows the whole picture:
 
-Copy it to the path step 3 identified, restart, and press **Ctrl+Shift+6**.
+```
+fileprobe: OPEN  ASSETS\LANG0.FPK   ... through ...  ASSETS\PAK8.FPK
+fileprobe: MISS  Data\AdvancedLighting.ini
+fileprobe: MISS  assets\data\Landscape.ini
+fileprobe: OPEN  ...\My Games\Sid Meier's Pirates!\Config.ini, KeyMap.ini
+```
 
-| Result | Verdict |
-|---|---|
-| `itemprobe: [7] Rum` | **The list length is the file's.** New goods can be named through the game's own text system. |
-| same as the step 2 control | the loose file is not being read — try another path from step 3 |
-| anything else | the list length is baked in somewhere; new goods need their own text path |
+**There is no loose probe for `text.ini`. Not a missing one — none at all.**
+
+That absence is real evidence rather than a gap in the instrumentation, because
+two *other* `.ini` files inside the same archive **are** probed on disk first
+and missed. `landscape.ini` and `advancedlighting.ini` both live in
+`Pak1.FPK`, and the game still looks for them on disk before falling back. So
+the probe catches misses, and the text system simply never asks the disk.
+
+The ten `.FPK` archives are opened once at startup and read from thereafter, so
+nothing inside them appears as a separate file open.
+
+**Verdict: `[ITEM]` cannot be extended with a loose file.** Doing it would mean
+repacking `Pak1.FPK` — modifying a game file, which this project does not do —
+or patching the parsed table in memory after load.
+
+### …and it does not matter
+
+The question was whether a PEMF-invented good could carry a name the engine
+renders. It can, just not through `@ITEM`: a PEMF good's name is a string in
+its own JSON, drawn through the same text and drawing routines everything else
+already uses, so it looks native because it is rendered natively.
+
+`@ITEM` would only have been needed for *engine* code to name our good — and
+that code iterates items 0-5 and cannot show an eighth good regardless. So the
+archive being closed to us costs nothing the plan actually wanted.
+
+**Do not repack `Pak1.FPK` for this.** It touches a game file, it is not needed,
+and `@ITEM` past the end of the list access-violates.
+
+---
+
+## A useful side finding: loose override *does* work — selectively
+
+`Data\AdvancedLighting.ini` and `assets\data\Landscape.ini` are looked for on
+disk **before** the archive copy is used. Creating either path loose would
+override the packed version with no repacking at all.
+
+So loose-file override is **per subsystem**, not global: some readers try disk
+first, the text system does not. Worth remembering for anything that turns out
+to live in one of the readers that does.
 
 ---
 
 ## Restoring
 
-Delete the file you copied. Nothing else was touched: the probes only read, and
-the game's own `text.ini` inside `Pak1.FPK` is never modified.
-
-## What a positive result does and does not buy
-
-It does **not** create an eighth cargo slot — that array is boxed in, and no
-amount of text changes that. What it buys is that a good living in PEMF's own
-memory can carry a name the engine will render, so our text about it looks like
-the game's own rather than like an overlay.
+Delete `PEMF\fileprobe.on` to stop the logging. Nothing else was changed —
+every probe here only reads.

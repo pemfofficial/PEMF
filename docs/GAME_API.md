@@ -422,9 +422,15 @@ seventh-slot fight worth having.
   future `{item}` placeholder against the list's real length rather than a
   constant. Same class of hazard as the token argument counts: the engine does
   not check, so we must.
-- **Loose files override packed ones.** The exe carries a `custom` path string
-  (`0x0070C168`) and the shipped `custom\` folder overrides art without
-  touching a `.FPK`.
+- **Loose override works, but PER SUBSYSTEM — and not for text.** Measured with
+  a startup-armed file probe: the ten `.FPK` archives are opened once and read
+  from thereafter, and `Data\AdvancedLighting.ini` and `assets\data\Landscape.ini`
+  are looked for **on disk first** and missed before the packed copies are used —
+  so creating either loose would override it with no repacking. But there is
+  **no disk probe at all for `text.ini`**, which lives in the same archive. That
+  absence is evidence rather than a gap, precisely because the other two misses
+  prove the probe catches them. So `[ITEM]` cannot be extended without repacking
+  `Pak1.FPK` or patching the parsed table in memory.
 - **The town side stores no per-good table.** A settlement record holds a single
   `goods` int (`+0x08`) and `economy` (`+0x0C`) — prices and availability are
   *derived*, not stored per (city, good). There is far less fixed table on the
@@ -434,8 +440,10 @@ seventh-slot fight worth having.
 price model, reading the town's real `economy` and `goods` fields as inputs so
 it behaves like part of the world, and presenting through our own drawing rather
 than the engine's trade screen — which iterates 0-5 and cannot be given a row.
-Its *name* can come from the engine's own text system by extending `[ITEM]`,
-so authored text about it reads natively.
+Its name is simply a string in its own JSON, drawn through the text and drawing
+routines we already use — native-looking because it is natively rendered.
+`@ITEM` was never actually needed: it would only let *engine* code name our
+good, and that code iterates items 0-5 and could not show an eighth one anyway.
 
 This is the standing principle — new systems live in our memory, the exe stays
 the world and the renderer — but it is a much better bet than it was, because

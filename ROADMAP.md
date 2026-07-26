@@ -148,11 +148,16 @@ Investigated 2026-07-26; findings in [`docs/GAME_API.md`](docs/GAME_API.md).
   fields so it behaves like part of the world, and presents through our own
   drawing. Encouragingly the town side stores **no** per-good table — prices are
   derived — so there is much less fixed structure to fight there than in the
-  hold. Its name can come from the engine's own text system by extending the
-  `[ITEM]` list, so authored text about it reads natively.
-- 💡 **Worth one cheap test first**: whether an eighth `Value` in `[ITEM]` loads
-  and renders. That decides whether new goods can be named natively or need
-  their own text path.
+  hold. Its name is a string in its own JSON, drawn through the routines we
+  already use.
+- ✅ **Tested, and it settled the design**: the engine's item-name list cannot be
+  extended with a loose file — the text system never looks on disk, only inside
+  the archive. It turns out not to matter, because engine code could not show an
+  eighth good anyway. Details in
+  [`re/experiments/trade_goods/`](re/experiments/trade_goods/README.md).
+- ✅ **Loose-file override does work for some data** — `assets\data\Landscape.ini`
+  and `Data\AdvancedLighting.ini` are read from disk in preference to the packed
+  copies. Useful elsewhere, even though it does not help with text.
 
 ## Crew & morale
 
