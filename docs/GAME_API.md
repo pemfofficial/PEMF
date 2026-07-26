@@ -33,6 +33,38 @@ patches: 2,634,387 of 2,879,488 `.text` bytes differ (91%). None of these
 addresses apply to it. `game::VerifyTarget()` byte-probes on startup and refuses
 to touch memory on a mismatch.
 
+### Build support: GOG vs Steam
+
+| Build | On disk | Analysable statically? | Status |
+|---|---|---|---|
+| **GOG** (`SHA-256 6E88B90E…`, 3,323,288 B) | plain PE, 4 sections, no ASLR | **Yes** | fully supported — every address here |
+| **Steam** (`SHA-256 5342209C…`, 1,189,888 B) | **DRM-packed** | **No** | needs extra work — see below |
+
+The **Steam executable is DRM-wrapped**. Its on-disk form has only two sections; the
+`.text` is `~1.1 MB` raw but `~5 MB` virtual with **entropy 8.00** (fully
+compressed/encrypted), and its import stub pulls in exactly `LoadLibraryA`,
+`GetProcAddress`, `VirtualAlloc`, `VirtualFree` — an unpacker that allocates memory,
+decompresses the real code at launch, and rebuilds the import table in memory. The
+real game imports (`timeGetTime`, `PeekMessageA`, `CreateFileA`, …) are **not on
+disk**.
+
+Consequences:
+
+- **Static analysis of the Steam file is not possible** — offsets cannot be derived
+  from it the way the GOG map was. It would require running the game and dumping the
+  **unpacked** image from memory, then analysing that dump.
+- **IAT hooking is uncertain on Steam** — the import table our hooks target is
+  rebuilt at runtime by the unpacker, so hook installation timing (and whether the
+  packer clobbers it) has to be tested, not assumed.
+- Good news: it is still x86, `ImageBase 0x400000`, **no ASLR** — so once unpacked
+  in memory, addresses are stable per run, same as GOG.
+
+**Practical stance:** the framework targets **DRM-free builds (GOG)**. Steam support
+is a separate, larger effort — dump the unpacked image, check whether the underlying
+build matches GOG (if so, offsets rebase cheaply), and adapt hook installation to run
+after the unpacker. Until then, `VerifyTarget` will simply refuse the Steam build
+rather than risk it.
+
 ---
 
 ## The Message / Event System
@@ -540,33 +572,53 @@ rendering are all already there.
 
 ### Ships are an array of fixed structs
 
-Each ship in a battle is a **`0x4A8`-byte struct**, in an array based around
-`0x008BC468`. Observed fields (offsets from the struct base):
+Each ship in a battle is a **`0x4A8`-byte struct**, in an array based at
+**`0x008BC468`**, indexed `[i * 0x12A]` (dword stride = `0x4A8`). Offsets confirmed
+from the setup code in `FUN_0047A040`:
 
-| Field (example global) | Meaning |
+| Offset | Field |
 |---|---|
-| `0x008BC46C` / `0x008BC470` | position (x, y) |
-| `0x008BC474` | heading / facing (drives the wind gauge) |
-| `0x008BC480`–`0x008BC488` | sails / rigging |
-| `0x008BC494` | hull damage (`100 - value` = %) |
-| `0x008BC498` | name / id |
-| `0x008BC4B0` | **AI command output** (see below) |
+| `+0x00` | flags / type (set to `1` on init) |
+| `+0x04` | **X position** (stored ×100) |
+| `+0x08` | **Y position** (stored ×100) |
+| `+0x0C` | heading / facing (drives the wind gauge) |
+| `+0x10` | stat (`300` at init — crew/speed) |
+| `+0x2C` | hull damage (`100 - value` = %) |
+| `+0x30` | name / id |
+| `+0x48` | **command / action** (see below) |
+| `+0x60` | combat state |
 
-The code indexes ships as `[i * 0x12A]` (dword stride = `0x4A8`), and the
-reference ship is reached at `base - i*0x4A8`. Ship speed is surfaced to the HUD as
-`"@NUM knots"`, and sail state toggles between **`Battle Sails`** and
-**`Full Sails`**.
+The reference ship lives at array index 4 (`0x008BD708`), so ship-to-ship distance
+is `(0x008BD70C − shipX, 0x008BD710 − shipY)` fed through the octagonal formula.
+Ship speed is surfaced to the HUD as `"@NUM knots"`, and sail state toggles between
+**`Battle Sails`** and **`Full Sails`**.
+
+### The battle instance — `FUN_0047A040`
+
+This is the naval-combat instance: on entry it initialises the ship array (ship 0 =
+the player, position `(0,0)` scaled ×100, heading, a stat of 300), then runs the
+per-ship combat loop — naming (`"Pirate @SHIPTYPE '@SHIPNAME'"`), firing and range
+checks (via `FUN_00476190`), movement, and the camera centre
+(`0x0085A124`/`0x0085A128`). A race mode would enter this same instance with chosen
+ships and start positions.
 
 **Ship-to-ship distance uses the same octagonal approximation** as
 `FindNearestCity` — `(min + max*2)/2` — which `game::CityDistance()` already
 reproduces. So measuring "how far is ship A from point B" needs no new math.
 
-### The combat AI — `FUN_00478730`
+### The combat AI and the command field — `FUN_00478730`
 
 Per ship, the AI picks one of **Fire / Board / Flee / Strike / Escort** from the
 relative hull, sail, and position of the two ships, and writes the choice to the
-ship's command field (`+0x008BC4B0`). This is the decision a race would **override**
-— instead of choosing a combat action, steer the ship toward the next waypoint.
+ship's **command field at `+0x48`** (`0x008BC4B0` for ship 0). `FUN_00476190` then
+reads that field (`0` fire, `1` board/escort, `2` flee) to drive the sail flags and
+the ship's behaviour that frame.
+
+So the command field is the single lever for a race: **override it (or write the
+heading at `+0x0C` directly) to steer a ship toward the next waypoint instead of
+letting the AI choose a combat action.** No rendering involved — it is a plain
+field write on the game thread, exactly the kind of state change the framework
+already does safely.
 
 ### Designing a race mode on top of this
 

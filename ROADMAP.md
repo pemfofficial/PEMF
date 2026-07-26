@@ -136,11 +136,21 @@ Until this is solved, everything visual is on hold. Everything non-visual works.
 
 ### 🟡 Running on every version of the game
 
-The framework currently targets one specific build of the game. The retail
-2004/disc release and other builds are different binaries, so the internal
-addresses don't line up. A version-detection step (fingerprint the game before
-launch, load the right map) is the plan. Until then, PEMF is build-specific and
-will refuse to run on a build it doesn't recognize rather than risk your game.
+The framework currently targets one specific build. Different releases are
+different binaries, so internal addresses don't line up; a version-detection step
+(fingerprint the game, load the right map) is the plan, and until then PEMF refuses
+any build it doesn't recognise rather than risk your game.
+
+The build landscape, now measured:
+
+- **GOG** — fully supported. Plain executable, analysed, every address mapped.
+- **Steam** — **DRM-packed.** The executable is compressed/encrypted on disk and
+  only unpacks in memory at launch, so its addresses can't be read from the file
+  the way GOG's were. Supporting it is a separate, larger effort: run it, dump the
+  unpacked image from memory, check whether the underlying build matches GOG (if so,
+  the map rebases cheaply), and adapt the hooks to install after the unpacker runs.
+  Details in [`docs/GAME_API.md`](docs/GAME_API.md#build-support-gog-vs-steam).
+- **Challenge Pack / retail disc** — different builds again; out of scope for now.
 
 ### 🟡 Windows Smart App Control
 
