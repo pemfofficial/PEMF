@@ -696,12 +696,32 @@ would have prepared, and the process crashes on the reset — verified. The
 `game::ForceResolution` wrapper exists and is correct as to *what* to write, but
 forcing it standalone is not viable.
 
-**The correct approach is to add 1920×1080 to the menu's resolution list**, so the
+**The implemented approach adds 1920×1080 to the menu's resolution list**, so the
 player selects it and the game runs its own complete, crash-free switch. The list
-is built from enumerated display modes filtered to 4:3; the table lives at
-`0x008CABF0` (12-byte entries, width at +4, height at +8) and is indexed by the
-slider. Widening that filter (or injecting a widescreen entry) is the pending
-piece.
+builder `FUN_004B2DF0(&table)` enumerates display modes and keeps only 4:3 ones via
+`cmp (height*100/width), 75` → `jne` at `0x004B2E8A` (bytes `75 21`). The core NOPs
+that `jne` (`90 90`) so every mode — widescreen included — is listed. The table is
+at `0x008CABF0` (12-byte entries, width +4, height +8), and the builder is a
+two-pass count-then-fill, so the count stays consistent.
+
+**Result: 1920×1080 is selectable and the 3D world renders in true 16:9** (the
+projection aspect comes from the resolution).
+
+### The 4:3 UI at 16:9 — an open problem
+
+The game renders its 2D UI in a **fixed 640×480 logical space** — `ScreenW`/`ScreenH`
+(and their sources `UIWidth`/`UIHeight`) stay `640×480` for *every* resolution;
+only the device size changes. At a 4:3 device that logical space scales up
+uniformly and everything lines up. At 16:9 (1920×1080) the horizontal scale
+diverges from the vertical, so the 2D UI stretches and the **mouse is offset
+horizontally** over menu items.
+
+The mouse maps through `FUN_005025D0` (`ScreenToClient`) → `FUN_005045A0` →
+`FUN_00504310` (the client→UI transform). A proper fix pillarboxes the 2D UI (keep
+the 4:3 interface centred with side bars, keep the 3D at 16:9) and adjusts the
+mouse mapping for the offset. That is the pending piece; forcing `ScreenW`/`ScreenH`
+to the device size is *not* a safe shortcut, since the 2D pipeline is built around
+the 640×480 logical space.
 
 ## Audio / Sound System
 
