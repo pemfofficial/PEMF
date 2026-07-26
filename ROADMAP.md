@@ -155,9 +155,16 @@ Investigated 2026-07-26; findings in [`docs/GAME_API.md`](docs/GAME_API.md).
   the archive. It turns out not to matter, because engine code could not show an
   eighth good anyway. Details in
   [`re/experiments/trade_goods/`](re/experiments/trade_goods/README.md).
-- ✅ **Loose-file override does work for some data** — `assets\data\Landscape.ini`
-  and `Data\AdvancedLighting.ini` are read from disk in preference to the packed
-  copies. Useful elsewhere, even though it does not help with text.
+- ✅ **Loose-file override works — but per subsystem, not everywhere.** Measured:
+  the game reads `assets\data\Landscape.ini` (terrain types, tree canopy, terrain
+  streaming) and `Data\AdvancedLighting.ini` (shadow darkness, light levels)
+  **from disk in preference to the packed copies**, so those can be changed by
+  dropping an edited file in — no repacking, no tools. `text.ini` is not read
+  that way. Which files can be overridden depends on which part of the game
+  reads them, so it has to be checked rather than assumed; the data-file probe
+  answers it in one restart. Nothing to do with trade goods — it fell out of
+  proving the text result — but a real lever for anyone changing how the world
+  looks.
 
 ## Crew & morale
 

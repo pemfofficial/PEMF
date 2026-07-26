@@ -97,8 +97,14 @@ fade on their own. A lookout sighting a harbour is a notice, not a question.
 ### Events fire from play
 
 Events happen while you are **sailing the overworld**. They will not interrupt
-you in a town, a menu, a battle, or while paused. So far they can fire after a
-stretch of sailing, or on approaching a port; more triggers are coming.
+you in a town, a menu, a battle, or while paused. They can fire after a stretch
+of sailing, on approaching a port, or when something about your ship crosses a
+line — your crew thinning out, your purse running low, morale souring, a voyage
+dragging on.
+
+A notice can also **hang over your ship and follow it** as you sail, the way the
+game labels other vessels, and it can name the port you are approaching:
+*"Land ho! Nevis off the bow!"*
 
 ### Your saves are respected
 
@@ -109,13 +115,15 @@ into a career it does not belong to.
 
 ### Testing hotkeys
 
-While the trigger system is being built, events are fired by hand. These are
-temporary and will disappear once events fire naturally from play.
+Events fire on their own during play. These are for **authors**, so you can see
+your own event without waiting for its conditions to come round.
 
 | Keys | What it does |
 |---|---|
 | **Ctrl+Shift+1** | Fires the first loaded event |
 | **Ctrl+Shift+2** | Fires the second |
+| **Ctrl+Shift+3** | A test notice at the top of the screen |
+| **Ctrl+Shift+4** | A test notice over your ship |
 
 You must be **in an actual game** (sailing, not at the main menu) — events read
 your live crew state.

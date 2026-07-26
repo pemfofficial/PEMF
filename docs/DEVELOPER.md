@@ -40,9 +40,9 @@ Content lives outside the DLL entirely, in `PEMF\events\*.json` beside the game.
 
 | Site | Role |
 |---|---|
-| `0x004726CA` → `FUN_004612B0` | **the render phase** — where anything visible happens |
+| `IDirect3DDevice9::BeginScene` / `EndScene` | **the render phase** — where anything visible happens |
 
-### Decide at the top, show after the render
+### Decide at the top, show inside the frame
 
 Two different points in the frame, for two different jobs. Conflating them was a
 real bug.
@@ -61,11 +61,30 @@ makes it the wrong place to show things:
   stale, half-drawn frame
 - HUD text drawn there is painted over by the world
 
-So presenting happens after `FUN_004612B0` (the sailing render) returns.
-That function has exactly one caller, so PEMF rewrites **that call's rel32** to
-its own stub rather than detouring the prologue — one 4-byte write, no
-trampoline, nothing relocated, and reversible. `render::Install()` verifies the
-call previously targeted `0x004612B0` and reverts if it did not.
+So showing happens **inside the frame**, on the game's own Direct3D device.
+
+> **Historical note, kept because it cost a lot to learn.** This used to work by
+> rewriting the rel32 of the single call to `FUN_004612B0` (the sailing render).
+> That **black-screened the game even with a callback that did nothing but
+> increment a counter** — the redirection itself was the fault. `render.h`
+> survives as the record of that dead end; the live path is `d3d9hook.h`.
+
+The device is found at `[[0x00727C30]+0x60]` and its vtable patched, so no game
+code is rewritten. **Two phases, not interchangeable, and both fail silently if
+confused:**
+
+- **`BeginScene`** — the frame is empty. **World-anchored text** goes here,
+  because the engine's world-text call builds scene-graph nodes that the render
+  walk then draws. Issued later, they are built after the walk that would have
+  drawn them.
+- **`EndScene`** — the scene is complete. **Screen-space HUD text** goes here,
+  because it is an immediate 2D blit that has to land on top.
+
+A displayed frame contains **several** `BeginScene`/`EndScene` pairs with
+different cameras, so world text is drawn in the **first** pass only. The frame
+boundary comes from the safe point, **not** `Present` — this game never calls
+`Present` on the device. Full account in
+[`GAME_API.md`](GAME_API.md#drawing-our-own-text--solved-and-how).
 
 ### Layer rules
 
@@ -75,6 +94,11 @@ call previously targeted `0x004612B0` and reverts if it did not.
   runs on the next frame ahead of the queue.
 - **Never** draw HUD text outside the render phase — it has no timer of its own
   and must be re-issued every frame.
+- **Never** draw world-anchored text at `EndScene`, or screen text at
+  `BeginScene`. Both are silent failures, not errors.
+- **Never** hand the engine a token argument count, or an `@ITEM` index, that has
+  not been read out of the disassembly. It does not bounds check; `@ITEM` past
+  the end of its list access-violates.
 - `session::Ready()` gates content on an active, loaded career.
 
 ### Why a `version.dll` proxy
@@ -263,14 +287,25 @@ heartbeat: ticks=1993 crew=40 morale=4 plunder=600 -- IN GAME
 
 ### Debug hotkeys
 
-**Scaffolding only** — behind `kDebugHotkeys` in `core.cpp`, to be removed once
-real triggers exist. F-keys collide with the game's own menus, hence Ctrl+Shift.
+Behind `kDebugHotkeys` in `core.cpp`. Triggers are live, so these are for
+testing content without waiting for the conditions to come round, plus a few
+engine probes. F-keys collide with the game's own menus, hence Ctrl+Shift.
 
 | Key | Action |
 |---|---|
-| Ctrl+Shift+1 | Consequence event (yes/no + state change + outcome) |
-| Ctrl+Shift+2 | Choice event, message form |
-| Ctrl+Shift+3 | Plain narrative card |
+| Ctrl+Shift+1 | Fire the first authored event |
+| Ctrl+Shift+2 | Fire the second |
+| Ctrl+Shift+3 | Test notice at the top of the screen |
+| Ctrl+Shift+4 | Test notice anchored over the ship |
+| Ctrl+Shift+5 | Log the engine's item names, indices 0-6 |
+| Ctrl+Shift+6 | Log item index 7 — **past the stock list; the lookup is not bounds checked** |
+| Ctrl+Shift+7 | Toggle the data-file probe (see below) |
+
+**The data-file probe** logs every `.ini` / `.txt` / `.csv` / `.fpk` the game
+opens *and every one it fails to open* — the misses are what reveal whether a
+loose file would be picked up. The hotkey is nearly useless on its own, because
+assets load during startup: drop a `PEMF\fileprobe.on` next to the exe and it is
+armed from the first open instead.
 
 The event engine must never know these exist. It takes a trigger and fires;
 whether that trigger was a keypress or a port entry is the caller's business.
@@ -285,16 +320,30 @@ whether that trigger was a keypress or a port entry is the caller's business.
 | 0.5 — modal choice + state consequences | **Verified in-game** |
 | 0.75 — hardening: safe point, threads, save/load, validation | **Verified in-game** |
 | 1a — JSON event engine | **Verified in-game** |
-| 1b — trigger layer (`elapsedSailing`, `nearPort`) | `elapsedSailing` **verified**; `nearPort` built |
-| 1c — render phase + `notice` events | **Built**, hook verified installing |
-| 1d — officers | **Next** |
+| 1b — trigger layer (`elapsedSailing`, `nearPort`, `stateCrosses`) | **Verified in-game**; `stateCrosses` built |
+| 1c — render phase + `notice` events | **Verified in-game**, on GOG and Steam |
+| 1c+ — notices anchored to the ship, `{placeholder}` authoring | **Verified in-game** |
+| 1d — event cards from inside the frame (stage 3) | **Next** — see below |
+| 1e — officers | After 1d |
 | 2 — crew simulation, mutiny outcomes | Planned |
 | 3 — factions and divisions | Later |
 | 4 — custom UI, textures, meshes | Much later |
 
-### Next: officers
+### Next: stage 3 — cards from inside the frame
 
-The framework pieces officers need are now in place — persistence keyed to the
+The one visible rough edge left. Event cards are presented from the safe point,
+before the world has been drawn that frame, so the background behind a card is
+stale or half-drawn.
+
+The fix is presenting from inside the frame hook, and the scaffolding exists
+(`PEMF_D3D9_STAGE 3`). **It is not a matter of raising the constant:** the
+game's dialog is modal and blocking, so its own message loop would re-enter
+`BeginScene`/`EndScene` from inside our hook. That needs a re-entrancy guard
+first.
+
+### After that: officers
+
+The framework pieces officers need are in place — persistence keyed to the
 save (`session.h`), validated state access, a render phase for any UI, and two
 event kinds to talk to the player through.
 

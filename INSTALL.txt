@@ -45,13 +45,14 @@ PEMF writes pemf.log next to Pirates!.exe.  A healthy start looks like:
     content: 3 event(s) from 1 file(s)
     safe point reached (main loop PeekMessageA) -- deferred dispatch live
 
-While the trigger system is being built, events are fired by hand.  Load a game,
+Events fire on their own while you sail.  To see one on demand, load a game,
 get sailing, then:
 
     Ctrl+Shift+1    fire the first event
     Ctrl+Shift+2    fire the second
 
-These hotkeys are temporary and will go away once events fire from play.
+These hotkeys are for authors testing their own events; they are not needed to
+play.
 
 
 UNINSTALL

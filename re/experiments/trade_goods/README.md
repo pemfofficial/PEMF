@@ -1,19 +1,45 @@
 # Can a trade good be *added*?
 
-The engine's cargo array is fixed at seven slots and cannot grow — measured in
-[`docs/GAME_API.md`](../../../docs/GAME_API.md#trade-goods--the-cargo-model-and-what-adding-one-would-cost).
-That leaves one question worth answering before designing anything:
+## The short version
 
-> **Is the item list the *file's*, or the *engine's*?**
+The game has **7 cargo types**, hardwired. Could we add an 8th? Two walls, and
+neither one ends up mattering.
 
-`@ITEM` is a `__VAR` lookup into the `[ITEM]` group parsed from `text.ini` at
-runtime. If an eighth entry loads and renders, then goods PEMF invents can carry
-names through the game's own text system, and authored text about them reads
-natively. If it does not, they need a text path of their own.
+**Wall 1 — the hold.** The ship's cargo is a fixed block of 7 numbers in
+memory. The number immediately after it is already used for something else, so
+there is no room to grow. 82 places in the game's code read that block, many
+naming individual goods outright.
 
-Nothing here modifies the game. The probes read state back and log it.
+**Wall 2 — the names.** Good names (Gold, Food, Sugar…) come from `text.ini`,
+which is sealed inside `Pak1.FPK`. **The game never looks on disk for it**
+(proven below), so a modified copy cannot be slipped in without repacking a game
+file — which this project does not do.
+
+**Why neither matters.** A PEMF trade good does not need the game's 7 slots or
+its name list. It lives in *our* memory, its name is a string in *our* JSON, and
+it is drawn with the *same* routines the game uses — so it still looks like part
+of the game. And the engine's own trade screen loops over items 0-5 and stops,
+so it could never have shown an 8th good anyway. Winning either wall would have
+changed nothing.
+
+**Conclusion: build trade goods in PEMF, with our own UI. Do not repack
+anything.**
+
+## Two things worth carrying away
+
+1. **`@ITEM` is not bounds checked** — asking for an item index past the end of
+   the list access-violates. Never emit one; bounds-check against the live list
+   length, not a constant.
+2. **Loose-file override works for some files and not others**, depending on
+   which part of the game reads them. `landscape.ini` and
+   `advancedlighting.ini` are read from disk in preference to their packed
+   copies — so terrain, foliage and shadow settings can be changed by dropping
+   an edited file in, no repacking. `text.ini` is not. **Check, do not assume**;
+   the probe below answers it in one restart.
 
 ---
+
+## The detail
 
 ## Step 1 — does the probe itself work?
 
