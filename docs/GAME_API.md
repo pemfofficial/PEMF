@@ -672,6 +672,33 @@ fallback.
 None of these need the render hook; they are ordinary reverse engineering of the
 combat setup, and player-vs-AI needs no networking.
 
+## Resolution / widescreen
+
+The game has a native resolution switcher (Options → *Change Video Resolution*),
+but its list is **filtered to 4:3 modes** — so it offers e.g. 1440×1080 but not
+1920×1080. The framework adds widescreen by calling the game's own apply function
+directly, bypassing that list.
+
+| Address | What |
+|---|---|
+| `0x004D3AB0` | `SetResolution(int w, int h)` — cdecl. The game's own "switch to WxH". |
+| `0x0072637C` / `0x00726380` | UI width / height — copied into `ScreenW` / `ScreenH` by the apply. |
+| `0x008CAC18` / `0x008CAC1C` | current device width / height (the apply's change-guard). |
+| `0x008CABF0` | resolution table base (12-byte entries: width at +4, height at +8), indexed by the slider. |
+
+`SetResolution` resets the D3D device, resizes the window, and — importantly —
+derives the projection aspect from `height / width`. So 1920×1080 yields a genuine
+**16:9 view (wider field of view), not a stretched 4:3**. Because it takes
+`ScreenW`/`ScreenH` from the UI-dimension globals, those are set first:
+
+```cpp
+game::ForceResolution(1920, 1080);   // sets UIWidth/UIHeight, then calls SetResolution
+```
+
+`game.h` wraps this; the core forces it once, shortly after the safe point goes
+live (so the render device is up before the reset). The engine lays out its UI as
+fractions of `ScreenW`/`ScreenH`, so the interface scales rather than breaking.
+
 ## Audio / Sound System
 
 > **Confidence: decompiled, not yet run.** Recovered by byte analysis

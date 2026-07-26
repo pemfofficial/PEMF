@@ -301,6 +301,18 @@ static void RunSafePoint()
         Log("safe point reached (main loop PeekMessageA) -- deferred dispatch live");
     }
 
+    // One-time: upscale to 1920x1080 (widescreen). Done a moment after the safe
+    // point is live, so the render device is definitely up before we reset it.
+    // The engine lays out the UI as fractions of ScreenW/H and derives the
+    // projection aspect from the resolution, so this is a genuine 16:9 view, not
+    // a stretched 4:3. Bypasses the menu's 4:3-only resolution list.
+    static bool g_resForced = false;
+    if (!g_resForced && g_safePointHits > 30) {
+        g_resForced = true;
+        game::ForceResolution(1920, 1080);
+        Log("resolution: forced 1920x1080 (widescreen upscale)");
+    }
+
     // A career starting, ending, or being loaded invalidates all trigger
     // progress -- accumulated sailing time and armed/disarmed state belong to
     // the career they were earned in.

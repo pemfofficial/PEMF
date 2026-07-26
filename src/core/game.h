@@ -126,6 +126,15 @@ namespace addr {
     constexpr uintptr_t SlotPeekMessageA = 0x006C03A4;  // USER32!PeekMessageA
     constexpr uintptr_t SlotCreateFileA  = 0x006C0074;  // KERNEL32!CreateFileA
     constexpr uintptr_t SlotCreateFileW  = 0x006C0154;  // KERNEL32!CreateFileW
+
+    // Resolution. SetResolution (FUN_004D3AB0, cdecl(w,h)) is the game's own
+    // "switch to WxH": it resets the D3D device, resizes the window, and derives
+    // the projection aspect from height/width -- so 16:9 is a true widescreen
+    // view, not a 4:3 stretch. It copies ScreenW/H from UIWidth/UIHeight, which
+    // are therefore set first. This bypasses the menu's 4:3-only resolution list.
+    constexpr uintptr_t SetResolution = 0x004D3AB0;
+    constexpr uintptr_t UIWidth       = 0x0072637C;  // becomes ScreenW
+    constexpr uintptr_t UIHeight      = 0x00726380;  // becomes ScreenH
 }
 
 // ------------------------------------------------------------- state access
@@ -136,6 +145,16 @@ inline int32_t&  StateFlags()       { return *(int32_t*)addr::StateFlags; }
 
 typedef int (*GetMoraleLevel_t)();
 inline int GetMoraleLevel() { return ((GetMoraleLevel_t)addr::GetMoraleLevel)(); }
+
+// Force the game to a given resolution, bypassing the menu's 4:3-only list. Sets
+// the UI dimensions (which become ScreenW/H) then invokes the game's own switch.
+typedef void (__cdecl *SetResolution_t)(int w, int h);
+inline void ForceResolution(int w, int h)
+{
+    *(int32_t*)addr::UIWidth  = w;
+    *(int32_t*)addr::UIHeight = h;
+    ((SetResolution_t)addr::SetResolution)(w, h);
+}
 
 // ---------------------------------------------------------------- the shims
 //
