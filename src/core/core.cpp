@@ -106,6 +106,54 @@ static bool HookIAT(const char* dllName, const char* funcName,
   }
 }
 
+// True if p lies within the loaded image of dllName -- i.e. the slot holds a
+// real function pointer into that module (the loader/unpacker has populated it).
+static bool PointsIntoModule(const void* p, const char* dllName)
+{
+    HMODULE m = GetModuleHandleA(dllName);
+    if (!m || !p || !PageReadable(m, sizeof(IMAGE_DOS_HEADER))) return false;
+    auto* dos = (IMAGE_DOS_HEADER*)m;
+    auto* nt  = (IMAGE_NT_HEADERS*)((BYTE*)m + dos->e_lfanew);
+    if (!PageReadable(nt, sizeof(IMAGE_NT_HEADERS))) return false;
+    uintptr_t base = (uintptr_t)m;
+    return (uintptr_t)p >= base && (uintptr_t)p < base + nt->OptionalHeader.SizeOfImage;
+}
+
+// Hook an IAT slot by its ABSOLUTE address. Needed on the DRM-packed Steam build
+// whose import name tables are destroyed (so HookIAT-by-name fails) but whose
+// slots are still populated at their known addresses. Only patches once the slot
+// holds a real pointer into the expected module, so calling it early -- before
+// the unpacker has filled the slot -- is a harmless no-op we can retry.
+static bool HookSlotByAddr(uintptr_t slotVA, const char* expectedDll,
+                           void* replacement, void** original)
+{
+    void** slot = (void**)slotVA;
+    if (!PageReadable(slot, sizeof(void*))) return false;
+    void* cur = *slot;
+    if (cur == replacement) return true;                    // already ours
+    if (!PointsIntoModule(cur, expectedDll)) return false;  // not populated yet
+    DWORD old = 0;
+    if (!VirtualProtect(slot, sizeof(void*), PAGE_READWRITE, &old)) return false;
+    *original = cur;
+    *slot = replacement;
+    VirtualProtect(slot, sizeof(void*), old, &old);
+    return true;
+}
+
+// Restore a slot we hooked, by absolute address. Same physical slot HookIAT
+// patches, so this restores hooks installed either way. Never stomps a slot that
+// no longer holds our replacement.
+static void UnhookSlot(uintptr_t slotVA, void* replacement, void* original)
+{
+    if (!original) return;
+    void** slot = (void**)slotVA;
+    if (!PageReadable(slot, sizeof(void*)) || *slot != replacement) return;
+    DWORD old = 0;
+    if (!VirtualProtect(slot, sizeof(void*), PAGE_READWRITE, &old)) return;
+    *slot = original;
+    VirtualProtect(slot, sizeof(void*), old, &old);
+}
+
 // --------------------------------------------------------- build diagnostics
 // Dumps the host image's layout and import table. On a DRM-packed build (e.g.
 // the Steam executable) the on-disk imports are a tiny unpacker stub; the real
@@ -456,6 +504,26 @@ static HANDLE WINAPI Hook_CreateFileW(LPCWSTR name, DWORD access, DWORD share,
     return h;
 }
 
+// ------------------------------------------------------------------- hooks
+// Each hook with the absolute IAT-slot address for its function. Hook-by-name
+// works on the GOG build; the by-address slot patch covers the packed Steam
+// build, whose import name tables are destroyed but whose slots are populated.
+struct HookSpec { uintptr_t slot; const char* dll; const char* fn; void* hook; void** orig; };
+static HookSpec g_hookSpecs[] = {
+    { game::addr::SlotTimeGetTime,  "WINMM.dll",    "timeGetTime",  (void*)&Hook_timeGetTime,  (void**)&g_origTimeGetTime },
+    { game::addr::SlotPeekMessageA, "USER32.dll",   "PeekMessageA", (void*)&Hook_PeekMessageA, (void**)&g_origPeekMessage },
+    { game::addr::SlotCreateFileA,  "KERNEL32.dll", "CreateFileA",  (void*)&Hook_CreateFileA,  (void**)&g_origCreateFile  },
+    { game::addr::SlotCreateFileW,  "KERNEL32.dll", "CreateFileW",  (void*)&Hook_CreateFileW,  (void**)&g_origCreateFileW },
+};
+
+// Try the proven name-based hook first (GOG, unchanged), then fall back to
+// patching the slot by absolute address (Steam).
+static bool InstallOneHook(const HookSpec& h)
+{
+    if (HookIAT(h.dll, h.fn, h.hook, h.orig)) return true;
+    return HookSlotByAddr(h.slot, h.dll, h.hook, h.orig);
+}
+
 // --------------------------------------------------------------- entry point
 static DWORD WINAPI Init(LPVOID)
 {
@@ -478,34 +546,40 @@ static DWORD WINAPI Init(LPVOID)
     DiagnoseImage("at-load");
     CloseHandle(CreateThread(nullptr, 0, DelayedDiag, nullptr, 0, nullptr));
 
+    // Wait for the host to be ready. The GOG build verifies immediately; the
+    // DRM-packed Steam build unpacks its .text lazily, so poll the byte probes
+    // until they match (or give up and load passively). Reading not-yet-unpacked
+    // .text returns garbage, not a fault, so polling is safe.
     char why[256] = {0};
+    int waited = 0;
+    for (; waited < 150 && !game::VerifyTarget(why, sizeof(why)); ++waited)
+        Sleep(100);                               // up to ~15s
     g_targetOK = game::VerifyTarget(why, sizeof(why));
-    if (g_targetOK) Log("target verified: offsets match the expected build");
-    else {
-        Log("TARGET MISMATCH: %s", why);
-        Log("refusing to touch game memory");
-    }
 
-    // Install IAT hooks ONLY on a verified build. On an unrecognised or
-    // DRM-packed host the import table may be encrypted/mid-unpack, so walking
-    // and patching it can fault -- and we have no business modifying a binary we
-    // do not recognise. Loading passively also lets a packed build keep running
-    // so the delayed diagnostic can capture the real, unpacked import table.
-    if (g_targetOK) {
-        struct { const char* dll; const char* fn; void* hook; void** orig; } hooks[] = {
-            { "WINMM.dll",    "timeGetTime",  (void*)&Hook_timeGetTime,  (void**)&g_origTimeGetTime },
-            { "USER32.dll",   "PeekMessageA", (void*)&Hook_PeekMessageA, (void**)&g_origPeekMessage },
-            { "KERNEL32.dll", "CreateFileA",  (void*)&Hook_CreateFileA,  (void**)&g_origCreateFile  },
-            { "KERNEL32.dll", "CreateFileW",  (void*)&Hook_CreateFileW,  (void**)&g_origCreateFileW },
-        };
-        for (auto& h : hooks) {
-            if (HookIAT(h.dll, h.fn, h.hook, h.orig))
-                Log("hooked %s!%s", h.dll, h.fn);
-            else
-                Log("ERROR: could not hook %s!%s", h.dll, h.fn);
-        }
+    if (!g_targetOK) {
+        Log("TARGET MISMATCH: %s", why);
+        Log("PASSIVE LOAD: no hooks installed, no game memory touched");
     } else {
-        Log("target not verified -- PASSIVE LOAD: installing no hooks, touching no memory");
+        if (waited) Log("target verified after %d ms (host unpacked)", waited * 100);
+        else        Log("target verified: offsets match the expected build");
+
+        // Install the hooks. On the packed build a slot may be filled slightly
+        // after .text unpacks, so retry until all four take (or time out). Each
+        // hook is installed at most once -- never re-patch an already-hooked slot
+        // (that would capture our own thunk as the "original").
+        int installed = 0;
+        for (int attempt = 0; attempt < 100 && installed < 4; ++attempt) {
+            installed = 0;
+            for (auto& h : g_hookSpecs) {
+                if (*h.orig) { ++installed; continue; }   // already hooked
+                if (InstallOneHook(h)) ++installed;
+            }
+            if (installed < 4) Sleep(100);                // up to ~10s
+        }
+        for (auto& h : g_hookSpecs)
+            Log("  %-12s %-13s slot 0x%08X  %s", h.dll, h.fn, (unsigned)h.slot,
+                (*h.orig ? "hooked" : "NOT hooked"));
+        Log("hooks installed: %d/4", installed);
     }
 
     // Content lives beside the exe so players can edit it without touching the
@@ -539,17 +613,11 @@ BOOL APIENTRY DllMain(HMODULE mod, DWORD reason, LPVOID reserved)
     else if (reason == DLL_PROCESS_DETACH && reserved == nullptr) {
         render::Uninstall();
         d3d9hook::Uninstall();
-        // Restore the IAT only on an explicit FreeLibrary. On process teardown
+        // Restore the slots only on an explicit FreeLibrary. On process teardown
         // the address space is going away and touching locks risks a hang.
-        void* dummy = nullptr;
-        if (g_origTimeGetTime)
-            HookIAT("WINMM.dll", "timeGetTime", (void*)g_origTimeGetTime, &dummy);
-        if (g_origPeekMessage)
-            HookIAT("USER32.dll", "PeekMessageA", (void*)g_origPeekMessage, &dummy);
-        if (g_origCreateFile)
-            HookIAT("KERNEL32.dll", "CreateFileA", (void*)g_origCreateFile, &dummy);
-        if (g_origCreateFileW)
-            HookIAT("KERNEL32.dll", "CreateFileW", (void*)g_origCreateFileW, &dummy);
+        // By-address restore works whether the hook was installed by name or by
+        // slot, so it covers both the GOG and Steam paths.
+        for (auto& h : g_hookSpecs) UnhookSlot(h.slot, h.hook, *h.orig);
     }
     return TRUE;
 }

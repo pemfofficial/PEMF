@@ -116,6 +116,16 @@ namespace addr {
     constexpr uintptr_t MainLoop          = 0x0042E1D0;
     constexpr uintptr_t MainLoopPeekCall  = 0x0042E206;
     constexpr uintptr_t MainLoopPeekRet   = MainLoopPeekCall + 6;  // 0x0042E20C
+
+    // Absolute addresses of the IAT slots for the functions we hook. On the
+    // GOG build these are found by name; on the DRM-packed Steam build the
+    // import name tables are destroyed, but the slots themselves live here and
+    // are populated at runtime -- so we hook them by address. Same build, no
+    // ASLR, so these VAs are valid for both.
+    constexpr uintptr_t SlotTimeGetTime  = 0x006C0430;  // WINMM!timeGetTime
+    constexpr uintptr_t SlotPeekMessageA = 0x006C03A4;  // USER32!PeekMessageA
+    constexpr uintptr_t SlotCreateFileA  = 0x006C0074;  // KERNEL32!CreateFileA
+    constexpr uintptr_t SlotCreateFileW  = 0x006C0154;  // KERNEL32!CreateFileW
 }
 
 // ------------------------------------------------------------- state access
