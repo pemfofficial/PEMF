@@ -249,6 +249,70 @@ d = (min(|dx|,|dy|) + max(|dx|,|dy|) * 2) / 2
 
 `game::CityDistance()` reproduces this so reported distances match the engine's.
 
+### City table capacity — how many towns the world can hold
+
+`FindNearestCity`'s own scan loop is the ground truth:
+
+```c
+piVar4 = &DAT_0085B170;   // positions, stride 16
+puVar3 = &DAT_00860B70;   // records,   stride 0x20
+do { /* checks 4 cities per pass */
+    puVar3 += 0x20; piVar4 += 0x10; iVar5 += 4;
+} while (iVar5 + 2 < 0x80);   // indices 0..127
+```
+
+- **The engine walks 128 settlement slots.** That is the ceiling on findable towns.
+- **44 (`0x2C`) are the named colonial cities.** The city-capture code gates a
+  "home nation" write with `if (index < 0x2C)`; the remaining slots are villages,
+  pirate havens, Jesuit missions and native settlements.
+- **So there is real headroom** — the base game is well under 128, leaving room to
+  add settlements up to that cap.
+
+City record layout (`0x00860B70`, stride `0x20`):
+
+| Offset | Field |
+|---|---|
+| +0x00 | flags (`dword`) — bits `0x400` relic, `0x10000`/`0x20000`/`0x800000` state |
+| +0x04 | nation (`byte`) |
+| +0x05 | population / prosperity (`byte`) |
+| +0x06 | militia (`byte`) |
+| +0x08 | goods (`int`) |
+| +0x0C | economy (`int`, 0–200) |
+| +0x10 | home nation (first 44 only) |
+
+Positions live in the parallel table at `0x0085B170` (x, y as 32-bit ints).
+
+### Overworld map format
+
+The map loaders (`0x004458D0`, `0x00445D40`) read `CaribbeanMap2/4/6.bmp` — the
+`2/4/6` are zoom levels of the same map — and:
+
+- build a **`0x400 × 0x400` (1024×1024)** working surface,
+- from an **8-bit paletted** bitmap (256-colour, `FUN_0053A540(0, 0x100)`),
+- blitted at `0x400 × 0x286` (1024 × 646).
+
+**`0x400` (1024) is hardcoded** in the surface size and row stride, so the world
+is a fixed ~1024 grid. World/city coordinates are 32-bit ints, so the coordinate
+range itself is not a constraint.
+
+**What this means for a combined/enlarged world:** replacing the coastline bitmaps
+(what existing map mods do) is straightforward and the game re-fits towns to the
+new landmass procedurally. Fitting *multiple* regions into one world means either
+compressing them into the fixed 1024 grid with up to 128 towns spread across them,
+or — a harder, code-level step — patching the hardcoded `0x400` / 128 constants to
+physically enlarge the grid.
+
+### World-event resolver — `FUN_0044D2E0`
+
+A large switch that resolves pending world events, useful both as a reference and
+as a set of hooks. It handles: royal ultimatums / war and peace, immigrant and
+troop convoys, plague, new governors, pirate and native raids, **city capture**
+(which rewrites a city's nation), **procedural settlement founding** (a village is
+promoted to a town with a nation, population and goods assigned), and the named
+sword-duel encounters. It composes its messages through the same `AddText`
+`@NATION` / `@CITYNAME` pipeline documented above — confirming that towns are
+data-driven and can be created and re-owned at runtime.
+
 ### Screen state — a dead end
 
 `0x007263BC` and `0x00726A84` looked like a current-screen id and a screen-stack
