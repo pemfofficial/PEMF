@@ -275,6 +275,18 @@ static bool  g_targetOK          = false;
 static bool  g_prevKeyDown       = false;
 static DWORD g_gameThreadId      = 0;
 static bool  g_loggedOtherThread = false;
+
+// Mouse aspect correction. = 768 * (deviceW/deviceH): equals 1024 at 4:3 (no
+// change) and widens at 16:9 so clicks line up horizontally. Our fmul operand is
+// repointed here. Defined up here so RunSafePoint can update it; the patch
+// function is below Init.
+static volatile float g_mouseHitTestXScale = 1024.0f;
+static void UpdateMouseAspect()
+{
+    int dw = *(int*)game::addr::DevWidth, dh = *(int*)game::addr::DevHeight;
+    if (dw > 0 && dh > 0)
+        g_mouseHitTestXScale = 768.0f * (float)dw / (float)dh;
+}
 static DWORD g_tickCount         = 0;
 static DWORD g_safePointHits     = 0;
 static bool  g_safePointFound    = false;
@@ -309,10 +321,12 @@ static void RunSafePoint()
         int devW = *(int*)game::addr::DevWidth, devH = *(int*)game::addr::DevHeight;
         if (devW != lastW || devH != lastH) {
             lastW = devW; lastH = devH;
-            Log("resstate: device=%dx%d  screen=%dx%d  ui=%dx%d",
+            UpdateMouseAspect();   // keep the hit-test X scale matched to the new aspect
+            Log("resstate: device=%dx%d  screen=%dx%d  ui=%dx%d  mouseXscale=%.1f",
                 devW, devH,
                 *(int*)game::addr::ScreenW, *(int*)game::addr::ScreenH,
-                *(int*)game::addr::UIWidth, *(int*)game::addr::UIHeight);
+                *(int*)game::addr::UIWidth, *(int*)game::addr::UIHeight,
+                (double)g_mouseHitTestXScale);
         }
     }
 
@@ -566,6 +580,28 @@ static void PatchWidescreenResolutions()
         (unsigned)game::addr::ResAspectFilterJne);
 }
 
+// ---------------------------------------------------- mouse aspect correction
+static void PatchMouseHitTestAspect()
+{
+    uint32_t* operand = (uint32_t*)game::addr::MouseHitTestXFmulOperand;  // 0x0050436F
+    if (!PageReadable(operand, sizeof(uint32_t))) { Log("mouse-aspect: operand not readable"); return; }
+    if (*operand != game::addr::MouseHitTestXConstAddr) {
+        Log("mouse-aspect: unexpected operand 0x%08X at 0x%08X -- NOT patching",
+            *operand, (unsigned)game::addr::MouseHitTestXFmulOperand);
+        return;
+    }
+    UpdateMouseAspect();
+    DWORD old = 0;
+    if (!VirtualProtect(operand, sizeof(uint32_t), PAGE_EXECUTE_READWRITE, &old)) {
+        Log("mouse-aspect: VirtualProtect failed"); return;
+    }
+    *operand = (uint32_t)(uintptr_t)&g_mouseHitTestXScale;   // repoint to our float
+    VirtualProtect(operand, sizeof(uint32_t), old, &old);
+    FlushInstructionCache(GetCurrentProcess(), operand, sizeof(uint32_t));
+    Log("mouse-aspect: hit-test X repointed to aspect-adaptive scale (now %.1f)",
+        (double)g_mouseHitTestXScale);
+}
+
 // --------------------------------------------------------------- entry point
 static DWORD WINAPI Init(LPVOID)
 {
@@ -634,6 +670,9 @@ static DWORD WINAPI Init(LPVOID)
 
     // Enable widescreen resolutions in the game's own Options menu (code patch).
     if (g_targetOK) PatchWidescreenResolutions();
+
+    // Correct the mouse hit-test for the actual aspect ratio (code patch).
+    if (g_targetOK) PatchMouseHitTestAspect();
 
     // The render-phase hook. Only attempted once the target is verified, since
     // it writes to the game's code.

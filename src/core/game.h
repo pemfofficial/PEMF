@@ -143,6 +143,16 @@ namespace addr {
     // 75 21 -> 90 90) and every display mode is listed -- widescreen included --
     // so 1920x1080 becomes a normal, selectable, crash-free menu choice.
     constexpr uintptr_t ResAspectFilterJne = 0x004B2E8A;
+
+    // Mouse hit-test aspect. The cursor->UI-plane transform (FUN_00504310)
+    // multiplies normalized X by a fixed 1024.0 and Y by 768.0 -- a hardcoded
+    // 4:3 plane, so at 16:9 the horizontal click position is compressed and
+    // clicks land off to the side. `fmul dword ptr [0x007135C8]` sits at
+    // 0x0050436D; its 4-byte operand (the absolute address 0x007135C8) is at
+    // 0x0050436F. We repoint just that operand to our own float so only this
+    // instruction changes (the 1024/768 constants are shared by other code).
+    constexpr uintptr_t MouseHitTestXFmulOperand = 0x0050436F;
+    constexpr uint32_t  MouseHitTestXConstAddr   = 0x007135C8;  // expected current operand
 }
 
 // ------------------------------------------------------------- state access
