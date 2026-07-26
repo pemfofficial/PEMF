@@ -297,10 +297,67 @@ range itself is not a constraint.
 
 **What this means for a combined/enlarged world:** replacing the coastline bitmaps
 (what existing map mods do) is straightforward and the game re-fits towns to the
-new landmass procedurally. Fitting *multiple* regions into one world means either
-compressing them into the fixed 1024 grid with up to 128 towns spread across them,
-or — a harder, code-level step — patching the hardcoded `0x400` / 128 constants to
-physically enlarge the grid.
+new landmass procedurally. Fitting *multiple* regions into one world has three
+shapes, in increasing difficulty:
+
+1. **Compress into the 1024 grid** — lay all regions inside the fixed world with
+   up to 128 towns spread across them. Asset-and-data only, no code risk.
+2. **Zone transitions** — keep separate 1024 maps and swap at the edge (see
+   below). Sidesteps *both* the size and town limits; medium effort, low risk.
+3. **Enlarge the grid** — patch the hardcoded `0x400` everywhere plus the
+   coordinate mapping. Real risk: many coupled sites, 16× the map memory on a
+   32-bit game, and it does **not** raise the separate 128-town cap. Code-level,
+   version-specific, test-heavy. Last resort.
+
+### Map boundary — the "strayed too far" handler (`0x00460F50`)
+
+`FUN_00460F50` is the world-edge handler. It checks the player against hardcoded
+bounds and, when crossed, **clamps the position back inside** and shows the
+turn-around message:
+
+- Naval: *"You have strayed too far from the action. You turn around and set sail
+  for the heart of the Caribbean!"*
+- Land: *"…you turn around and walk further inland."*
+
+```c
+// player position, milli-units
+DAT_00814304 = X   (bounds ~15,000,000 .. 437,000,000 = 0x1A10AB20)
+DAT_00814308 = Y   (bounds ~15,000,000 .. 280,000,000)
+DAT_0081430C = heading written after a bounce
+// returns 1 if it bounced the player, 0 if in-bounds
+```
+
+This is a **clean hook point for a zone transition**: the function already detects
+exactly which edge was crossed, so a mod can replace the bounce-back with "load the
+adjacent region" instead.
+
+### Swapping the map at runtime — zone transitions
+
+The overworld map is **loaded once and cached**. The renderer `FUN_004458D0` (one
+caller, `FUN_00446B49`) calls the bitmap loader `FUN_00445D40` three times (zoom
+2/4/6) **only when the cache `0x008DC920` is null**, then just re-blits every frame.
+
+So a runtime map swap is: invalidate the cache (`0x008DC920` and the per-zoom
+surfaces `0x008DC924[]`) and feed the loader a different region's bitmap — the map
+filenames are hardcoded literals, so this means hooking the loader (or replacing
+files). Combined with the edge handler above, a "sail to the edge → load the next
+region" transition looks like:
+
+1. **Hook `0x00460F50`** — on the crossed edge, begin a transition instead of a
+   bounce.
+2. **Snapshot the departing region's state** — the city table plus the other
+   Caribbean-wide globals (nation relations, prices, etc.). PEMF's save-sidecar
+   system is the natural foundation: treat each region like a save.
+3. **Swap the map** — invalidate the cache and load the new region's bitmap.
+4. **Swap the town table** — repopulate `0x00860B70` with the new region's towns
+   (towns are runtime-writable; see below).
+5. **Reposition the player** to the opposite edge of the new map.
+
+The payoff: **each region gets its own full 1024 map _and_ its own ~128 towns** —
+so this sidesteps both hard limits without patching any engine dimension. The cost
+is a loading transition at the edge (not seamless) and the real work of per-region
+state save/restore. It works *within* the engine's assumptions rather than against
+them, which is why it is far lower-risk than enlarging the grid.
 
 ### World-event resolver — `FUN_0044D2E0`
 
@@ -312,6 +369,32 @@ promoted to a town with a nation, population and goods assigned), and the named
 sword-duel encounters. It composes its messages through the same `AddText`
 `@NATION` / `@CITYNAME` pipeline documented above — confirming that towns are
 data-driven and can be created and re-owned at runtime.
+
+### Creating and modifying towns at runtime
+
+A town is **not a compiled entity — it is a record** in the city table
+(`0x00860B70`), and the game itself rewrites those records while you play:
+
+- **City capture** overwrites a town's nation (+0x04).
+- **Founding** (the resolver's case `0x15`) promotes a native village into a
+  colony, writing its nation, economy (`= 100`), population, and goods (`rand % 20`)
+  into the record.
+
+Because it is just table data that the engine already mutates, a mod can do the
+same through the validated state layer: change ownership or prosperity, found a new
+town in a free slot (up to the 128 cap), or reassign goods.
+
+**Caveat — a complete town is a *bundle* of linked records, not one write.** A
+fully working settlement needs, at minimum:
+
+- a record in the city table (nation, economy, population, goods, flags),
+- a position that sits on a valid coastline,
+- a name (from the name tables),
+- and the linked economy / governor / relations state other systems expect.
+
+The engine supports all of this (it founds towns itself), but authoring a new town
+means populating each linked piece correctly — not flipping a single value. This is
+also exactly what a **zone transition** does when it swaps in a region's town set.
 
 ### Screen state — a dead end
 
