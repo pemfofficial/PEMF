@@ -79,6 +79,36 @@ event-driven audio here before.
   are **not** blocked by the render work, so audio callouts can arrive before the
   on-screen versions.
 
+## World & map
+
+Early exploration, scope deliberately open — but the reverse engineering here is
+real and documented in [`docs/GAME_API.md`](docs/GAME_API.md). The overworld turns
+out to be far more open to modding than expected.
+
+- ✅ **Map + town system mapped** — the overworld is a fixed ~1024 grid, 8-bit
+  paletted bitmap at three zoom levels; the engine's town lookup walks **128
+  settlement slots** (the base game uses ~44 named cities), and each town is an
+  editable record (nation, economy, population, goods).
+- ✅ **Towns are runtime-creatable** — a town is table data the game itself
+  rewrites (captures, foundings). A mod can create, re-own, or reshape towns
+  through the state layer (a complete town is a bundle of linked records, not one
+  value).
+- ✅ **The map edge is a clean hook** — the "you've strayed too far" boundary
+  handler detects exactly which edge you crossed, an ideal place to trigger a
+  transition instead of a bounce-back.
+- 💡 **A combined, multi-region world** (e.g. Caribbean + Europe + Asia). Three
+  shapes, increasing difficulty:
+  - 📐 *Compress* all regions into the fixed 1024 grid — asset/data only, safe.
+  - 📐 *Zone transitions* — sail to the edge, load the next region. **The promising
+    path:** each region keeps its own full map *and* its own ~128 towns, sidestepping
+    both the size and town limits. Reuses the save/state system for per-region
+    snapshots. A loading transition, not seamless.
+  - 💡 *Enlarge the grid* — patch the hardcoded map dimensions. Highest risk
+    (many coupled constants, 16× memory, doesn't lift the town cap). Last resort.
+- 💡 **Authored towns on any map** — layer real names, nations, and lore over the
+  procedurally-placed towns that map mods generate. Natural collaboration point
+  with existing map-mod projects.
+
 ## Crew & morale
 
 - ✅ **Morale model understood** — the game's own crew-happiness math is mapped
