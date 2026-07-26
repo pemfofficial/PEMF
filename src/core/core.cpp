@@ -290,12 +290,14 @@ static void UpdateMouseAspect()
 
 // Widescreen UI pillarbox toggle (Ctrl+Shift+3), on by default. Lets us A/B the
 // pillarbox against the game's default stretched ortho.
+// Widescreen 2D-UI pillarbox: RESEARCH PARKED. The UI camera's fixed 4:3 frustum
+// is heap-cached (FUN_00503CA0), and both patching its source constants and
+// rewriting the live frustum in memory failed to visibly pillarbox the menu UI
+// (the memory scan also lagged the intro and black-screened the packed build).
+// The widescreen RESOLUTIONS (selectable, correct 3D 16:9) work and stay; the
+// 2D-UI-at-16:9 fix is documented as a future-session research target. This
+// toggle/flag is kept inert for now.
 static bool g_pillarboxEnabled = true;
-static bool g_orthoVerified    = false;   // defined here; used by RunSafePoint + hotkey
-static void PatchUIOrtho();                // defined below Init
-static float* g_liveFrustum = nullptr;    // cached live UI-camera frustum
-static bool FindAndPatchLiveFrustum();     // defined below Init
-static void ApplyFrustumPillarbox(float* f);
 static DWORD g_tickCount         = 0;
 static DWORD g_safePointHits     = 0;
 static bool  g_safePointFound    = false;
@@ -322,15 +324,6 @@ static void RunSafePoint()
         Log("safe point reached (main loop PeekMessageA) -- deferred dispatch live");
     }
 
-    // Live UI-frustum pillarbox: the UI camera is heap-allocated once, so we find
-    // its frustum in memory and rewrite it directly. Scan (throttled) until found;
-    // afterwards the pointer is cached and re-applies are cheap.
-    if (g_targetOK && !g_liveFrustum && g_safePointHits > 20) {
-        static DWORD lastScan = 0;
-        DWORD now = GetTickCount();
-        if (now - lastScan > 1000) { lastScan = now; FindAndPatchLiveFrustum(); }
-    }
-
     // On a resolution change, re-apply the aspect-dependent widescreen fixes and
     // log the layout state. (The player picking a resolution rebuilds the UI, so
     // the re-patched ortho immediates take effect on the next UI build.)
@@ -340,9 +333,6 @@ static void RunSafePoint()
         if (devW != lastW || devH != lastH) {
             lastW = devW; lastH = devH;
             UpdateMouseAspect();   // keep the hit-test X scale matched to the new aspect
-            if (g_targetOK) PatchUIOrtho();
-            if (g_liveFrustum) ApplyFrustumPillarbox(g_liveFrustum);  // re-apply for new aspect
-            g_liveFrustum = nullptr;  // camera may have been rebuilt; re-find
             Log("resstate: device=%dx%d  screen=%dx%d  ui=%dx%d  mouseXscale=%.1f",
                 devW, devH,
                 *(int*)game::addr::ScreenW, *(int*)game::addr::ScreenH,
@@ -472,11 +462,7 @@ static DWORD WINAPI Hook_timeGetTime(void)
     // default stretched ortho). Re-applies immediately; visible on the next UI
     // build (e.g. moving between menu screens).
     if (k3) {
-        g_pillarboxEnabled = !g_pillarboxEnabled;
-        g_orthoVerified = true;   // already verified once; allow re-apply
-        PatchUIOrtho();
-        if (g_liveFrustum) ApplyFrustumPillarbox(g_liveFrustum);
-        Log("ui-frustum: pillarbox toggled %s", g_pillarboxEnabled ? "ON" : "OFF");
+        Log("ws: Ctrl+Shift+3 (widescreen-UI research toggle currently inert)");
         return r;
     }
 
@@ -614,118 +600,6 @@ static void PatchWidescreenResolutions()
         (unsigned)game::addr::ResAspectFilterJne);
 }
 
-// ------------------------------------------------- widescreen UI (pillarbox)
-// Widen the 2D UI camera's ortho left/right by aspect/(4:3) so the 4:3 interface
-// is pillarboxed (centred with side bars) at 16:9 instead of stretched. The two
-// values are `push` immediates in FUN_00503CA0; we rewrite them, and re-apply on
-// resolution change. At 4:3 the scale is 1.0 so the values stay -0.5/+0.5.
-static void PatchUIOrtho()
-{
-    int dw = *(int*)game::addr::DevWidth, dh = *(int*)game::addr::DevHeight;
-    if (dw <= 0 || dh <= 0) return;
-
-    uint32_t* pL = (uint32_t*)game::addr::UIOrthoLeftImm;
-    uint32_t* pR = (uint32_t*)game::addr::UIOrthoRightImm;
-    if (!PageReadable(pL, 4) || !PageReadable(pR, 4)) { Log("ui-ortho: operands not readable"); return; }
-
-    // On the first patch, confirm the known 4:3 defaults are there; afterwards we
-    // re-apply freely (the values are then our own computed ones).
-    if (!g_orthoVerified) {
-        if (*pL != game::addr::UIOrthoLeftDefault || *pR != game::addr::UIOrthoRightDefault) {
-            Log("ui-ortho: unexpected operands L=0x%08X R=0x%08X -- NOT patching", *pL, *pR);
-            return;
-        }
-        g_orthoVerified = true;
-    }
-
-    // Pillarbox when enabled; otherwise restore the game's 4:3 default (stretch).
-    float aspectScale = g_pillarboxEnabled
-        ? ((float)dw / (float)dh) / (4.0f / 3.0f)
-        : 1.0f;
-    float halfW = 0.5f * aspectScale;
-    float left = -halfW, right = halfW;
-
-    DWORD old = 0;
-    if (VirtualProtect(pL, 4, PAGE_EXECUTE_READWRITE, &old)) {
-        memcpy(pL, &left, 4);  VirtualProtect(pL, 4, old, &old);
-        FlushInstructionCache(GetCurrentProcess(), pL, 4);
-    }
-    if (VirtualProtect(pR, 4, PAGE_EXECUTE_READWRITE, &old)) {
-        memcpy(pR, &right, 4); VirtualProtect(pR, 4, old, &old);
-        FlushInstructionCache(GetCurrentProcess(), pR, 4);
-    }
-    Log("ui-ortho: pillarbox set L=%.4f R=%.4f (aspectScale=%.3f, %dx%d)",
-        (double)left, (double)right, (double)aspectScale, dw, dh);
-}
-
-// --------------------------------------------- live UI frustum (pillarbox v2)
-// The UI camera is heap-allocated and its 4:3 frustum is baked in once at build
-// time, so patching the source constants does nothing. Instead we find the live
-// frustum in memory by its exact float signature and rewrite left/right. The
-// frustum is 6 consecutive floats: left,right,top,bottom,near,far =
-// -0.5, +0.5, +0.375, -0.375, 921.6, 1536.0. We match left/right/top/bottom and
-// the near/far pair to avoid false positives, then pillarbox left/right.
-static bool FrustumMatches(const float* f)
-{
-    // top(+0.375), bottom(-0.375), near, far are invariant; left/right may be
-    // the default (-0.5/+0.5) or our own already-applied values.
-    if (f[2] != 0.375f || f[3] != -0.375f) return false;
-    if (f[4] != 921.6f || f[5] != 1536.0f) return false;
-    // left negative ~[-1,-0.4], right positive ~[0.4,1], symmetric
-    if (!(f[0] < -0.4f && f[0] > -1.01f)) return false;
-    if (!(f[1] >  0.4f && f[1] <  1.01f)) return false;
-    return true;
-}
-
-static void ApplyFrustumPillarbox(float* f)
-{
-    int dw = *(int*)game::addr::DevWidth, dh = *(int*)game::addr::DevHeight;
-    if (dw <= 0 || dh <= 0) return;
-    float scale = g_pillarboxEnabled ? ((float)dw / (float)dh) / (4.0f / 3.0f) : 1.0f;
-    float half = 0.5f * scale;
-    DWORD old = 0;
-    if (VirtualProtect(f, 8, PAGE_READWRITE, &old)) {
-        f[0] = -half; f[1] = half;
-        VirtualProtect(f, 8, old, &old);
-    }
-}
-
-// Scan committed memory for the frustum signature. One-shot; caches the pointer.
-static bool FindAndPatchLiveFrustum()
-{
-    if (g_liveFrustum) { ApplyFrustumPillarbox(g_liveFrustum); return true; }
-
-    SYSTEM_INFO si; GetSystemInfo(&si);
-    BYTE* addr = (BYTE*)si.lpMinimumApplicationAddress;
-    BYTE* maxA = (BYTE*)si.lpMaximumApplicationAddress;
-    MEMORY_BASIC_INFORMATION mbi;
-    int scanned = 0;
-    while (addr < maxA && VirtualQuery(addr, &mbi, sizeof(mbi)) == sizeof(mbi)) {
-        BYTE* next = (BYTE*)mbi.BaseAddress + mbi.RegionSize;
-        bool readable = mbi.State == MEM_COMMIT &&
-                        !(mbi.Protect & (PAGE_NOACCESS | PAGE_GUARD)) &&
-                        (mbi.Protect & (PAGE_READWRITE | PAGE_READONLY | PAGE_WRITECOPY |
-                                        PAGE_EXECUTE_READ | PAGE_EXECUTE_READWRITE));
-        // heap frustum lives in a normal read/write data region
-        if (readable && (mbi.Protect & (PAGE_READWRITE | PAGE_WRITECOPY)) &&
-            mbi.RegionSize < 0x4000000) {
-            BYTE* p   = (BYTE*)mbi.BaseAddress;
-            BYTE* end = next - 24;
-            for (; p < end; p += 4) {   // floats are 4-aligned
-                if (FrustumMatches((const float*)p)) {
-                    g_liveFrustum = (float*)p;
-                    ApplyFrustumPillarbox(g_liveFrustum);
-                    Log("ui-frustum: live frustum found at %p and pillarboxed", (void*)p);
-                    return true;
-                }
-            }
-            ++scanned;
-        }
-        addr = next;
-    }
-    return false;
-}
-
 // ---------------------------------------------------- mouse aspect correction
 static void PatchMouseHitTestAspect()
 {
@@ -819,9 +693,6 @@ static DWORD WINAPI Init(LPVOID)
 
     // Correct the mouse hit-test for the actual aspect ratio (code patch).
     if (g_targetOK) PatchMouseHitTestAspect();
-
-    // Pillarbox the 2D UI at widescreen (code patch; re-applied on res change).
-    if (g_targetOK) PatchUIOrtho();
 
     // The render-phase hook. Only attempted once the target is verified, since
     // it writes to the game's code.
