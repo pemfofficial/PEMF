@@ -420,6 +420,47 @@ an author writing it meant.
 
 ---
 
+## Seventh pass (2026-07-28) — career and save/load state
+
+### 17. Browsing the load screen replaced your live state — FIXED
+
+`OnSaveFileOpened` applied a sidecar on every read of a save file. The Load/Save
+screen opens **every** save it can see in order to list them — measured at seven
+files inside 13 ms — so merely opening that screen overwrote the running
+career's state with whichever save was listed last. Event counts and trigger
+progress were affected exactly as much as flags; flags were only the first thing
+visible enough to notice.
+
+### 18. A save loaded from inside a career was never applied — FIXED
+
+The commit was tied to an out-of-game → in-game transition, and loading while
+already at sea does not produce one. The player kept the previous career's
+history on a freshly loaded save, and the uncommitted state then sat staged
+until the next career entry — usually a **new** career, which swallowed it.
+
+### 19. `crew > 0` is not "in a career" — FIXED
+
+`state::InGame()` had been load-bearing since the first milestone. The crew
+count does **not** return to zero at the main menu, so after the first career of
+a session it reads true forever: no transitions, no `BeginNewCareer`, and every
+later career inheriting the last one's state. Career presence now comes from the
+screen state.
+
+### 20. The fix that was never wired up — FIXED
+
+The career fingerprint had its struct field, its parser and its comparison, and
+nothing that **wrote** it. Every sidecar read as "unknown", every load failed
+verification, and no load could ever commit. A grep for the field name returned
+three hits — all real, none of them the missing one.
+
+**The process failure is the finding.** Five rounds of fixes were reasoned from
+logs that showed only what had been *decided*. Adding a trace of what the
+decision was *made from* answered it in one read, and showed two independent
+faults at once. The trace is now permanent; see
+[`re/experiments/career_state/`](../re/experiments/career_state/README.md).
+
+---
+
 ## Remaining, in priority order
 
 1. **Address single source of truth.** `re/out/offsets.json` and `src/core/game.h`
@@ -457,4 +498,8 @@ of bug that is expensive to diagnose.
 | **A notice's clock stops while it is off screen.** | Otherwise it expires unseen behind a menu and the player loses it for having glanced at the map. |
 | **A retained pointer to an engine object must be referenced.** | Gamebryo refcounts at `+4` and destroys at zero. Capturing flag textures without a reference crashed the game on first use. |
 | **Confirm a limit exists before building around it.** | "Flags must be replaced" was accepted for years; the game had enumerated them since 2004. One call site settled it. |
+| **Career presence comes from the screen state, never from `crew > 0`.** | The crew count does not reset at the main menu, so that test is true forever after the first career and stops seeing transitions entirely. |
+| **A save file being read is not a load.** | Starting a new career reads one too, and the load screen reads every save to list them. Only a fingerprint match against the live career proves it. |
+| **Verify a write landed, not that a symbol exists.** | The fingerprint had its field, parser and comparison, and no `fprintf`. A grep matched three real sites and the feature still did nothing. |
+| **Trace the inputs, not the outcomes.** | Five fixes were reasoned from logs showing only decisions. One log of what the decision was made *from* ended it immediately. |
 | **Redirect a call site rather than detour a prologue, where possible.** | No trampoline, nothing relocated, one reversible write. |

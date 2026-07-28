@@ -20,6 +20,9 @@
 #define PGA_DRAWHUDTEXT 0x004B06C0
 // Inline asm cannot see constexpr, so the world-text drawer needs a macro too.
 #define PGA_DRAWWORLDTEXT 0x004AEC30
+// Asset lookup and texture loading, both taking their name in ESI.
+#define PGA_ASSETEXISTS   0x004F4ED0
+#define PGA_LOADTEXTURE   0x00500850
 
 namespace game {
 
@@ -219,6 +222,42 @@ namespace addr {
     // re/experiments/screen_state for how that enumeration works.
     constexpr uintptr_t CustomFlagCount = 0x008C9560;
     constexpr uintptr_t CustomSailCount = 0x008C9564;
+
+    // The names behind those counts. Each container is the game's own growable
+    // array, filled by the directory scan:
+    //     +0x04  char** entries
+    //     +0x08  capacity
+    //     +0x0C  count
+    constexpr uintptr_t FlagList = 0x00726AA8;
+    constexpr uintptr_t SailList = 0x00726A90;
+    constexpr int       kListEntries  = 0x04;
+    constexpr int       kListCapacity = 0x08;
+    constexpr int       kListCount    = 0x0C;
+
+    // The currently-selected names, as written to Config.ini. Pointers to the
+    // engine's own string type: characters at the pointer, LENGTH IN THE DWORD
+    // AT -4. Reading past the pointer without honouring that is how you get a
+    // name that looks right and is not.
+    constexpr uintptr_t CustomSailName = 0x00726A88;
+    constexpr uintptr_t CustomFlagName = 0x00726A8C;
+
+    // Asset lookup and texture load, recovered from the config-load path at
+    // 0x004293D7 -- the code that turns `CustomFlag = <name>` into the texture
+    // the mast flies. Both take the name in ESI and end in a plain `ret`, so
+    // there is no stack to clean.
+    //
+    //   char  AssetExists()   esi = name
+    //   void* LoadTexture()   esi = name, eax = format struct, or 0 for
+    //                         defaults (with 0 it requires the name to end
+    //                         ".dds" and picks the format itself)
+    //
+    // The same path also shows the ownership rules, which is why it is worth
+    // copying wholesale rather than paraphrasing: release the outgoing texture
+    // (decrement +4, and if it reaches zero call vtable[0](1)), store the new
+    // pointer, then AddRef it. Skipping the AddRef is what crashed the game the
+    // first time PEMF held one of these.
+    constexpr uintptr_t AssetExists = 0x004F4ED0;
+    constexpr uintptr_t LoadTexture = 0x00500850;
 
     // The game's own nearest-city search, FUN_0045FD40.
     //   int FindNearestCity(int x, int y, uint typeMask, int maxDist, uint exclude)
@@ -701,8 +740,116 @@ inline void* PlayerFlagTexture() { return *(void**)addr::PlayerFlagTex; }
 // applying), so writing this is enough -- there is nothing to call afterwards.
 inline void SetPlayerFlagTexture(void* tex) { *(void**)addr::PlayerFlagTex = tex; }
 
+// ------------------------------------------------- refcounted engine objects
+// The count is the dword at +4 and reaching zero calls vtable[0](1). Both
+// halves are copied from the config-load path at 0x00429403, not guessed --
+// and getting the AddRef wrong is what crashed the game the first time PEMF
+// held a texture. See DEVELOPER.md's layer rules.
+constexpr int kRefCount = 4;
+
+inline void AddRef(void* obj)
+{
+    if (obj) ++*(long*)((char*)obj + kRefCount);
+}
+
+inline void Release(void* obj)
+{
+    if (!obj) return;
+    long* rc = (long*)((char*)obj + kRefCount);
+    if (--*rc == 0) {
+        void** vtbl = *(void***)obj;
+        if (vtbl && vtbl[0])
+            ((void (__thiscall*)(void*, int))vtbl[0])(obj, 1);
+    }
+}
+
 inline int CustomFlagCount() { return *(const int*)addr::CustomFlagCount; }
 inline int CustomSailCount() { return *(const int*)addr::CustomSailCount; }
+
+// ------------------------------------------------- the enumerated name lists
+// Whatever the directory scan found, in the order the picker shows it. Both
+// return null rather than reaching past the end.
+inline int ListCount(uintptr_t list)
+{
+    return *(const int*)(list + addr::kListCount);
+}
+
+inline const char* ListName(uintptr_t list, int index)
+{
+    if (index < 0 || index >= ListCount(list)) return nullptr;
+    const char* const* entries = *(const char* const**)(list + addr::kListEntries);
+    return entries ? entries[index] : nullptr;
+}
+
+inline int FlagListCount()            { return ListCount(addr::FlagList); }
+inline const char* FlagName(int i)    { return ListName(addr::FlagList, i); }
+inline int SailListCount()            { return ListCount(addr::SailList); }
+inline const char* SailName(int i)    { return ListName(addr::SailList, i); }
+
+// The engine's string type: characters at the pointer, length at -4.
+inline const char* EngineString(uintptr_t slot, int* lengthOut = nullptr)
+{
+    const char* s = *(const char* const*)slot;
+    if (!s) { if (lengthOut) *lengthOut = 0; return nullptr; }
+    if (lengthOut) *lengthOut = *(const int*)(s - 4);
+    return s;
+}
+
+// ------------------------------------------------------ loading by name
+// Both callees take the name in ESI and clean nothing, so the shims only have
+// to place the register and get out of the way.
+__declspec(naked) static char AssetExistsRaw(const char* /*name*/)
+{
+    __asm {
+        push esi
+        mov  esi, [esp + 8]         // name
+        mov  eax, PGA_ASSETEXISTS
+        call eax
+        pop  esi
+        ret
+    }
+}
+
+__declspec(naked) static void* LoadTextureRaw(const char* /*name*/)
+{
+    __asm {
+        push esi
+        mov  esi, [esp + 8]         // name
+        xor  eax, eax               // default format, as the config path uses
+        mov  edx, PGA_LOADTEXTURE
+        call edx
+        pop  esi
+        ret
+    }
+}
+
+// Fly the flag with this name. The whole point of the exercise: a name an
+// author or a player can write, rather than a pointer we happened to catch.
+//
+// The sequence is the config path's, in its order, because the ownership rules
+// are not ours to invent: load, release the outgoing texture, store, AddRef.
+// Doing the release before the store means a name that resolves to the texture
+// already flying is handled by the early return rather than by a refcount that
+// briefly hits zero.
+//
+// Returns false and changes nothing if the asset does not exist or will not
+// load -- a refused swap is always better than a bad pointer on the mast.
+inline bool SetPlayerFlagByName(const char* name)
+{
+    if (!name || !*name) return false;
+    if (!AssetExistsRaw(name)) return false;
+
+    void* tex = LoadTextureRaw(name);
+    if (!tex) return false;
+
+    void* old = *(void**)addr::PlayerFlagTex;
+    if (old == tex) return true;             // already flying it
+
+    *(void**)addr::PlayerFlagTex = tex;
+    AddRef(tex);
+    Release(old);
+    return true;
+}
 
 inline const char* NationName(int n)
 {
@@ -849,6 +996,17 @@ inline void ShowNotice(const char* resolved, int y, unsigned colour)
 {
     *(int*)addr::HudTextStyle = kNoticeStyle;
     DrawHudTextRaw(resolved, ScreenW() / 2, y, kNoticeStyle, colour, 4, -1, 0);
+}
+
+// Empty the game's shared message buffer. Anything left in it is redrawn over
+// the player's ship by the sailing render, on its own, next frame -- so this
+// must be called after any use of it, including a plain HUD draw, which uses
+// the buffer as scratch even when we composed nothing ourselves. Writing a lone
+// terminator is the game's own idiom for the job.
+inline void ClearMessageBuffer()
+{
+    __try { *(char*)addr::MessageText = 0; }
+    __except (EXCEPTION_EXECUTE_HANDLER) { }
 }
 
 // Call the world-text drawer. Text goes in ecx and the colour in eax, so this

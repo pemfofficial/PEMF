@@ -194,11 +194,16 @@ Findings in [`re/experiments/flags/`](re/experiments/flags/README.md).
   no concept of flying false colours, which means the mechanic is **entirely
   PEMF's to define** rather than something to keep in step with engine
   behaviour. Better news than it sounds.
-- 📐 **Naming a flag** — today a flag can be flown but not *identified*. A real
-  feature needs `flag_spa.dds` by name, which means driving the engine's texture
-  loader or capturing names as the picker resolves them. Next piece of work.
-- 📐 **Per-career colours** — `Config.ini` is global; a disguise belongs to a
-  save. The sidecar already exists for exactly this.
+- ✅ **Flags fly by name** — `flag_spa.dds`, through the engine's own texture
+  loader, using the recipe the game uses for its `Config.ini` setting. PEMF also
+  scans for flags itself at startup, so nothing has to be opened first.
+- ✅ **Colours belong to the career, not the settings file** — a disguise is
+  stored in that save's sidecar and restored with it. Getting this right meant
+  rebuilding career and save/load detection, which turned up two long-standing
+  bugs unrelated to flags; see
+  [`re/experiments/career_state/`](re/experiments/career_state/README.md).
+- 📐 **Your captain's own colours** — a flag chosen per captain at career start,
+  rather than inherited from the one global setting every captain shares.
 - 📐 **Suspicion** — the system that gives a false flag stakes: rising with
   proximity to warships and ports, with time spent under false colours, and with
   infamy; falling with distance and time. Thresholds drive hails, challenges and
@@ -206,6 +211,11 @@ Findings in [`re/experiments/flags/`](re/experiments/flags/README.md).
 - 💡 **Custom nation art at runtime** — retexture the five nation flag nodes in
   memory instead of replacing files. Additive, reversible, and immune to the
   "pink flags" trap that catches people who install a partial flag pack.
+- 📐 **Starting on your faction's colours.** A custom flag in `Config.ini`
+  overrides the faction flag on every career — that is the game's own behaviour,
+  not a PEMF effect. Making a new career start on the colours of the nation you
+  chose would be an improvement on the game, and needs the player's chosen
+  faction, which is not yet located.
 - 💡 **Lowering and raising the flag** when colours change. Flags attach via
   `bone_flag_*_pivot` and are ordinary named scene nodes, so driving the node
   transform from the frame hook is the plausible route. Unproven.

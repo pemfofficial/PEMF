@@ -923,10 +923,48 @@ round, comparing before applying:
 Write `0x008E8FB4` and the flag on the mast changes; the engine keeps it there
 with no further calls. Verified in game across repeated swaps and a restore.
 
-⚠️ **These are refcounted objects — see the layer rule in
-[`DEVELOPER.md`](DEVELOPER.md#layer-rules).** Capturing one without taking a
-reference crashes the game, because the picker releases a texture the moment it
-scrolls away from it.
+### Loading a texture by name
+
+Recovered from the config-load path at `0x004293D7` — the code that turns
+`CustomFlag = <name>` into the texture on the mast.
+
+| Address | Signature |
+|---|---|
+| `0x004F4ED0` | `char AssetExists()` — `esi` = name |
+| `0x00500850` | `void* LoadTexture()` — `esi` = name, `eax` = format struct, or 0 for defaults |
+
+Both take the name in **ESI** and end in a plain `ret`, so there is no stack to
+clean. With `eax = 0` the loader requires the name to end `.dds` and chooses the
+format itself. **A bare filename works** — `flag_spa.dds`, exactly as the
+directory scan reports it. Verified in game across all eleven flags.
+
+The name globals are the engine's string type — characters at the pointer,
+**length in the dword at −4**:
+
+| Global | Holds |
+|---|---|
+| `0x00726A88` | `CustomSail` name |
+| `0x00726A8C` | `CustomFlag` name |
+| `0x00726A90` | sail name list |
+| `0x00726AA8` | flag name list |
+
+Each list is the game's growable array: `+0x04` entries (`char**`), `+0x08`
+capacity, `+0x0C` count.
+
+### ⚠️ Engine objects are refcounted
+
+**The count is the dword at `+4`, and reaching zero calls `vtable[0](1)`.** Both
+halves are visible in the same config-load path, which is why PEMF copies its
+ownership sequence wholesale rather than paraphrasing it:
+
+```
+load -> store -> AddRef(new) -> Release(old)
+```
+
+Capturing a texture without taking a reference **crashes the game**, because the
+picker releases each one the moment it scrolls away. That is not hypothetical —
+it is how this was learned. See the layer rule in
+[`DEVELOPER.md`](DEVELOPER.md#layer-rules).
 
 ### Nation flags are five fixed meshes
 
@@ -966,6 +1004,35 @@ vessels — it is simply not the flag.
 about are unrelated systems that never touch, so the engine has no concept of
 flying false colours. That makes the mechanic entirely PEMF's to define rather
 than something to keep in step with engine behaviour.
+
+### Screen state also answers "am I in a career"
+
+The same `ScreenId`/`ScreenDepth` pair that gates notice drawing. **Depth alone
+is enough for career presence**, and it is the only reliable source:
+
+| Depth | Screen |
+|---|---|
+| 1 | main menu |
+| 2 | character creation |
+| 3 | sailing, town |
+| 4 | Load/Save |
+| 4–5 | battle |
+
+⛔ **Do NOT use `crew > 0` for this.** The crew count does **not** return to zero
+when the player leaves a career, so anything built on it works exactly once per
+session and then silently stops seeing transitions. That mistake made every
+career after the first inherit the previous one's state. Measured; full account
+in [`re/experiments/career_state/`](../re/experiments/career_state/README.md).
+
+### ⛔ A save file being read does not mean a save was loaded
+
+**Starting a brand new career makes the game read a save file**, at the same
+distance in time as a genuine load, with nothing about the access to tell them
+apart. The Load/Save screen also opens every save it can see just to list them.
+
+So file access cannot answer "was this loaded or is it new". PEMF stamps a
+fingerprint of the career into each sidecar and compares it against the live
+game instead. Same write-up.
 
 ---
 

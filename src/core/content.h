@@ -742,11 +742,31 @@ inline void ShowPendingOutcome(int)
 // A notice is drawn every frame until it expires, which is how the game's own
 // HUD text works -- there is no timed-message call to borrow. The text is
 // composed once, here, and re-drawn from the render hook.
+// ------------------------------------------------------------- channels
+// Not all on-screen text wants the same behaviour, and treating it as one kind
+// produced a wall of stacked lines during testing.
+//
+//   Narrative  a lookout's call, an observation. Several can be true at once,
+//              so they STACK, oldest pushed off, exactly as before.
+//   Status     what the framework is doing right now -- which flag is flying,
+//              what a debug key just did. Only the LATEST is ever meaningful,
+//              so a new one REPLACES the old in place rather than queueing
+//              behind it.
+//
+// The channel is a property of the message, not of the caller, so anything can
+// post to either. Adding a third (warnings, say) is one enum value and one
+// line in PostToChannel.
+enum NoticeChannel {
+    kChannelNarrative = 0,
+    kChannelStatus    = 1,
+};
+
 struct ActiveNotice {
-    std::string resolved;          // @-tokens already substituted, at post time
-    DWORD       posted = 0;
-    DWORD       until  = 0;
-    bool        anchor = false;    // true: track the player's ship in the world
+    std::string  resolved;         // @-tokens already substituted, at post time
+    DWORD        posted  = 0;
+    DWORD        until   = 0;
+    bool         anchor  = false;  // true: track the player's ship in the world
+    NoticeChannel channel = kChannelNarrative;
 };
 
 // How long an anchored notice spends easing out at the end of its life. The
@@ -761,6 +781,23 @@ inline int          g_noticeCount = 0;
 inline void ClearNotices()
 {
     g_noticeCount = 0;
+}
+
+// Find a slot for a notice on this channel. A status notice reuses the slot its
+// predecessor held, so the newest simply overwrites the old one and nothing
+// accumulates; a narrative notice takes a fresh slot, dropping the oldest when
+// full -- a stale line is less useful than the one that just happened.
+inline ActiveNotice* SlotFor(NoticeChannel channel)
+{
+    if (channel == kChannelStatus) {
+        for (int i = 0; i < g_noticeCount; ++i)
+            if (g_notices[i].channel == kChannelStatus) return &g_notices[i];
+    }
+    if (g_noticeCount >= kMaxNotices) {
+        for (int i = 1; i < g_noticeCount; ++i) g_notices[i - 1] = g_notices[i];
+        --g_noticeCount;
+    }
+    return &g_notices[g_noticeCount++];
 }
 
 // A notice's life is measured in wall-clock time, which quietly meant it kept
@@ -899,6 +936,21 @@ inline void DrawNotices()
         ++write;
     }
     if (!g_drawOff) g_noticeCount = write;
+
+    // THE SHARED BUFFER IS A TRAP, AND IT BITES TWICE.
+    //
+    // We already knew composing into 0x00869B48 and leaving text there makes
+    // the game redraw it over the player's ship. This is the same fault by a
+    // different route: the engine's HUD drawer uses that buffer as its own
+    // scratch, so simply DRAWING leaves our line in it -- we never composed
+    // anything. The next frame's sailing render then paints it over the ship,
+    // and because each notice overwrites a little of the last, the result is
+    // several messages piled illegibly on top of one another.
+    //
+    // Clearing after our draws is safe: the game re-composes immediately
+    // before each of its own draws, so an empty buffer between frames is
+    // exactly the state it expects. This is the engine's own idiom for the job.
+    game::ClearMessageBuffer();
 }
 
 // Safe-point reporting for the draw path: says plainly whether our own text
@@ -926,30 +978,29 @@ inline void ReportDrawFromSafePoint()
 }
 
 // A notice with no authored event behind it, for exercising the draw path.
-inline void PostDebugNotice(const char* text, int seconds, bool anchor = false)
+// Debug and framework messages default to the STATUS channel, so pressing a
+// key five times leaves one line saying what is true now rather than five
+// saying what used to be.
+inline void PostDebugNotice(const char* text, int seconds, bool anchor = false,
+                            NoticeChannel channel = kChannelStatus)
 {
-    if (g_noticeCount >= kMaxNotices) {
-        for (int i = 1; i < g_noticeCount; ++i) g_notices[i - 1] = g_notices[i];
-        --g_noticeCount;
-    }
-    ActiveNotice& n = g_notices[g_noticeCount++];
+    ActiveNotice& n = *SlotFor(channel);
     n.resolved = text;
     n.anchor   = anchor;
+    n.channel  = channel;
     n.posted   = GetTickCount();
     n.until    = n.posted + (DWORD)seconds * 1000;
-    Log("debug: notice posted -- '%s' for %d s (%s)", text, seconds,
-        anchor ? "anchored to the ship" : "top of screen");
+    Log("debug: notice posted -- '%s' for %d s (%s, %s)", text, seconds,
+        anchor ? "anchored to the ship" : "top of screen",
+        channel == kChannelStatus ? "status" : "narrative");
 }
 
 inline void PostNotice(const Event& ev)
 {
-    if (g_noticeCount >= kMaxNotices) {
-        // Drop the oldest rather than refuse the newest -- a stale notice is
-        // less useful than the one that just happened.
-        for (int i = 1; i < g_noticeCount; ++i) g_notices[i - 1] = g_notices[i];
-        --g_noticeCount;
-    }
-    ActiveNotice& n = g_notices[g_noticeCount++];
+    // Authored notices are narrative: several can be true at once, so they
+    // stack and the oldest is dropped when full.
+    ActiveNotice& n = *SlotFor(kChannelNarrative);
+    n.channel = kChannelNarrative;
     // Resolve the text ONCE, here at the safe point, rather than every frame
     // inside the render hook: composing uses the game's shared message buffer,
     // which is not something to be touching mid-frame.

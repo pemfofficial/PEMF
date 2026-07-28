@@ -19,7 +19,9 @@
 #include <stdarg.h>
 #include <intrin.h>
 #include <shlwapi.h>
+#include <shlobj.h>
 #pragma comment(lib, "shlwapi.lib")
+#pragma comment(lib, "shell32.lib")
 
 #include "log.h"
 #include "game.h"
@@ -294,7 +296,11 @@ static void RunContentEvent(int index)
 
 // Defined with the false-colours probe below; called from the safe point.
 static void WatchTheWater();
-static void CaptureFlagTexture();
+static void ApplyCareerFlag();
+// Latches cleared on a career change: a disguise, and our memory of the
+// captain's honest colours, both belong to the career they were formed in.
+extern bool g_careerFlagApplied;
+extern bool g_haveTrueFlag;
 
 // ------------------------------------------------------- the safe point
 // Everything that touches the game or presents UI happens here, and nowhere
@@ -316,6 +322,8 @@ static void RunSafePoint()
         // own value is whatever the game loaded, so all we must do is stop
         // believing we have something of theirs to give back.
         state::ForgetNationalityOverride();
+        g_careerFlagApplied = false;
+        g_haveTrueFlag      = false;
     }
 
     triggers::Tick();       // may Post(); never presents anything
@@ -340,9 +348,11 @@ static void RunSafePoint()
     // experiment is answered by numbers rather than by an impression.
     WatchTheWater();
 
-    // Picks up any flag texture the player selects in Options, so the pointers
-    // are ours to swap without reversing the engine's texture loader.
-    CaptureFlagTexture();
+    // A career's colours belong to the career, so they are restored here rather
+    // than left to Config.ini -- which is global and would otherwise carry one
+    // captain's disguise into the next one's voyage.
+    ApplyCareerFlag();
+
 
     // The game's Direct3D device only exists once the game has created it, and
     // the engine has been seen rebuilding its vtable mid-session -- so the hook
@@ -543,93 +553,178 @@ static void WatchTheWater()
     }
 }
 
-// ------------------------------------------------- captured flag textures
-// We cannot yet ask the engine for "the texture called flag_spa.dds" -- that
-// means driving its loader and its refcounting. But we do not need to in order
-// to answer the question in front of us. The game loads every custom flag
-// itself when the player picks one in Options, and parks the chosen one in
-// PlayerFlagTex. So: let the player select each flag in turn, capture the
-// pointer the game put there, and then try writing those pointers back while
-// under way.
+// --------------------------------------------------- flags, by name
+// Textures are now loaded BY NAME through the engine's own loader, the way the
+// config path does it (see game::SetPlayerFlagByName). That replaced an earlier
+// approach which captured pointers as the player browsed the picker -- it
+// worked, but it could only fly "texture #3" without knowing which flag that
+// was, which is no use to an author or a player.
 //
-// If the flag on the mast follows the pointer, false colours is a pointer swap
-// and the rest is bookkeeping. If it does not, the flag is bound somewhere
-// further down and no amount of loader work would have helped.
-// THESE OBJECTS ARE REFCOUNTED, and forgetting that crashed the game the first
-// time this ran. The picker RELEASES a texture as soon as it scrolls away from
-// it -- the very function we read this from does so four lines below the line
-// we copied:
-//
-//     refcount = *(dword*)((char*)obj + 4);
-//     if (--refcount == 0) (*(void(**)(int))*(void**)obj)(1);   // destructor
-//
-// so every pointer captured while browsing was dead before we ever wrote it
-// back. Holding a pointer to a refcounted object means TAKING A REFERENCE, and
-// the engine's own idiom for that is on the next line again: obj[1] += 1.
-//
-// We deliberately never release ours. A handful of flag textures held for the
-// life of the process is the correct trade for pointers that cannot dangle,
-// and it is what "we intend to keep this" means in a refcounted world.
-constexpr int kRefCountOffset = 4;
+// What is still worth remembering is the name the player actually chose, so a
+// disguise can always be taken off. Captured live rather than re-read from
+// Config.ini, because they may have changed it this session.
+static char g_trueFlagName[128] = {0};
+bool        g_haveTrueFlag      = false;
+static int  g_flagCursor        = 0;
 
-static bool LooksLikeRefObject(void* p)
-{
-    // A Gamebryo ref object begins with a vtable pointer and a refcount. Both
-    // must at least be readable before we touch either.
-    if (!p || !PageReadable(p, 8)) return false;
-    void* vtbl = *(void**)p;
-    return vtbl && PageReadable(vtbl, sizeof(void*));
-}
+// Puts the career's colours back on the mast after a load, and captures this
+// captain's honest colours the first time we see them.
+//
+// Runs from the safe point, and only once the world exists: the flag is a
+// texture on a scene node, and asking for one before the game has built any is
+// a question with no good answer. Retried every frame until it takes, then
+// latched -- a load can complete before the ship does.
+bool g_careerFlagApplied = false;
 
-static bool AddRefTexture(void* p)
+static void ApplyCareerFlag()
 {
-    if (!LooksLikeRefObject(p)) return false;
+    // session::InCareer(), NOT state::InGame(). The latter is "crew > 0", which
+    // stays true on the main menu, so this ran while the player was LEAVING a
+    // career and re-applied the disguise they had just abandoned.
+    if (!session::InCareer()) { g_careerFlagApplied = false; return; }
+    if (g_careerFlagApplied) return;
+
     __try {
-        ++*(volatile long*)((char*)p + kRefCountOffset);
-        return true;
-    }
-    __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
-}
+        // Whatever Config.ini had is this captain's honest choice, unless the
+        // sidecar already recorded one.
+        if (!session::TrueFlagName()[0]) {
+            int len = 0;
+            const char* n = game::EngineString(game::addr::CustomFlagName, &len);
+            char nm[128];
+            if (n && len > 0 && SafeStr(n, nm, sizeof(nm)))
+                session::RecordTrueFlag(nm);
+        }
 
-struct CapturedFlag {
-    void* tex = nullptr;
-    int   seq = 0;          // the order we saw it in, for the log
-};
-static CapturedFlag g_flagSlot[8];
-static int          g_flagSlots  = 0;
-static int          g_flagCursor = 0;
+        // A career with no disguise recorded must still be SET, not left alone.
+        // The flag texture is global -- it is the Config.ini custom flag, and
+        // the game does not reset it when a career begins -- so leaving the mast
+        // untouched means the previous captain's disguise simply stays on it.
+        // (This was briefly "left alone" on the theory that the game picks a
+        // flag from the nation chosen at character creation. It does not: what
+        // looked like a correct faction flag was the global custom flag, which
+        // happened to be a copy of the English one.)
+        //
+        // So: a recorded disguise, or failing that the player's own Config.ini
+        // choice, which is what undisguised means.
+        const char* want = session::FlagName();
+        char fallback[128] = {0};
+        const bool disguised = (want && *want);
+        if (!disguised) {
+            int len = 0;
+            const char* n = game::EngineString(game::addr::CustomFlagName, &len);
+            if (n && len > 0 && SafeStr(n, fallback, sizeof(fallback)))
+                want = fallback;
+        }
 
-// Watches PlayerFlagTex and records anything new. Called from the safe point,
-// so selecting a flag in the menu is picked up without the player doing
-// anything else.
-static void CaptureFlagTexture()
-{
-    if (!g_falseColours) return;
-    __try {
-        void* cur = game::PlayerFlagTexture();
-        if (!cur) return;
-        for (int i = 0; i < g_flagSlots; ++i)
-            if (g_flagSlot[i].tex == cur) return;               // already known
-        if (g_flagSlots >= 8) return;
-
-        // Take a reference BEFORE recording it, and record nothing if we could
-        // not -- a slot we cannot keep alive is a crash waiting to be pressed.
-        if (!AddRefTexture(cur)) {
-            Log("falsecolours: 0x%p does not look like a texture object -- "
-                "not captured", cur);
+        if (want && *want) {
+            if (game::SetPlayerFlagByName(want)) {
+                Log("falsecolours: career colours set to '%s' -- %s", want,
+                    disguised ? (session::Disguised() ? "a recorded disguise"
+                                                      : "this career's own")
+                              : "nothing recorded, so the player's own flag");
+                g_careerFlagApplied = true;
+            }
+            // No latch on failure: the world may simply not be built yet, and
+            // this costs one guarded call a frame until it is.
             return;
         }
-        g_flagSlot[g_flagSlots].tex = cur;
-        g_flagSlot[g_flagSlots].seq = g_flagSlots;
-        ++g_flagSlots;
-        Log("falsecolours: captured flag texture #%d = 0x%p (referenced) "
-            "(%d custom flags / %d sails known to the game)",
-            g_flagSlots - 1, cur, game::CustomFlagCount(), game::CustomSailCount());
+        // No custom flag anywhere: the game is on its stock flag already.
+        g_careerFlagApplied = true;
     }
     __except (EXCEPTION_EXECUTE_HANDLER) {
-        Log("falsecolours: EXCEPTION 0x%08X reading the flag texture; probe off",
+        Log("falsecolours: EXCEPTION 0x%08X restoring career colours",
             GetExceptionCode());
-        g_falseColours = false;
+        g_careerFlagApplied = true;      // never retry into a fault
+    }
+}
+
+// ------------------------------------------------ our own flag enumeration
+// The game finds custom flags with a directory scan, but only runs it when the
+// "Change Sails and Flags" screen is first opened. Depending on that would mean
+// telling a player to visit a menu before the framework works, every session --
+// which is not a feature, it is a chore we would be inventing.
+//
+// So PEMF scans for itself, at startup. This is ordinary Windows file work and
+// needs no engine call at all: the two folders are the same two the game looks
+// in, the pattern is the same pattern, and the loader takes a bare filename --
+// all measured, not assumed. The game's own list is still read when it exists,
+// as a cross-check.
+static char g_gameDir[MAX_PATH] = {0};
+static char g_flagNames[64][128];
+static int  g_flagNameCount = 0;
+
+static void ScanFlagFolder(const char* folder)
+{
+    char pattern[MAX_PATH];
+    _snprintf_s(pattern, sizeof(pattern), _TRUNCATE, "%s\\flag_*.dds", folder);
+
+    WIN32_FIND_DATAA fd{};
+    HANDLE h = FindFirstFileA(pattern, &fd);
+    if (h == INVALID_HANDLE_VALUE) return;
+    do {
+        if (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) continue;
+        if (g_flagNameCount >= (int)(sizeof(g_flagNames) / sizeof(g_flagNames[0])))
+            break;
+        // The game de-duplicates across its two folders, so we do too.
+        bool seen = false;
+        for (int i = 0; i < g_flagNameCount && !seen; ++i)
+            seen = _stricmp(g_flagNames[i], fd.cFileName) == 0;
+        if (seen) continue;
+        strncpy_s(g_flagNames[g_flagNameCount], sizeof(g_flagNames[0]),
+                  fd.cFileName, _TRUNCATE);
+        ++g_flagNameCount;
+    } while (FindNextFileA(h, &fd));
+    FindClose(h);
+}
+
+static void ScanFlags()
+{
+    g_flagNameCount = 0;
+    if (g_gameDir[0]) {
+        char folder[MAX_PATH];
+        _snprintf_s(folder, sizeof(folder), _TRUNCATE, "%s\\custom", g_gameDir);
+        ScanFlagFolder(folder);
+    }
+    // The player's own folder, which the game reads in preference to nothing --
+    // see re/experiments/flags.
+    char docs[MAX_PATH];
+    if (SHGetFolderPathA(nullptr, CSIDL_PERSONAL, nullptr, 0, docs) == S_OK) {
+        char folder[MAX_PATH];
+        _snprintf_s(folder, sizeof(folder), _TRUNCATE,
+                    "%s\\My Games\\Sid Meier's Pirates!\\Custom", docs);
+        ScanFlagFolder(folder);
+    }
+    Log("flags: %d flag(s) found by our own scan -- no need to open the "
+        "picker first", g_flagNameCount);
+    for (int i = 0; i < g_flagNameCount; ++i)
+        Log("flags:   [%2d] %s", i, g_flagNames[i]);
+}
+
+// Our scan is authoritative because it always exists. The game's list is used
+// only to confirm the two agree.
+static int FlagCount() { return g_flagNameCount; }
+static const char* FlagAt(int i)
+{
+    return (i >= 0 && i < g_flagNameCount) ? g_flagNames[i] : nullptr;
+}
+
+static void RememberTrueFlag()
+{
+    if (g_haveTrueFlag) return;
+    __try {
+        int len = 0;
+        const char* n = game::EngineString(game::addr::CustomFlagName, &len);
+        if (n && len > 0 && SafeStr(n, g_trueFlagName, sizeof(g_trueFlagName))) {
+            g_haveTrueFlag = true;
+            Log("falsecolours: true colours are '%s'", g_trueFlagName);
+        } else {
+            Log("falsecolours: no custom flag is selected, so there is nothing "
+                "to restore to -- pick one in Options first");
+        }
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER) {
+        Log("falsecolours: EXCEPTION 0x%08X reading the chosen flag name",
+            GetExceptionCode());
     }
 }
 
@@ -641,10 +736,37 @@ static void ReportColours(const char* when)
     __try {
         const int mine = state::Nationality();
         const int px = game::PlayerX() / 1000, py = game::PlayerY() / 1000;
-        Log("falsecolours [%s]: flag texture 0x%p (%d captured), "
+
+        int nameLen = 0;
+        const char* chosen = game::EngineString(game::addr::CustomFlagName, &nameLen);
+        char safeName[128] = "(none)";
+        if (chosen && nameLen > 0) SafeStr(chosen, safeName, sizeof(safeName));
+
+        Log("falsecolours [%s]: flag texture 0x%p, chosen name '%s' (len %d), "
             "ship-record nation %d (%s -- NOT the flag, see game.h)",
-            when, game::PlayerFlagTexture(), g_flagSlots, mine,
+            when, game::PlayerFlagTexture(), safeName, nameLen, mine,
             game::NationName(mine));
+
+        // The enumerated lists -- what a feature can actually refer to by name.
+        const int nflags = game::FlagListCount();
+        const int nsails = game::SailListCount();
+        Log("falsecolours: %d flag(s) / %d sail(s) enumerated (counters say "
+            "%d / %d)", nflags, nsails,
+            game::CustomFlagCount(), game::CustomSailCount());
+        for (int i = 0; i < nflags && i < 32; ++i) {
+            char nm[128];
+            const char* rawName = game::FlagName(i);
+            if (rawName && SafeStr(rawName, nm, sizeof(nm)))
+                Log("falsecolours:   flag[%2d] = '%s'", i, nm);
+            else
+                Log("falsecolours:   flag[%2d] = <unreadable>", i);
+        }
+        for (int i = 0; i < nsails && i < 32; ++i) {
+            char nm[128];
+            const char* rawName = game::SailName(i);
+            if (rawName && SafeStr(rawName, nm, sizeof(nm)))
+                Log("falsecolours:   sail[%2d] = '%s'", i, nm);
+        }
 
         // Whatever else is on the water right now. The player is index 0, so
         // start at 1. A modest window: this is orientation, not a census.
@@ -790,50 +912,54 @@ static DWORD WINAPI Hook_timeGetTime(void)
         }
         if (k0) {
             ReportColours("asked");
-            for (int i = 0; i < g_flagSlots; ++i)
-                Log("falsecolours:   captured #%d = 0x%p", i, g_flagSlot[i].tex);
             content::PostDebugNotice("Colours reported to pemf.log.", 5);
             return r;
         }
         if (k9) {
-            // Back to whatever the player actually chose.
-            if (g_flagSlots > 0 && LooksLikeRefObject(g_flagSlot[0].tex)) {
-                game::SetPlayerFlagTexture(g_flagSlot[0].tex);
-                g_flagCursor = 0;
-                Log("falsecolours: flag texture restored to #0 = 0x%p",
-                    g_flagSlot[0].tex);
-                content::PostDebugNotice("First captured flag restored.", 5);
+            if (!g_haveTrueFlag) {
+                Log("falsecolours: true colours were never captured -- nothing "
+                    "to restore to");
+                return r;
+            }
+            if (game::SetPlayerFlagByName(g_trueFlagName)) {
+                session::RecordFlag(g_trueFlagName);
+                Log("falsecolours: true colours restored -- '%s'", g_trueFlagName);
+                content::PostDebugNotice("True colours restored.", 5);
+            } else {
+                Log("falsecolours: could not reload '%s'", g_trueFlagName);
             }
             return r;
         }
-        // Ctrl+Shift+8 flies the next captured texture. This is THE test: if
-        // the mast follows this pointer, false colours is a pointer swap.
-        if (g_flagSlots < 2) {
-            Log("falsecolours: only %d flag texture(s) captured -- open "
-                "Options > Change Sails and Flags and pick a DIFFERENT flag, "
-                "then come back to sea. Each distinct one is captured "
-                "automatically.", g_flagSlots);
-            content::PostDebugNotice("Pick another flag in Options first.", 7);
+
+        // Ctrl+Shift+8 flies the next flag from THE GAME'S OWN LIST, BY NAME.
+        // That is the point of this pass: what flies is something an author
+        // could write down, not a pointer we happened to catch.
+        RememberTrueFlag();
+        const int nflags = FlagCount();
+        if (nflags <= 0) {
+            Log("falsecolours: our scan found no flags in the custom folder(s)");
+            content::PostDebugNotice("No custom flags found.", 6);
             return r;
         }
-        g_flagCursor = (g_flagCursor + 1) % g_flagSlots;
-        void* pick = g_flagSlot[g_flagCursor].tex;
-        // We hold a reference, so this should always pass. Checked anyway:
-        // handing the renderer a bad pointer is exactly how this crashed, and
-        // a refused swap is worth infinitely more than a repeat of that.
-        if (!LooksLikeRefObject(pick)) {
-            Log("falsecolours: captured texture #%d = 0x%p no longer looks "
-                "valid -- REFUSING to fly it", g_flagCursor, pick);
-            content::PostDebugNotice("Captured flag looks invalid; refused.", 6);
-            return r;
-        }
-        game::SetPlayerFlagTexture(pick);
-        Log("falsecolours: flying captured texture #%d = 0x%p", g_flagCursor, pick);
-        {
-            char msg[96];
-            _snprintf_s(msg, sizeof(msg), _TRUNCATE,
-                        "Flying captured flag #%d.", g_flagCursor);
+
+        g_flagCursor = (g_flagCursor + 1) % nflags;
+        char pick[128];
+        strncpy_s(pick, sizeof(pick), FlagAt(g_flagCursor), _TRUNCATE);
+
+        if (game::SetPlayerFlagByName(pick)) {
+            session::RecordFlag(pick);          // travels with the save
+            Log("falsecolours: flying flag[%d] '%s'", g_flagCursor, pick);
+            char msg[160];
+            _snprintf_s(msg, sizeof(msg), _TRUNCATE, "Flying %s.", pick);
             content::PostDebugNotice(msg, 6);
+        } else {
+            // A refusal is a result, not a failure: it says the name the list
+            // holds is not the name the loader wants, which is exactly the
+            // thing this pass exists to pin down.
+            Log("falsecolours: REFUSED flag[%d] '%s' -- the loader would not "
+                "resolve it. The enumerated name probably needs a path or a "
+                "different extension.", g_flagCursor, pick);
+            content::PostDebugNotice("That flag name would not load.", 6);
         }
         return r;
     }
@@ -1044,6 +1170,9 @@ static DWORD WINAPI Init(LPVOID)
                 ".csv/.fpk open and miss will be logged from here", marker);
         }
     }
+
+    strncpy_s(g_gameDir, sizeof(g_gameDir), dir, _TRUNCATE);
+    ScanFlags();
 
     // False colours writes game state, so it is opt-in the same way.
     {

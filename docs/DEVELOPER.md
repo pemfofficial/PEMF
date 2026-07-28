@@ -112,6 +112,13 @@ boundary comes from the safe point, **not** `Present` — this game never calls
   `triggers::WorldOnScreen()`, which matches a screen signature it *learned*
   from ticks where the ship demonstrably moved. Motion learns the answer; it is
   never the answer.
+- **Never** use `state::InGame()` to mean "a career is running". It is
+  `crew > 0`, and the crew count does not reset at the main menu — so it is true
+  forever after the first career of a session. Use `session::InCareer()`, which
+  reads the screen state.
+- **Never** treat a save file being read as a load. Starting a **new career**
+  reads one too, and the load screen reads every save just to list them. Staged
+  state is committed only when its fingerprint matches the live career.
 - **Never** hardcode a measured screen signature. They are recorded in
   [`GAME_API.md`](GAME_API.md#drawing-belongs-to-the-sailing-view) as evidence
   only. Comparing against them would mean one unvisited HUD state stops all

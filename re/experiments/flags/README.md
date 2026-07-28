@@ -188,22 +188,91 @@ the swap is verified in game.
 it is a texture and the game reasons about nationality somewhere else that does
 not move with it. Nothing to fight, nothing to keep in step.
 
+### Loading a flag BY NAME — solved
+
+Capturing pointers worked but could only ever fly "texture #3" without knowing
+which flag that was. The recipe for doing it properly was in the **config-load
+path** at `0x004293D7` — the code that turns `CustomFlag = <name>` in
+`Config.ini` into the texture on the mast:
+
+```asm
+mov  esi, [0x726a8c]     ; the name (engine string: length in the dword at -4)
+call 0x4f4ed0            ; AssetExists()  -> al
+mov  esi, [0x726a8c]
+xor  eax, eax            ; default format
+call 0x500850            ; LoadTexture()  -> texture*
+...                      ; release outgoing, store, then: inc [esi+4]  = AddRef
+```
+
+| Address | Signature |
+|---|---|
+| `0x004F4ED0` | `char AssetExists()` — `esi` = name |
+| `0x00500850` | `void* LoadTexture()` — `esi` = name, `eax` = format struct or 0 |
+
+Both take the name in **ESI** and end in a plain `ret`, so the shims only place
+the register. With `eax = 0` the loader requires the name to end `.dds` and
+picks the format itself. **A bare filename is enough** — `flag_spa.dds`, exactly
+as the enumerator reports it. Verified in game: all eleven flags load by name,
+zero refusals.
+
+That same path independently confirmed the refcount rules learned by crashing,
+which is why it is copied wholesale rather than paraphrased.
+
+### Per-career colours — solved, and it exposed two other bugs
+
+A disguise belongs to a save, not to `Config.ini`, so the sidecar carries `flag`
+and `trueFlag`. Getting that to behave correctly turned out to require fixing
+career and save/load detection from the ground up — including two pre-existing
+bugs that had nothing to do with flags. That is its own write-up:
+[`../career_state/`](../career_state/README.md).
+
+Two design points worth keeping:
+
+- **`trueFlag` is recorded once and never overwritten while disguised.**
+  Recording it again mid-disguise would make the disguise permanent — the one
+  bug a player could never undo, so it is designed out rather than tested for.
+- **The sidecar is player-editable text**, and its value is handed to the
+  engine's asset loader, so it is validated as a filename rather than trusted.
+
+### PEMF enumerates flags itself
+
+The game's scan only runs when the picker screen is first opened, so depending
+on it would mean telling players to visit a menu before the framework works.
+PEMF does its own `FindFirstFileA` over the same two folders with the same
+pattern, de-duplicated the same way, at startup. No engine call involved.
+
+---
+
+## Where this leaves the feature
+
+**Presentation is solved.** The flag is a texture pointer, loadable by name, the
+engine maintains it, and it persists per career.
+
+**The mechanic is entirely PEMF's to build**, because the flag feeds nothing.
+
 Still open, in order:
 
-1. **Name → texture.** We fly "captured texture #3" without knowing whether that
-   is Spanish or a test copy. A real feature needs `flag_spa.dds` by name, which
-   means driving the engine's loader or capturing the name alongside the pointer
-   as the picker resolves it.
-2. **Per-career persistence.** `Config.ini` is global; a disguise belongs to a
-   save. The sidecar already exists for exactly this.
-3. **Suspicion** — the PEMF-owned system that gives the flag stakes: rising with
+1. **Suspicion** — the PEMF-owned system that gives the flag stakes: rising with
    proximity to warships and ports, with time under false colours, and with
    infamy; falling with distance and time. Thresholds drive hails, challenges,
    and being unmasked.
-4. **The AI half.** What the game actually uses to decide hostility is not yet
+2. **The AI half.** What the game actually uses to decide hostility is not yet
    located; the leads followed so far (`International Relations`, the war and
    Letter-of-Marque strings) all landed in news-ticker and pedia formatters
    rather than live state.
-5. **Lower-and-raise animation** — flags attach via `bone_flag_*_pivot` and are
+3. **The player's chosen faction.** Not located either. The nation-select screen
+   art (`intro_s3_e/d/f/s.dds`) turns out to be intro cinematics, and the
+   ship-record nationality is measured not to be it. The starting port proves
+   the game tracks it somewhere. Needed before a new career can start on its
+   faction's colours, and before Suspicion can know who you are impersonating
+   *relative to*.
+4. **Lower-and-raise animation** — flags attach via `bone_flag_*_pivot` and are
    ordinary named scene nodes, so driving the node transform from the frame hook
-   is the plausible route. Unproven, and correctly sequenced after (1).
+   is the plausible route. Unproven.
+
+**Worth knowing about the "wrong" starting flag:** a custom flag in `Config.ini`
+overrides the faction flag on every career — that is the game's own behaviour,
+not a PEMF effect. `FUN_004AF760` applies it unconditionally whenever one is
+set. A career only shows its faction's flag when no custom flag is selected.
+Making new careers start on their faction's colours would be PEMF improving on
+the game, and needs (3).
