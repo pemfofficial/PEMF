@@ -1106,6 +1106,57 @@ fills in the ship. This is the clean entry point — prefer it.
 
 **`__cdecl`, one arg, returns index or `-1`** (`0x0040DB62`).
 
+### There is a family, and the builder decides the role
+
+A ship built by `FUN_00414FC0` turns straight round and sails home, because it
+comes out with **role 0** — ordinary traffic with no orders. Role is not a field
+to patch afterwards; it is chosen by *which builder you call*, and each one sets
+its ship up completely.
+
+| Function | Args | Role | Flags | Nationality |
+|---|---|---|---|---|
+| `FUN_00414FC0` | `(city, kind)`, cdecl | 0 | `0x800` | from the city |
+| `FUN_00415290` | `eax = city`, type on stack | 4 | `0x200` | from the city |
+| `FUN_004154F0` | `(type)`, cdecl | 3 | `0x1C00` | hardcoded `0`, port from `0x00722A08` |
+
+All three are verified callable in a running game — signature check passes, a
+slot is consumed, flags come out distinct per builder. `FUN_00415290`'s mixed
+convention needs a naked shim; no compiler emits it.
+
+### ✅ The lever is the DESTINATION, not the role
+
+Both builders hand back a ship whose **destination city equals the port it was
+built at**. It has arrived. That — not a missing role, not missing flags — is
+why the first spawned ships turned straight round or sat at anchor: they were
+doing exactly what a ship with nowhere to go does.
+
+Write a different city into `+0x3E` and **the ship sails for it**. Verified in a
+running game across all four role values; every one of them travels once it has
+somewhere to be, so role is not what gates movement.
+
+```
+slot 20 AS BUILT -- ROLE 4, dest city 0, home city 0        <- already there
+slot 20 ORDERED -- role 1, dest city 72 (Spanish, 87828 away)  <- sails
+```
+
+**What this makes possible:** build a vessel of any nation, at any port, and
+send it anywhere. A pirate hunter is a ship built at the offended crown's
+nearest port with a destination on the far side of the player. No hostility flag
+required — and there is none to find, so this is the mechanism, not a
+workaround.
+
+Roles 1 and 2 cannot be produced by any callable builder — they are written only
+inside the encounter spawner and the governor's dispatch. They can be **stamped**
+after the fact, which is how their behaviour was tested at all. Patching role on
+a ship built by the wrong builder would otherwise be a bad idea: the remaining
+fields would belong to a different kind of vessel.
+
+⛔ **`FUN_004154F0` reads its home port from `0x00722A08` and does not validate
+it.** In a fresh career that global is unset, and the builder cheerfully makes
+ships at a null settlement — measured, three of them at map position `(1,2)`,
+the corner of the world, and a handful of those crashed the game. Check the
+global before calling; PEMF refuses when it is out of range.
+
 ### `FUN_004135F0` — the low-level initialiser
 
 Takes its arguments **in registers** (`ebp` = slot index, `edx` = city index,
@@ -1138,10 +1189,18 @@ there is a reason not to.
 | `+0x04` | `0x008142FC` | nationality, word — the colours she is seen to fly |
 | `+0x0C` | `0x00814304` | X, milli-units |
 | `+0x10` | `0x00814308` | Y |
-| `+0x22` | `0x00814322` | **role / mission**, word, values 1–4 |
-| `+0x36` | `0x00814336` | a city index (destination) |
-| `+0x38` | `0x00814338` | a city index (origin) |
+| `+0x2A` | `0x00814322` | **role / mission**, word, values 1–4 |
+| `+0x3E` | `0x00814336` | a city index (destination) |
+| `+0x40` | `0x00814338` | a city index (origin) |
 | `+0x58` | `0x00814350` | flags |
+
+⚠️ Those three offsets were first written down as `+0x22`, `+0x36` and `+0x38` —
+plain subtraction errors against the `0x008142F8` base. The first live spawn test
+consequently reported *every* ship as role 0, including two built by functions
+that demonstrably write 4 and 3. The flags read correctly throughout, which is
+what showed the calls were fine and the readout was not. **Derive offsets by
+subtracting, then check the arithmetic against a field whose value is already
+known.**
 
 Flag bits seen written: `0x10`, `0x200`, `0x800`, `0x1400`, `0x8000`, `0x28000`,
 `0x400000`, `0x800000`. ⛔ `0x400000` is **written in five places and read in

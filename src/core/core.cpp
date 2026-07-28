@@ -463,6 +463,11 @@ extern bool g_fileProbe;
 // rather than being a key anyone can hit. See the hotkey handler.
 bool g_falseColours = false;
 
+// The shipyard experiment gets its own marker. It does not write game state so
+// much as CREATE it, and unlike every other probe here that cannot be undone by
+// pressing the key a second time.
+bool g_shipyard = false;
+
 // ------------------------------------------------------ watching the water
 // "Did they attack me?" is not a measurement. Whether a vessel is CLOSING on
 // the player or drifting away is, so the probe tracks each one's distance over
@@ -808,6 +813,194 @@ static void ReportColours(const char* when)
     }
 }
 
+// ---------------------------------------------------- the shipyard experiment
+// Ask the engine to build a ship, and find out whether it works.
+//
+// THE QUESTION: can PEMF call the game's own ship factory and get a real vessel
+// on the water? Everything a false-colours consequence needs rests on the
+// answer. If yes, being unmasked can mean a crown DISPATCHES A HUNTER, which is
+// what the game itself does when it decides you are a problem. If no, the top
+// of the suspicion ladder has no teeth and the design needs rethinking.
+//
+// It is arranged so that the log answers the question even if nothing visible
+// happens on screen. Three things are recorded around the call:
+//
+//   1. the free-slot count before and after -- if the factory consumed a slot,
+//      it did something, whatever appears on screen
+//   2. the returned index, and whether it is in the range the allocator should
+//      hand back (8..255)
+//   3. the new record's own fields -- type, nationality, position, role, flags
+//
+// A returned index with an unchanged free count would mean the call reported
+// success without allocating, which is a different and more interesting failure
+// than a refusal.
+//
+// The ship is built AT A CITY, because that is the only form the factory takes:
+// nationality comes from the city, and so does the starting position. The
+// nearest port is used, so whatever appears should be close enough to see.
+// After the first live test: which builder was called decides what the ship
+// DOES, so all three are exposed and the experiment is now "which of these
+// behaves like a hunter" rather than "does the call work" (it does).
+enum ShipyardKind { kYardRole0 = 0, kYardRole4 = 1, kYardRole3 = 2 };
+
+// The role to stamp on a newly built ship, cycled by its own key.
+//
+// Patching this was argued against at first, on the grounds that each builder
+// sets its ship up completely and a patched role would leave the other fields
+// belonging to a different kind of vessel. That argument was sound and it is
+// now beside the point: BOTH builders produce a ship whose destination is the
+// port it was built at, so the ship is already where it was going. Role 3 sails
+// home (it is home) and role 4 sits still. Neither is misbehaving.
+//
+// Roles 1 and 2 cannot be produced by any callable builder -- they are written
+// only inside the encounter spawner and the governor's dispatch, both far too
+// entangled to call. So the only way to see what they DO is to stamp them.
+static int g_testRole = 1;
+
+// Somewhere for a ship to actually go. A destination equal to the origin is the
+// whole reason nothing moved, so the experiment needs a port that is elsewhere.
+// Picked from a distance band rather than "the farthest": across the map is a
+// long wait before anything is visible, and next door is indistinguishable from
+// staying put.
+static int FindDistantCity(int notThisOne)
+{
+    int best = -1, bestDist = 0;
+    for (int c = 0; c < game::addr::kMaxCities; ++c) {
+        if (c == notThisOne) continue;
+        const int d = game::CityDistance(c);
+        if (d < 15000 || d > 90000) continue;
+        if (d > bestDist) { bestDist = d; best = c; }
+    }
+    return best;
+}
+
+static void RunShipyardExperiment(ShipyardKind which)
+{
+    if (!g_shipyard) {
+        Log("shipyard: not armed -- drop PEMF\\shipyard.on next to the exe. It "
+            "creates permanent game state, so it is opt-in separately from "
+            "everything else.");
+        return;
+    }
+    if (!state::InGame()) {
+        Log("shipyard: refused -- not in a career");
+        return;
+    }
+    static const char* const kYardName[3] = {
+        "role0 (FUN_00414FC0 -- ordinary traffic)",
+        "role4 (FUN_00415290)",
+        "role3 (FUN_004154F0 -- picks its own port)"
+    };
+    const bool callable = which == kYardRole0 ? game::SpawnShipCallable()
+                        : which == kYardRole4 ? game::SpawnRole4Callable()
+                                              : game::SpawnRole3Callable();
+    if (!callable) {
+        Log("shipyard: REFUSED -- %s does not match its expected bytes. "
+            "Nothing was called.", kYardName[which]);
+        content::PostDebugNotice("Shipyard refused: signature mismatch.", 6);
+        return;
+    }
+
+    __try {
+        // Role 3 chooses its own port, so a nearby city is only needed for the
+        // other two. Still looked up either way, because the log wants to say
+        // where the player was standing when the ship appeared.
+        const int city = game::NearestCity(60000);
+        if (city < 0 && which != kYardRole3) {
+            Log("shipyard: no city within range to build at -- sail nearer a "
+                "port and try again");
+            content::PostDebugNotice("No port in range.", 5);
+            return;
+        }
+
+        const int nation = city >= 0 ? game::CityNation(city) : -1;
+        const int freeBefore = game::CountFreeShipSlots();
+
+        Log("shipyard: building %s -- nearest city %d (%s), %d free slot(s) "
+            "before", kYardName[which], city,
+            nation >= 0 ? game::NationName(nation) : "n/a", freeBefore);
+
+        // Ship type / kind 0xB, the value the governor's blockade dispatch
+        // passes at 0x0040DA9A. Chosen because it is the one argument we have
+        // actually SEEN the game use, rather than a number that seemed
+        // reasonable.
+        const int slot = which == kYardRole0 ? game::SpawnShipAtCity(city, 0x0B)
+                       : which == kYardRole4 ? game::SpawnRole4Ship(city, 0x0B)
+                                             : game::SpawnRole3Ship(0x0B);
+
+        const int freeAfter = game::CountFreeShipSlots();
+        Log("shipyard: factory returned %d, %d free slot(s) after (delta %d)",
+            slot, freeAfter, freeBefore - freeAfter);
+
+        if (slot == -2) {
+            Log("shipyard: role3 REFUSED -- its home-city global at 0x%08X "
+                "reads %d, which is not a real settlement. That is why the "
+                "earlier attempt built ships at map position (1,2) and "
+                "eventually crashed: the builder does not validate it.",
+                (unsigned)game::Role3HomeCity, game::Role3HomeCityIndex());
+            content::PostDebugNotice("Role 3 unavailable in this career.", 6);
+            return;
+        }
+        if (slot < 0) {
+            Log("shipyard: the factory refused -- array full, or it did not "
+                "like the arguments");
+            content::PostDebugNotice("Shipyard: factory refused.", 6);
+            return;
+        }
+        if (slot < 8 || slot >= game::addr::kMaxShips) {
+            Log("shipyard: ⚠ returned slot %d is OUTSIDE the pool the allocator "
+                "should use (8..%d). Treating the reading as wrong rather than "
+                "the game.", slot, game::addr::kMaxShips - 1);
+            return;
+        }
+
+        const uintptr_t rec = game::ShipRecord(slot);
+        Log("shipyard: slot %d AS BUILT -- type %d, nationality %d (%s), "
+            "ROLE %d, flags 0x%08X, dest city %d, home city %d",
+            slot, game::ShipType(slot), game::ShipNationality(slot),
+            game::NationName(game::ShipNationality(slot)),
+            game::ShipRole(slot), game::ShipFlagBits(slot),
+            game::ShipDestCity(slot), game::ShipHomeCity(slot));
+
+        // Give it somewhere to be and something to be doing. Only on the
+        // role-4 builder, so H stays a clean control: if H and J now behave
+        // differently, the orders are what did it.
+        if (which == kYardRole4) {
+            const int dest = FindDistantCity(city);
+            if (dest < 0) {
+                Log("shipyard: no port in the 15k-90k band to send it to -- "
+                    "orders unchanged");
+            } else {
+                game::SetShipRoleRaw(slot, g_testRole);
+                game::SetShipDestCityRaw(slot, dest);
+                Log("shipyard: slot %d ORDERED -- role %d, dest city %d (%s, "
+                    "%d away). Watch whether she sails for it.",
+                    slot, game::ShipRole(slot), dest,
+                    game::NationName(game::CityNation(dest)),
+                    game::CityDistance(dest));
+            }
+        }
+        Log("shipyard: slot %d at (%d,%d); the player is at (%d,%d)",
+            slot,
+            *(const int*)(rec + 0x0C) / 1000, *(const int*)(rec + 0x10) / 1000,
+            game::PlayerX() / 1000, game::PlayerY() / 1000);
+
+        char msg[160];
+        _snprintf_s(msg, sizeof(msg), _TRUNCATE, "Built %s ship %d, role %d.",
+                    game::NationName(game::ShipNationality(slot)), slot,
+                    game::ShipRole(slot));
+        content::PostDebugNotice(msg, 8);
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER) {
+        // A fault here is a RESULT: it says the call is not safe in this form.
+        // The marker is dropped so a second keypress cannot repeat it.
+        g_shipyard = false;
+        Log("shipyard: EXCEPTION 0x%08X -- the factory is not callable this "
+            "way. Shipyard disarmed for the session; do NOT save this game.",
+            GetExceptionCode());
+    }
+}
+
 // ------------------------------------------------------- the nations probe
 // Everything nations.h claims, printed from a running game so it can be
 // checked rather than believed. The addresses behind it were read out of the
@@ -1020,7 +1213,12 @@ static DWORD WINAPI Hook_timeGetTime(void)
     bool k0 = mods && (GetAsyncKeyState('0') & 0x8000);
     // The digits were all spoken for by the time the nations probe arrived.
     bool kN = mods && (GetAsyncKeyState('N') & 0x8000);
-    bool down = k1 || k2 || k3 || k4 || k5 || k6 || k7 || k8 || k9 || k0 || kN;
+    bool kH = mods && (GetAsyncKeyState('H') & 0x8000);
+    bool kJ = mods && (GetAsyncKeyState('J') & 0x8000);
+    bool kK = mods && (GetAsyncKeyState('K') & 0x8000);
+    bool kL = mods && (GetAsyncKeyState('L') & 0x8000);
+    bool down = k1 || k2 || k3 || k4 || k5 || k6 || k7 || k8 || k9 || k0 ||
+                kN || kH || kJ || kK || kL;
 
     bool rising = down && !g_prevKeyDown;
     g_prevKeyDown = down;
@@ -1078,6 +1276,24 @@ static DWORD WINAPI Hook_timeGetTime(void)
     if (kN) {
         ReportNations("asked");
         content::PostDebugNotice("Nations reported to pemf.log.", 5);
+        return r;
+    }
+    // Ctrl+Shift+H/J/K each ask a DIFFERENT one of the engine's ship builders
+    // for a vessel. Behind their own marker file, because they create state
+    // that a second keypress cannot take back.
+    if (kH || kJ || kK) {
+        RunShipyardExperiment(kH ? kYardRole0 : kJ ? kYardRole4 : kYardRole3);
+        return r;
+    }
+    // Ctrl+Shift+L picks which role the next J-built ship is given. Roles 1 and
+    // 2 exist only inside code we cannot call, so stamping is the only way to
+    // find out what they mean.
+    if (kL) {
+        g_testRole = (g_testRole % 4) + 1;          // 1,2,3,4, round again
+        Log("shipyard: next ordered ship will be given ROLE %d", g_testRole);
+        char msg[80];
+        _snprintf_s(msg, sizeof(msg), _TRUNCATE, "Next role: %d", g_testRole);
+        content::PostDebugNotice(msg, 5);
         return r;
     }
 
@@ -1371,6 +1587,32 @@ static DWORD WINAPI Init(LPVOID)
             Log("falsecolours: ARMED (found %s) -- pick flags in Options to "
                 "capture them, then Ctrl+Shift+8 flies the next captured one, "
                 "9 restores the first, 0 reports", marker);
+        }
+    }
+
+    // The shipyard gets its OWN marker, deliberately not shared with false
+    // colours. Everything else behind a marker can be undone by pressing the
+    // key again; this one creates a ship that persists into the save. A
+    // different risk deserves a different opt-in.
+    {
+        char marker[MAX_PATH];
+        _snprintf_s(marker, sizeof(marker), _TRUNCATE,
+                    "%s\\PEMF\\shipyard.on", dir);
+        if (GetFileAttributesA(marker) != INVALID_FILE_ATTRIBUTES) {
+            g_shipyard = true;
+            Log("shipyard: ARMED (found %s) -- Ctrl+Shift+H/J/K build a ship "
+                "using each of the engine's three builders. THIS WRITES "
+                "PERMANENT GAME STATE; use a save you do not mind losing.",
+                marker);
+            Log("shipyard:   H = role 0 (0x%08X) %s",
+                (unsigned)game::SpawnShipFn,
+                game::SpawnShipCallable() ? "MATCHES" : "MISMATCH");
+            Log("shipyard:   J = role 4 (0x%08X) %s",
+                (unsigned)game::SpawnShipRole4Fn,
+                game::SpawnRole4Callable() ? "MATCHES" : "MISMATCH");
+            Log("shipyard:   K = role 3 (0x%08X) %s",
+                (unsigned)game::SpawnShipRole3Fn,
+                game::SpawnRole3Callable() ? "MATCHES" : "MISMATCH");
         }
     }
 

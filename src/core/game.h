@@ -848,6 +848,248 @@ inline void SetShipNationalityRaw(int index, int nation)
     *(short*)(addr::ShipNationality + (uintptr_t)index * addr::kShipStride) = (short)nation;
 }
 
+// ------------------------------------------------------------ the shipyard
+// Calling the engine's own ship factory.
+//
+// This is the primitive a false-colours consequence needs, and it exists
+// because the alternative does not: NOTHING in the binary reads the player's
+// nationality, so there is no "make that ship hostile" switch to throw. What
+// the game does when a crown decides you are a problem is BUILD A SHIP AND SEND
+// IT -- a pirate hunter, a privateer, a blockade squadron. So we build one too,
+// through the same function it uses.
+//
+//     FUN_00414FC0(cityIndex, kind) -> new slot index, or -1
+//
+// Plain __cdecl. It walks the array from slot 8 looking for a free record (type
+// word == -1), zeroes the whole 0x45C, sets flags |= 0x800, and fills the ship
+// in from the city. Slot 0 is the player and 1-7 are reserved, which is why the
+// scan starts where it does.
+//
+// ⚠️ THIS CREATES REAL GAME STATE THAT PERSISTS INTO SAVES. It is not a probe
+// that can be undone by pressing the key again. Everything that calls it is
+// behind its own marker file, and the first use of it belongs on a save nobody
+// minds losing.
+constexpr uintptr_t SpawnShipFn = 0x00414FC0;
+
+// The first bytes of that function on both the GOG and the packed builds:
+//     83 EC 08        sub esp, 8
+//     56              push esi
+//     BE 08 00 00 00  mov esi, 8        <- the slot scan's starting index
+// Checked before every call. Calling a wrong address does not fail politely, it
+// executes whatever is there, and "the address moved" is exactly the failure a
+// signature catches cheaply.
+constexpr unsigned char kSpawnShipSig[] = {
+    0x83, 0xEC, 0x08, 0x56, 0xBE, 0x08, 0x00, 0x00, 0x00
+};
+
+// There is a FAMILY of these, not one function, and the difference between them
+// is the ROLE the new ship gets. That is the finding that came out of the first
+// live test: a ship built by the factory above turns straight round and sails
+// home, because it is built with role 0 -- ordinary traffic with no orders.
+//
+//   FUN_00414FC0(city, kind)   role 0   flags 0x800    nationality from city
+//   FUN_00415290(city, type)   role 4   flags 0x200    nationality from city
+//   FUN_004154F0(type)         role 3   flags 0x1400   nationality 0, port from
+//                                                      the global at 0x00722A08
+//
+// So "what is this ship for" is not a field to be patched after the fact; it is
+// chosen by which builder is called, and each one sets up its ship completely.
+// Patching role afterwards would leave the other fields belonging to a
+// different kind of vessel, which is the sort of half-state that produces a bug
+// nobody can reproduce.
+constexpr uintptr_t SpawnShipRole4Fn = 0x00415290;
+constexpr uintptr_t SpawnShipRole3Fn = 0x004154F0;
+
+constexpr unsigned char kSpawnRole4Sig[] = {
+    0x83, 0xEC, 0x0C, 0x53, 0x55, 0x8B, 0xD8, 0xBD, 0x08, 0x00
+};
+constexpr unsigned char kSpawnRole3Sig[] = {
+    0x51, 0x56, 0xBE, 0x08, 0x00, 0x00, 0x00
+};
+
+inline bool BytesMatch(uintptr_t va, const unsigned char* sig, size_t n)
+{
+    __try {
+        const unsigned char* p = (const unsigned char*)va;
+        for (size_t i = 0; i < n; ++i) if (p[i] != sig[i]) return false;
+        return true;
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
+}
+
+inline bool SpawnShipCallable()
+{
+    return BytesMatch(SpawnShipFn, kSpawnShipSig, sizeof(kSpawnShipSig));
+}
+inline bool SpawnRole4Callable()
+{
+    return BytesMatch(SpawnShipRole4Fn, kSpawnRole4Sig, sizeof(kSpawnRole4Sig));
+}
+inline bool SpawnRole3Callable()
+{
+    return BytesMatch(SpawnShipRole3Fn, kSpawnRole3Sig, sizeof(kSpawnRole3Sig));
+}
+
+typedef int (__cdecl *SpawnShip_t)(int cityIndex, int kind);
+typedef int (__cdecl *SpawnRole3_t)(int shipType);
+
+// Returns the new ship's slot index, or -1 if the array is full or the
+// signature check failed. Never called from content or from the render hook.
+inline int SpawnShipAtCity(int cityIndex, int kind)
+{
+    if (!SpawnShipCallable()) return -1;
+    if (cityIndex < 0 || cityIndex >= addr::kMaxCities) return -1;
+    __try {
+        return ((SpawnShip_t)SpawnShipFn)(cityIndex, kind);
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER) { return -1; }
+}
+
+// The city the role-3 builder uses. It reads this rather than taking a port,
+// which is a problem: in a fresh career it is not set, and the builder happily
+// makes ships at a null city. MEASURED -- three of them appeared at map
+// position (1,2), the corner of the world, and a handful of those crashed the
+// game. So the global is checked before the call rather than after.
+constexpr uintptr_t Role3HomeCity = 0x00722A08;
+
+inline int Role3HomeCityIndex()
+{
+    __try { return *(const int*)Role3HomeCity; }
+    __except (EXCEPTION_EXECUTE_HANDLER) { return -1; }
+}
+
+// Role 3. Plain __cdecl, one argument -- but it picks its own port, so the only
+// way to keep it safe is to refuse when that port is not a real one.
+inline int SpawnRole3Ship(int shipType)
+{
+    if (!SpawnRole3Callable()) return -1;
+    const int city = Role3HomeCityIndex();
+    if (city <= 0 || city >= addr::kMaxCities) return -2;   // -2: bad global
+    __try {
+        return ((SpawnRole3_t)SpawnShipRole3Fn)(shipType);
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER) { return -1; }
+}
+
+// Role 4 takes its city in EAX and its ship type on the stack -- a mixed
+// convention the compiler will not produce, so it needs a shim. The callee
+// cleans nothing; the caller pops the one argument.
+constexpr uintptr_t PGA_SPAWN_ROLE4 = SpawnShipRole4Fn;
+
+__declspec(naked) static int SpawnRole4Raw(int /*cityIndex*/, int /*shipType*/)
+{
+    __asm {
+        push ebx
+        mov  eax, [esp + 8]         // cityIndex -> eax, where it is expected
+        mov  ebx, [esp + 12]        // shipType
+        push ebx                    // ...goes on the stack
+        mov  edx, PGA_SPAWN_ROLE4
+        call edx
+        add  esp, 4
+        pop  ebx
+        ret
+    }
+}
+
+inline int SpawnRole4Ship(int cityIndex, int shipType)
+{
+    if (!SpawnRole4Callable()) return -1;
+    if (cityIndex < 0 || cityIndex >= addr::kMaxCities) return -1;
+    __try {
+        return SpawnRole4Raw(cityIndex, shipType);
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER) { return -1; }
+}
+
+// A free slot is marked by a type word of -1. Exposed so a caller can count
+// them before and after, which is how the experiment proves the call did
+// anything at all rather than merely returning a number.
+inline int ShipType(int index)
+{
+    __try {
+        return *(const short*)(addr::ShipArray + (uintptr_t)index * addr::kShipStride);
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER) { return -1; }
+}
+
+// Field offsets are derived from the absolute addresses the disassembly uses,
+// and the arithmetic is worth doing carefully: role was first written down as
+// +0x22 when 0x00814322 - 0x008142F8 is 0x2A, so the first live test read a
+// neighbouring field and reported every ship as role 0 -- including two built
+// by functions that demonstrably write 4 and 3. The flags were right, which is
+// what showed the calls were fine and the readout was not.
+constexpr int kShipRole     = 0x2A;   // 0x00814322
+constexpr int kShipDestCity = 0x3E;   // 0x00814336
+constexpr int kShipHomeCity = 0x40;   // 0x00814338
+
+inline int ShipRole(int index)
+{
+    __try {
+        return *(const short*)(addr::ShipArray +
+                               (uintptr_t)index * addr::kShipStride + kShipRole);
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER) { return -1; }
+}
+
+// Orders, such as they are. A ship built by either factory comes out with its
+// destination set to the port it was built at, which is to say: already there,
+// nothing to do. That -- not a missing role -- is why the first spawns sailed
+// home or sat still.
+//
+// Deliberately raw, deliberately only called from the shipyard experiment. If
+// this turns into a shipped feature it belongs behind something validated.
+inline void SetShipRoleRaw(int index, int role)
+{
+    __try {
+        *(short*)(addr::ShipArray + (uintptr_t)index * addr::kShipStride
+                  + kShipRole) = (short)role;
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER) {}
+}
+
+inline void SetShipDestCityRaw(int index, int cityIndex)
+{
+    __try {
+        *(short*)(addr::ShipArray + (uintptr_t)index * addr::kShipStride
+                  + kShipDestCity) = (short)cityIndex;
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER) {}
+}
+
+inline int ShipDestCity(int index)
+{
+    __try {
+        return *(const short*)(addr::ShipArray +
+                               (uintptr_t)index * addr::kShipStride + kShipDestCity);
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER) { return -1; }
+}
+
+inline int ShipHomeCity(int index)
+{
+    __try {
+        return *(const short*)(addr::ShipArray +
+                               (uintptr_t)index * addr::kShipStride + kShipHomeCity);
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER) { return -1; }
+}
+
+inline unsigned ShipFlagBits(int index)
+{
+    __try {
+        return *(const unsigned*)(addr::ShipArray + (uintptr_t)index * addr::kShipStride + 0x58);
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER) { return 0; }
+}
+
+inline int CountFreeShipSlots()
+{
+    int n = 0;
+    for (int i = 8; i < addr::kMaxShips; ++i)
+        if (ShipType(i) == -1) ++n;
+    return n;
+}
+
 // ------------------------------------------------------ the player's flag
 // The texture currently flown. A pointer to a Gamebryo texture object, or null
 // before one has been chosen.

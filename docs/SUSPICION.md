@@ -124,13 +124,20 @@ Every input the design needs is confirmed working in a running game.
 | Our standing with each crown | `0x00869A78`, `0x00869A88` | ⚠️ addresses confirmed, values not yet seen to move |
 | Showing all of it | notice channels + choice card | ✅ verified |
 | Persisting it per career | sidecar | ✅ verified |
-| **Dispatching a hunter** | `FUN_00414FC0(city, kind)` | ⚠️ **untested — this is the bounded experiment** |
+| **Dispatching a hunter** | ship factory + destination write | ✅ **verified — builds, sails, arrives** |
 
 ## What is missing
 
-1. **The hunter spawn is unproven.** One function call, clear yes/no test. Until
-   it works, the top of the ladder has no consequence and Suspicion is tension
-   without payoff.
+1. ~~The hunter spawn is unproven.~~ **Done.** PEMF can build a ship of any
+   nation at any port and send it anywhere, using the engine's own factory. The
+   lever turned out to be the destination field, not a role or a hostility bit —
+   a ship built with its destination equal to its origin has arrived, which is
+   why the first attempts appeared to do nothing. Full account in
+   [`GAME_API.md`](GAME_API.md#-the-lever-is-the-destination-not-the-role).
+
+   Still open underneath it: a hunter currently sails to a *place*, not at a
+   *ship*. Pointing it past the player is close enough to read as pursuit, and
+   whether true target-chasing exists has not been established.
 2. **Infamy is not located.** The game tracks an "@ORDINAL most notorious pirate"
    ranking, so a value exists, but the HUD only draws the *word* "Fame" and the
    two references to that string push no value. Wanted for the "a famous captain
