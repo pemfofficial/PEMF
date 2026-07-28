@@ -95,6 +95,15 @@ struct NationSuspicion {
     int   lastRate = 0;     // points/sec last tick, for the panel
     DWORD lastBeat = 0;     // threshold we have already spoken about
     int   spokenAt = 0;
+
+    // Fractional carry, in point-milliseconds.
+    //
+    // Without this the system cannot work at all: the safe point runs every
+    // ~16 ms, so `level += rate * dt / 1000` is `12 * 16 / 1000`, which is ZERO
+    // in integer arithmetic, on every tick, forever. The panel showed a correct
+    // rate of +12 beside a level that never left 0 -- a rate is not progress
+    // until something keeps the remainder.
+    int   carry = 0;
 };
 
 inline NationSuspicion g_sus[game::addr::kNationsWithRank];
@@ -421,9 +430,11 @@ inline void Tick(DWORD dtMs)
     if (g_wearing < 0 || g_wearing >= game::addr::kNationsWithRank) {
         for (int n = 0; n < game::addr::kNationsWithRank; ++n) {
             NationSuspicion& s = g_sus[n];
-            if (s.level <= 0) continue;
-            s.level -= (g_tune.decayClear * (int)dtMs) / 1000;
-            if (s.level < 0) s.level = 0;
+            if (s.level <= 0) { s.carry = 0; continue; }
+            s.carry -= g_tune.decayClear * (int)dtMs;
+            const int w = s.carry / 1000;
+            if (w != 0) { s.level += w; s.carry -= w * 1000; }
+            if (s.level < 0) { s.level = 0; s.carry = 0; }
             s.lastRate = -g_tune.decayClear;
         }
         return;
@@ -437,9 +448,11 @@ inline void Tick(DWORD dtMs)
     s.lastRate = rate;
 
     const int before = s.level;
-    s.level += (rate * (int)dtMs) / 1000;
-    if (s.level < 0)   s.level = 0;
-    if (s.level > 100) s.level = 100;
+    s.carry += rate * (int)dtMs;
+    const int whole = s.carry / 1000;
+    if (whole != 0) { s.level += whole; s.carry -= whole * 1000; }
+    if (s.level < 0)   { s.level = 0;   s.carry = 0; }
+    if (s.level > 100) { s.level = 100; s.carry = 0; }
 
     // Remember WHERE this was earned, so leaving the area cools it faster.
     if (rate > 0) {
@@ -494,8 +507,10 @@ inline void RefreshPanel()
     if (!state::InGame()) return;
     if (g_wearing < 0 || g_wearing >= game::addr::kNationsWithRank) return;
 
+    // Shown for as long as we are wearing someone else's flag, even at zero.
+    // Hiding it whenever nothing was happening made it look broken -- it
+    // vanished and, since the level could never rise, never came back.
     const NationSuspicion& s = g_sus[g_wearing];
-    if (s.level <= 0 && s.lastRate <= 0) return;
 
     // A bar rather than a bare number: it reads at a glance while sailing.
     char bar[21];
