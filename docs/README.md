@@ -116,6 +116,10 @@ levels are used throughout the docs:
 | Reading nation relations — war, treaty, neutral | **Verified** — seen changing live as wars ended |
 | Reading the nation the player serves | **Verified** — four careers, four crowns, four values |
 | Reading the player's rank and reputation per crown | **Built** — addresses confirmed in the disassembly; every career tested so far holds no commission, so the values have not yet moved |
+| Building a ship through the engine's own factory | **Verified** — any nation, any port |
+| Giving a spawned ship a destination it sails to | **Verified** — across all four role values |
+| A hunter that chases the player rather than a port | Not started |
+| Suspicion | Not started |
 | Playing a named game sound with an event | **Verified** |
 | Officer simulation | Not started |
 | Factions and divisions | Not started |

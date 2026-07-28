@@ -223,7 +223,18 @@ Findings in [`re/experiments/flags/`](re/experiments/flags/README.md).
 - ⛔ **The AI lever is NOT the ship record's nationality.** That was the plan of
   record and it is dead: the player's field read `0` in four careers begun under
   four different crowns, so it neither records who you are nor plausibly tells
-  the AI anything. What the game does use is once again unlocated.
+  the AI anything. **There is no hostility flag at all** — nothing in the binary
+  reads the player's nationality.
+- ✅ **PEMF can build ships.** The engine's own factory, called from PEMF: a
+  vessel of any nation, at any port, sailing to any destination. Verified in
+  game. This is how the world reacts to a blown disguise, because it is how the
+  *game* reacts when a crown decides you are a problem — it dispatches a ship
+  rather than flagging one. See
+  [`re/experiments/shipyard/`](re/experiments/shipyard/README.md).
+- 📐 **A hunter that chases rather than travels.** A spawned ship sails to a
+  *place*; pointing it past the player reads as pursuit, but true target-chasing
+  has not been found. Re-aiming the destination as the player moves is the
+  fallback.
 - 📐 **Starting on your faction's colours.** A custom flag in `Config.ini`
   overrides the faction flag on every career — that is the game's own behaviour,
   not a PEMF effect. Now unblocked: the chosen nation can be read directly.
