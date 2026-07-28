@@ -1072,6 +1072,105 @@ map of what game state *is*. Sizes worth having:
 walks (`0x45C00 / 0x45C`). Twenty-four has been a serviceable window on the
 water near the player, never a correct bound.
 
+## Making ships — the factory
+
+The engine has no way to make an existing vessel hostile: **nothing anywhere
+reads the player's nationality field**, checked exhaustively. When a nation
+decides you are a problem the game does not flip a bit on a passing merchant —
+it *builds a ship and sends it*. That is what a pirate hunter is, what a
+privateer is when two crowns go to war, and what a governor's blockade fleet is.
+
+So the primitive worth having is not a hostility switch. It is the constructor.
+
+### Slot allocation — `+0x00 == -1` means free
+
+| Slots | Use |
+|---|---|
+| 0 | the player |
+| 1–7 | reserved |
+| 8–255 | the AI pool |
+
+The allocator walks from slot 8 looking for a record whose **type word at
+`+0x00` is `-1`**, and stops at `0x00859EF8` — which is `0x008142F8 + 256 *
+0x45C`, the third independent statement that the array holds 256.
+
+### `FUN_00414FC0(cityIndex, kind)` — allocate and build
+
+**`__cdecl`, two args, returns the new slot index or `-1`.** Caller-cleaned;
+seen at `0x0040DA9A` as `push 0xB / push ecx / call`.
+
+Finds a free slot, zeroes the whole `0x45C` record, sets flags `|= 0x800`, and
+fills in the ship. This is the clean entry point — prefer it.
+
+### `FUN_00414D00(cityIndex)` — the same job, one arg
+
+**`__cdecl`, one arg, returns index or `-1`** (`0x0040DB62`).
+
+### `FUN_004135F0` — the low-level initialiser
+
+Takes its arguments **in registers** (`ebp` = slot index, `edx` = city index,
+returns `eax = ebp`), so it needs a naked shim. What it does is worth knowing
+even if it is not what you call:
+
+```
+memset(ship, 0, 0x45C)                   ; rep stosd, 0x117 dwords
+flags |= 0x10
++0x18 = 0x12C
++0x4C = 0xFFFF
+if (cityIndex != -1) {
+    +0x3E = cityIndex                     ; home city
+    +0x04 = CityNation(cityIndex)         ; NATIONALITY COMES FROM THE CITY
+    +0x0C, +0x10 = city position * 1000   ; spawned at that city
+    +0x5C = 1
+    flags |= 0x200
+}
+```
+
+⚠️ The exact entry point needs pinning before this is called — the bytes just
+before `0x004135F8` disassemble ambiguously. Use `FUN_00414FC0` instead unless
+there is a reason not to.
+
+### Ship record fields recovered so far
+
+| Offset | Global | Meaning |
+|---|---|---|
+| `+0x00` | `0x008142F8` | ship type, word. **`-1` = free slot** |
+| `+0x04` | `0x008142FC` | nationality, word — the colours she is seen to fly |
+| `+0x0C` | `0x00814304` | X, milli-units |
+| `+0x10` | `0x00814308` | Y |
+| `+0x22` | `0x00814322` | **role / mission**, word, values 1–4 |
+| `+0x36` | `0x00814336` | a city index (destination) |
+| `+0x38` | `0x00814338` | a city index (origin) |
+| `+0x58` | `0x00814350` | flags |
+
+Flag bits seen written: `0x10`, `0x200`, `0x800`, `0x1400`, `0x8000`, `0x28000`,
+`0x400000`, `0x800000`. ⛔ `0x400000` is **written in five places and read in
+none** — it is not a hostility bit, whatever it is. One of its writes happens
+after a yes/no dialog returns "no", so "player declined, do not re-offer" is the
+better guess.
+
+### `FUN_00413710` — the encounter spawner
+
+The function that puts traffic in front of you. It:
+
+1. reads the player's position, divides by 1000, and offsets Y by `+500` —
+   a point just ahead of the ship;
+2. picks a free slot (two pools: `108 + rand%4` for one case, `8 + rand%0x78`
+   otherwise);
+3. picks a random city (`rand % 0x2C`), rejects it unless it is within `0x73` of
+   that point and its flags pass;
+4. builds the ship and **assigns the role field** at `+0x22`.
+
+Every one of the role assignments in the binary lives inside this function or
+the governor-mission code, which is why the role values are worth mapping: they
+are the vocabulary for "what is this ship doing". Role `2` is set by the
+governor's blockade dispatch at `0x0040DAD3`, alongside the message *"I am about
+to send the Brig '@SHIPNAME' to blockade @CITYNAME."*
+
+**Not yet established:** what roles 1, 3 and 4 mean, and which role (if any) is
+"hunt the player". No consumer of `+0x22` has been found — every access through
+the absolute form is a write, so the readers use a register base.
+
 ### Screen state also answers "am I in a career"
 
 The same `ScreenId`/`ScreenDepth` pair that gates notice drawing. **Depth alone
