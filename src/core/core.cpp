@@ -322,6 +322,10 @@ static void RunSafePoint()
     content::g_worldLive = state::InGame() && triggers::WorldOnScreen() &&
                            *(void**)game::addr::WorldLabelManager != nullptr;
 
+    // A notice should not spend its life expiring behind a menu, so its clock
+    // only runs while the overworld is actually on screen.
+    content::HoldNoticeClock(content::g_worldLive);
+
     // The game's Direct3D device only exists once the game has created it, and
     // the engine has been seen rebuilding its vtable mid-session -- so the hook
     // installs and re-verifies itself from here. A few guarded reads per frame.

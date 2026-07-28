@@ -37,23 +37,70 @@ struct WorldSample {
     int  x = 0, y = 0;
     int  nearestCity = -1;
     int  nearestDist = -1;
-    int  screenId    = 0;   // diagnostic only
-    int  screenDepth = 0;   // diagnostic only
+    int  screenId    = 0;   // together, the screen signature -- see WorldOnScreen
+    int  screenDepth = 0;
 };
 
-// Drawing wants a TIGHTER test than firing does. kMovingWindowMs deliberately
-// tolerates a stationary moment so a trigger is not lost to one frozen frame;
-// for drawing that same tolerance is a bug, because opening a menu freezes the
-// ship and the notice would go on being painted over the menu for the whole
-// window. A notice leaking onto a menu for two seconds is very visible, and
-// losing a few frames of a notice while becalmed is not.
-constexpr DWORD kDrawWindowMs = 350;
+// ------------------------------------------------- is the overworld on screen
+// Drawing needs a different question answered than firing does, and for a long
+// time it asked a worse version of the same one: "has the ship moved in the
+// last 350 ms". That is not a screen test. Opening a menu freezes the ship, so
+// a notice went on painting over the menu until the window lapsed -- an
+// anchored one projected onto whatever the menu was showing, which put a
+// lookout's call across the Load/Save map (reported from a playtest 2026-07-28).
+// Shortening the window could not fix it either: a becalmed or paused ship at
+// sea is indistinguishable from a menu under a motion test, so a tighter window
+// only trades a menu leak for notices vanishing at sea.
+//
+// What works is a POSITIVE signal, and it turns out the screen-state globals
+// give one. game.h once recorded them as a dead end, which was too strong a
+// conclusion: what was actually established is that they are not an ENUM, and
+// they are not -- but they are a stable per-screen SIGNATURE. Measured over a
+// session that visited every screen:
+//
+//   sailing / overworld   0x0FFFEFDF, 0x0FFFFFDF   depth 3
+//   town                  0x0FFFEFFA, 0x0FFFFFFA   depth 3
+//   Load / Save           0x0FFBE770, 0x0FFBE750   depth 4
+//   battle                0x8FFFEFFF, 0x8FFFFFFF   depth 4-5
+//   main menu             0x0FFFEFF0, 0x0FFFFFF0   depth 1
+//
+// Those read as a bitfield rather than an identifier, so hardcoding the sailing
+// values would be a constant nobody could maintain: one HUD state we did not
+// happen to visit and notices stop, silently, which is the failure mode this
+// project likes least.
+//
+// So the gate CALIBRATES ITSELF. A ship whose position changed this very tick
+// is unambiguously out on the overworld, whatever the numbers happen to be --
+// so that is when a signature is learned. Afterwards the overworld is "on
+// screen" whenever the live signature matches one we learned. Motion is used to
+// LEARN the answer, never to be the answer.
+//
+// That fixes both halves at once. A menu never matches, so nothing leaks and
+// there is no tail to wait out. A becalmed ship still matches, so notices stop
+// dropping out when you come to a stop -- which the old window did too.
+//
+// It also fails in the safe direction: an unrecognised screen draws nothing
+// until the ship moves and teaches us the signature, so the worst case is a
+// missing notice rather than one painted over a menu.
+//
+// Battle is deliberately NOT learned. It has its own signature and its own ship
+// array, and the overworld position is frozen throughout, so a notice anchored
+// to a map position would hang in the wrong place anyway.
+struct ScreenSignature {
+    int id    = 0;
+    int depth = 0;
+};
 
-// Is the overworld actually on screen right now? This is a heuristic, like
-// Sailing() -- the game's obvious screen-id globals turned out to be
-// pointer-like rather than an enum (see game.h). It holds because every menu
-// and town screen freezes the ship's position.
+// Four is comfortably more than the two variants the overworld has been seen to
+// use -- one bit of the id flickers -- while still being small enough that a
+// wrong entry could never accumulate into "everything matches".
+constexpr int kMaxWorldSignatures = 4;
+
+inline ScreenSignature g_worldSig[kMaxWorldSignatures];
+inline int             g_worldSigCount = 0;
+
 inline bool WorldOnScreen();
+inline void LearnWorldSignature(int id, int depth);
 
 inline int   g_lastX = 0, g_lastY = 0;
 inline DWORD g_lastMovedAt = 0;
@@ -69,6 +116,9 @@ inline WorldSample Sample()
         s.x = game::PlayerX();
         s.y = game::PlayerY();
 
+        s.screenId    = *(const int*)game::addr::ScreenId;
+        s.screenDepth = *(const int*)game::addr::ScreenDepth;
+
         DWORD now = GetTickCount();
         if (!g_havePos) {
             g_havePos = true;
@@ -77,15 +127,17 @@ inline WorldSample Sample()
         } else if (s.x != g_lastX || s.y != g_lastY) {
             g_lastX = s.x; g_lastY = s.y;
             g_lastMovedAt = now;
+            // The position changed on THIS tick, so the overworld is certainly
+            // what is on screen. That is the only moment worth learning from --
+            // a moment later the ship could be stationary in a menu with the
+            // same recent-movement history.
+            LearnWorldSignature(s.screenId, s.screenDepth);
         }
         s.moving = (now - g_lastMovedAt) < kMovingWindowMs;
 
         s.nearestCity = game::NearestCity(kScanRadius);
         if (s.nearestCity >= 0)
             s.nearestDist = game::CityDistance(s.nearestCity);
-
-        s.screenId    = *(const int*)game::addr::ScreenId;
-        s.screenDepth = *(const int*)game::addr::ScreenDepth;
     }
     __except (EXCEPTION_EXECUTE_HANDLER) {
         Log("triggers: EXCEPTION 0x%08X sampling world state", GetExceptionCode());
@@ -110,10 +162,51 @@ inline bool Sailing(const WorldSample& s)
     return s.inGame && s.moving;
 }
 
+// Learned only from a tick where the position actually changed. See the note
+// above: motion teaches the signature, it does not stand in for it.
+inline void LearnWorldSignature(int id, int depth)
+{
+    for (int i = 0; i < g_worldSigCount; ++i)
+        if (g_worldSig[i].id == id && g_worldSig[i].depth == depth) return;
+
+    if (g_worldSigCount >= kMaxWorldSignatures) {
+        // More variants than the overworld has ever been seen to use. Report it
+        // rather than silently evicting: it means the assumption behind this
+        // gate needs re-measuring, and a quiet gate is exactly what we were
+        // trying to get away from.
+        static bool warned = false;
+        if (!warned) {
+            warned = true;
+            Log("triggers: more than %d overworld screen signatures seen "
+                "(latest 0x%08X depth 0x%08X) -- the screen-state assumption "
+                "needs re-checking", kMaxWorldSignatures,
+                (unsigned)id, (unsigned)depth);
+        }
+        return;
+    }
+
+    g_worldSig[g_worldSigCount].id    = id;
+    g_worldSig[g_worldSigCount].depth = depth;
+    ++g_worldSigCount;
+    Log("triggers: learned overworld screen signature 0x%08X depth 0x%08X (%d)",
+        (unsigned)id, (unsigned)depth, g_worldSigCount);
+}
+
 inline bool WorldOnScreen()
 {
-    if (!g_havePos) return false;
-    return (GetTickCount() - g_lastMovedAt) < kDrawWindowMs;
+    if (!g_havePos || g_worldSigCount <= 0) return false;
+
+    __try {
+        const int id    = *(const int*)game::addr::ScreenId;
+        const int depth = *(const int*)game::addr::ScreenDepth;
+        for (int i = 0; i < g_worldSigCount; ++i)
+            if (g_worldSig[i].id == id && g_worldSig[i].depth == depth)
+                return true;
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER) {
+        return false;
+    }
+    return false;
 }
 
 // ------------------------------------------------------- per-event runtime

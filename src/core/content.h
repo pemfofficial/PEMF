@@ -763,6 +763,31 @@ inline void ClearNotices()
     g_noticeCount = 0;
 }
 
+// A notice's life is measured in wall-clock time, which quietly meant it kept
+// running down while nobody could see it: open a menu with a notice up, stay a
+// while, and it had expired by the time you came back. The player loses a
+// lookout's call to having glanced at the map.
+//
+// So the clock is HELD whenever the overworld is not on screen. Every frame the
+// world is not live, both timestamps move forward by exactly the time that
+// passed, which leaves the REMAINING time untouched -- a notice resumes with
+// what it had left rather than restarting or vanishing. Called once per frame
+// from the safe point, next to where g_worldLive is decided.
+inline DWORD g_noticeClockAt = 0;
+
+inline void HoldNoticeClock(bool worldLive)
+{
+    const DWORD now = GetTickCount();
+    if (g_noticeClockAt && !worldLive) {
+        const DWORD held = now - g_noticeClockAt;
+        for (int i = 0; i < g_noticeCount; ++i) {
+            g_notices[i].posted += held;
+            g_notices[i].until  += held;
+        }
+    }
+    g_noticeClockAt = now;
+}
+
 // Called from the RENDER phase, every frame. Draws whatever is live and drops
 // whatever has expired.
 // Drawing state, reported from the safe point rather than logged in place --
@@ -814,8 +839,9 @@ inline int NoticeFade(const ActiveNotice& n, DWORD now)
 // one painted over the Load/Save screen or the pause menu is a bug whether it
 // is anchored in the world or pinned to the top of the screen.
 //
-// Notices keep expiring while this is false, so a notice posted just before a
-// menu is opened does not come back afterwards; it simply goes unseen.
+// A notice's clock is HELD while this is false (see HoldNoticeClock), so one
+// posted just before a menu is opened resumes with its remaining time rather
+// than expiring unseen behind it.
 inline bool g_worldLive = false;
 
 // The world phase, issued at BeginScene in the last render pass of the frame.

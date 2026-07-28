@@ -188,13 +188,23 @@ namespace addr {
     // The engine walks 128 settlement slots.
     constexpr int       kMaxCities      = 128;
 
-    // DEAD END -- do not re-investigate these as a screen enum.
-    // They looked like a current-screen id and a screen-stack depth
-    // (DAT_007263bc = (&DAT_007268f4)[DAT_00726a84 * 4] in the town code), but a
-    // playtest showed the values are POINTER-LIKE, not an enum:
-    //   0x1000EF5F (120 samples), 0x1000EF7A (4), 0x1000FF5F (1)
-    // "Am I sailing" is determined from ship movement instead. See
-    // triggers.h::Sailing(), which is playtest-validated.
+    // Screen state. NOT an enum -- an earlier playtest established that much and
+    // recorded it as a dead end, which was too strong a conclusion. The values
+    // read as a bitfield (DAT_007263bc = (&DAT_007268f4)[DAT_00726a84 * 4] in
+    // the town code), but taken TOGETHER the pair is a stable per-screen
+    // signature, and a 2026-07-28 session that visited every screen separates
+    // them cleanly:
+    //
+    //   sailing / overworld   0x0FFFEFDF, 0x0FFFFFDF   depth 3
+    //   town                  0x0FFFEFFA, 0x0FFFFFFA   depth 3
+    //   Load / Save           0x0FFBE770, 0x0FFBE750   depth 4
+    //   battle                0x8FFFEFFF, 0x8FFFFFFF   depth 4-5
+    //   main menu             0x0FFFEFF0, 0x0FFFFFF0   depth 1
+    //
+    // These are recorded as EVIDENCE, not as constants to compare against --
+    // nothing in the framework hardcodes them. triggers.h::WorldOnScreen()
+    // learns the overworld's signature at runtime instead, from ticks where the
+    // ship demonstrably moved. See the note there for why.
     constexpr uintptr_t ScreenId      = 0x007263BC;
     constexpr uintptr_t ScreenDepth   = 0x00726A84;
 

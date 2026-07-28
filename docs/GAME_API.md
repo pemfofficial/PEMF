@@ -686,12 +686,48 @@ using, so a label drawn from a menu lands *on that menu* — a lookout's call
 across the Load/Save map. Both draw phases are gated on the overworld being on
 screen.
 
-That test has to be **tighter for drawing than for firing**. The trigger layer
-deliberately tolerates a couple of seconds of stillness so an event is not lost
-to one frozen frame; opening a menu freezes the ship, so the same tolerance
-keeps painting over the menu for its whole window. Drawing uses a short window
-of its own (`triggers::kDrawWindowMs`). Losing a few frames of a notice while
-becalmed is a better failure than a notice across the save screen.
+For a long time that gate asked the wrong question. It tested whether the ship
+had moved recently, which is not a screen test at all: opening a menu freezes
+the ship, so a notice went on painting over the menu until the window lapsed.
+Shortening the window could not fix it, because a becalmed ship at sea is
+indistinguishable from a menu under a motion test — it only traded a menu leak
+for notices vanishing at sea.
+
+The gate now uses the screen-state globals (`ScreenId` / `ScreenDepth`). These
+are **not an enum** — an earlier playtest established that and recorded them as
+a dead end, which was too strong a conclusion. They read as a bitfield, but the
+pair taken together is a stable per-screen signature, and a session visiting
+every screen separates them cleanly:
+
+| Screen | `ScreenId` | `ScreenDepth` |
+|---|---|---|
+| Sailing / overworld | `0x0FFFEFDF`, `0x0FFFFFDF` | 3 |
+| Town | `0x0FFFEFFA`, `0x0FFFFFFA` | 3 |
+| Load / Save | `0x0FFBE770`, `0x0FFBE750` | 4 |
+| Battle | `0x8FFFEFFF`, `0x8FFFFFFF` | 4–5 |
+| Main menu | `0x0FFFEFF0`, `0x0FFFFFF0` | 1 |
+
+Those numbers are **evidence, not constants**: nothing compares against them.
+Hardcoding them would be a value nobody could maintain — one HUD state we never
+visited and notices stop, silently. Instead `triggers::WorldOnScreen()`
+calibrates itself. A ship whose position changed on *this* tick is unambiguously
+out on the overworld whatever the numbers are, so that is when a signature is
+learned; afterwards the overworld is on screen whenever the live signature
+matches a learned one. **Motion is used to learn the answer, never to be the
+answer.**
+
+This fixes both directions at once: a menu never matches, so nothing leaks and
+there is no tail to wait out, and a becalmed ship still matches, so notices no
+longer drop out when you stop. It fails closed — an unrecognised screen draws
+nothing until the ship moves and teaches us its signature — and more than four
+overworld signatures logs a loud warning rather than going quiet.
+
+Battle is deliberately not learned: it has its own ship array and the overworld
+position is frozen throughout, so a notice anchored to a map position would hang
+at a stale place.
+
+A notice's clock is also **held while the overworld is off screen**, so one does
+not spend its life expiring behind a menu and reappear already gone.
 
 ### The shared message buffer is a trap — and a discovery
 
