@@ -987,19 +987,28 @@ static void RunShipyardExperiment(ShipyardKind which)
         // do unless the role itself gives it something. If a role means "hunt",
         // this is the only arrangement in which that can show.
         if (which == kYardRoleOnly) {
-            game::SetShipPurposeRaw(slot, g_testPurpose);
-            game::SetShipRoleRaw(slot, g_testRole);
-            Log("shipyard: slot %d PURPOSE %d (%s), role %d, destination left "
-                "at city %d -- where she already is. Anything she does now is "
-                "hers, not an errand. Hover her: the label should read '%s %s'.",
+            // The game's own recipe, from 0x0045F060, rather than our guess:
+            // build at the port, stamp pirate-hunter, and scale her to how
+            // badly that crown thinks of us.
+            game::SetShipPurposeRaw(slot, game::kPurposePirateHunter);
+            const int str = game::HunterStrengthFor(nation);
+            Log("shipyard: slot %d DISPATCHED AS A HUNTER -- purpose %d (%s), "
+                "%s, strength %d (reputation %d, so 2 - rep/10 clamped to "
+                "2..4). Destination left alone: hunters are exempted from the "
+                "avoid-the-player branch at 0x0046A345, so if that is the whole "
+                "mechanism she should come for us unaided.",
                 slot, game::ShipPurposeOf(slot),
                 game::PurposeName(game::ShipPurposeOf(slot)),
-                game::ShipRole(slot), game::ShipDestCity(slot),
-                game::NationName(game::ShipNationality(slot)),
-                game::PurposeName(game::ShipPurposeOf(slot)));
+                game::NationName(game::ShipNationality(slot)), str,
+                nations::Reputation(nation));
+            Log("shipyard: slot %d flags 0x%08X -- the AI branch above also "
+                "tests flag 0x8, which this ship does NOT have. If she sits, "
+                "that bit is the next thing to try.",
+                slot, game::ShipFlagBits(slot));
             char m2[160];
-            _snprintf_s(m2, sizeof(m2), _TRUNCATE, "%s, no orders. Watch her.",
-                        game::PurposeName(g_testPurpose));
+            _snprintf_s(m2, sizeof(m2), _TRUNCATE,
+                        "%s hunter dispatched, strength %d.",
+                        game::NationName(game::ShipNationality(slot)), str);
             content::PostDebugNotice(m2, 8);
             return;
         }

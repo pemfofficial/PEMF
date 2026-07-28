@@ -1185,11 +1185,45 @@ does not name.
 ✅ **Verified in game.** A ship stamped `+0x02 = 4` hovered as `English
 smuggler`; `= 1` hovered as `English pirate-hunter`.
 
-⛔ **It is a label, not a behaviour.** A ship stamped `1` and left with its
-destination at its home port does not hunt — it sits, exactly as any other ship
-with nowhere to go does. **There is no "chase the player" flag in this game.** A
-pirate hunter is a ship classified `1` *and* given a route that brings it at
-you; both halves have to be set.
+### ✅ The game's own pirate-hunter dispatch — `0x0045F060`
+
+Reproduced exactly (there is a duplicate at `0x00465670`):
+
+```
+slot = FUN_00414FC0(city, kind)         ; the same factory PEMF calls
+rep  = reputation[CityNation(city)]     ; your standing with that crown
+str  = 2 - rep/10                       ; imul 0x66666667 / sar 1
+ship[slot].purpose = 1                  ; PIRATE-HUNTER
+clamp str to [2, 4]
+```
+
+**The worse your standing with a nation, the stronger the hunter it sends.** That
+one line is the entire relationship between reputation and being pursued, and it
+means a system that drives reputation is turning a dial the game already reads
+rather than inventing a parallel one.
+
+The `kind` argument is indexed out of a table at `0x007252D0`.
+
+### And the behaviour — `0x0046A345`
+
+```
+mov  eax, [ebp + 0x814350]      ; flags
+test al, 8                       ; must have bit 0x8 to be in this path at all
+je   skip
+test ah, 0x41
+jne  skip
+cmp  word [ebp + 0x8142FA], 1    ; a pirate-hunter?
+je   skip                        ; <- EXEMPT
+```
+
+Ordinary vessels take a branch that **steers them away from the player**;
+purpose `1` is exempted from it. So "hunting" is not a pursuit routine — it is
+the *absence* of the avoidance every other ship has, in a ship that is already
+near you.
+
+⚠️ Note `test al, 8`. A ship needs flag `0x8` to enter this path, and none of the
+three builders sets it. That is the most likely reason a hand-stamped hunter
+sits still.
 
 Values are written at: `0x0040DACA` (3, governor's dispatch), `0x00413FD0` (4),
 `0x0041412A` (2), `0x00414093` (3 — the raider branch, gated on the game-progress

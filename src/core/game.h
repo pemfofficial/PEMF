@@ -1080,6 +1080,38 @@ inline int ShipPurposeOf(int index)
     __except (EXCEPTION_EXECUTE_HANDLER) { return -1; }
 }
 
+// ------------------------------------------------- dispatching a hunter
+// The game's own pirate-hunter recipe, reproduced from 0x0045F060 (and its
+// duplicate at 0x00465670), which is what a crown does when it has had enough
+// of you:
+//
+//     slot = FUN_00414FC0(city, kind)          ; the factory PEMF already calls
+//     rep  = reputation[CityNation(city)]
+//     str  = 2 - rep/10                        ; imul 0x66666667 / sar 1
+//     ship[slot].purpose = 1                   ; PIRATE-HUNTER
+//     clamp str to [2, 4]
+//
+// **The worse your standing, the stronger the hunter.** That single line is the
+// whole relationship between reputation and being pursued, and it means a
+// suspicion system that drives reputation is not merely thematic -- it is
+// turning the dial the game already reads.
+//
+// The kind argument comes from a table at 0x007252D0 in the original; we pass
+// the one value the game is otherwise known to use.
+constexpr uintptr_t HunterKindTable = 0x007252D0;
+
+inline int HunterStrengthFor(int nation)
+{
+    // Reputation is a signed word; the divide matches the engine's.
+    int rep = 0;
+    __try { rep = *(const short*)(addr::PlayerReputation + (uintptr_t)nation * 2); }
+    __except (EXCEPTION_EXECUTE_HANDLER) { rep = 0; }
+    int s = 2 - (rep / 10);
+    if (s < 2) s = 2;
+    if (s > 4) s = 4;
+    return s;
+}
+
 inline void SetShipPurposeRaw(int index, int purpose)
 {
     __try {
