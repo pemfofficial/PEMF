@@ -990,21 +990,31 @@ static void RunShipyardExperiment(ShipyardKind which)
             // The game's own recipe, from 0x0045F060, rather than our guess:
             // build at the port, stamp pirate-hunter, and scale her to how
             // badly that crown thinks of us.
-            game::SetShipPurposeRaw(slot, game::kPurposePirateHunter);
+            // The whole recipe this time. The previous attempt computed the
+            // strength and then never wrote it, which is the difference
+            // between dispatching a hunter and labelling a ship.
             const int str = game::HunterStrengthFor(nation);
-            Log("shipyard: slot %d DISPATCHED AS A HUNTER -- purpose %d (%s), "
-                "%s, strength %d (reputation %d, so 2 - rep/10 clamped to "
-                "2..4). Destination left alone: hunters are exempted from the "
-                "avoid-the-player branch at 0x0046A345, so if that is the whole "
-                "mechanism she should come for us unaided.",
-                slot, game::ShipPurposeOf(slot),
-                game::PurposeName(game::ShipPurposeOf(slot)),
-                game::NationName(game::ShipNationality(slot)), str,
+            game::SetShipPurposeRaw(slot, game::kPurposePirateHunter);
+            game::SetShipRoleRaw(slot, str);          // +0x2A is STRENGTH
+            game::MarkCitySentHunter(city, slot);     // the port owns her
+
+            // ...plus the one thing the dispatch does NOT do, because in the
+            // game's own flow the ship already has it: flag 0x8, without which
+            // the AI branch at 0x0046A345 never looks at her at all. Applied
+            // separately and logged separately, so if she moves we know which
+            // half did it.
+            const unsigned before = game::ShipFlagBits(slot);
+            game::OrShipFlagsRaw(slot, 0x8);
+
+            Log("shipyard: slot %d DISPATCHED -- %s pirate-hunter, strength %d "
+                "(reputation %d -> 2 - rep/10, clamped 2..4)",
+                slot, game::NationName(game::ShipNationality(slot)), str,
                 nations::Reputation(nation));
-            Log("shipyard: slot %d flags 0x%08X -- the AI branch above also "
-                "tests flag 0x8, which this ship does NOT have. If she sits, "
-                "that bit is the next thing to try.",
-                slot, game::ShipFlagBits(slot));
+            Log("shipyard:   purpose %d, +0x2A %d, city %d flagged as having "
+                "sent her, flags 0x%08X -> 0x%08X (bit 0x8 added by us -- the "
+                "AI branch tests it before anything else)",
+                game::ShipPurposeOf(slot), game::ShipRole(slot), city,
+                before, game::ShipFlagBits(slot));
             char m2[160];
             _snprintf_s(m2, sizeof(m2), _TRUNCATE,
                         "%s hunter dispatched, strength %d.",
@@ -1049,6 +1059,74 @@ static void RunShipyardExperiment(ShipyardKind which)
         Log("shipyard: EXCEPTION 0x%08X -- the factory is not callable this "
             "way. Shipyard disarmed for the session; do NOT save this game.",
             GetExceptionCode());
+    }
+}
+
+// ------------------------------------------------ reputation, on a hotkey
+// Suspicion's whole consequence is that it drives reputation, and reputation is
+// what the game reads to decide how hard to come after you. Testing any of that
+// by earning it honestly would take hours a session, so this sets it.
+//
+// The presets are the thresholds the ENGINE uses, not round numbers:
+//
+//   +30  comfortably above the +3 promotion gate; welcome everywhere
+//     0  neutral, and what a fresh career has
+//   -10  hostile: their ports drop out of the settlement search entirely
+//   -20  a price on your head, and the maximum-strength hunter (2 - rep/10
+//        clamps at 4 here)
+//   -40  well past every threshold, to check nothing changes further
+//
+// Applied to the nation of the NEAREST PORT, so it always concerns the crown
+// whose water you are testing in.
+static const int kRepPresets[] = { 0, -10, -20, -40, 30 };
+static int g_repPreset = 0;
+
+static void CycleReputation()
+{
+    if (!g_shipyard) {
+        Log("reputation: not armed -- this writes career state, so it needs "
+            "PEMF\\shipyard.on like the shipyard keys");
+        return;
+    }
+    if (!state::InGame()) { Log("reputation: refused -- not in a career"); return; }
+
+    __try {
+        const int city = game::NearestCity(60000);
+        if (city < 0) {
+            Log("reputation: no port in range -- sail nearer one so there is a "
+                "crown to be in trouble with");
+            content::PostDebugNotice("No port in range.", 5);
+            return;
+        }
+        const int nation = game::CityNation(city);
+        if (nation < 0 || nation >= game::addr::kNationsWithRank) {
+            Log("reputation: nearest port %d has nation %d, which is not a "
+                "crown -- nothing to set", city, nation);
+            return;
+        }
+
+        g_repPreset = (g_repPreset + 1) % (int)(sizeof(kRepPresets) / sizeof(int));
+        const int before = nations::Reputation(nation);
+        game::SetReputationRaw(nation, kRepPresets[g_repPreset]);
+        const int after = nations::Reputation(nation);
+
+        Log("reputation: %s %d -> %d  (port %d, its own opinion of us is %d)",
+            game::NationName(nation), before, after, city,
+            game::CityReputationOf(city));
+        Log("reputation:   at %d -- ports %s, %s, a hunter would sail at "
+            "strength %d",
+            after,
+            after < 0 ? "CLOSED to us" : "open",
+            after < -1 ? "there is a PRICE ON OUR HEAD" : "no bounty",
+            game::HunterStrengthFor(nation));
+
+        char msg[160];
+        _snprintf_s(msg, sizeof(msg), _TRUNCATE, "%s reputation now %d.",
+                    game::NationName(nation), after);
+        content::PostDebugNotice(msg, 6);
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER) {
+        Log("reputation: EXCEPTION 0x%08X", GetExceptionCode());
     }
 }
 
@@ -1269,8 +1347,9 @@ static DWORD WINAPI Hook_timeGetTime(void)
     bool kK = mods && (GetAsyncKeyState('K') & 0x8000);
     bool kL = mods && (GetAsyncKeyState('L') & 0x8000);
     bool kO = mods && (GetAsyncKeyState('O') & 0x8000);
+    bool kU = mods && (GetAsyncKeyState('U') & 0x8000);
     bool down = k1 || k2 || k3 || k4 || k5 || k6 || k7 || k8 || k9 || k0 ||
-                kN || kH || kJ || kK || kL || kO;
+                kN || kH || kJ || kK || kL || kO || kU;
 
     bool rising = down && !g_prevKeyDown;
     g_prevKeyDown = down;
@@ -1341,6 +1420,13 @@ static DWORD WINAPI Hook_timeGetTime(void)
     // Ctrl+Shift+L picks which role the next J-built ship is given. Roles 1 and
     // 2 exist only inside code we cannot call, so stamping is the only way to
     // find out what they mean.
+    // Ctrl+Shift+U cycles our standing with the nearest port's crown through
+    // the engine's own thresholds. Behind the shipyard marker: it writes career
+    // state that a keypress cannot take back either.
+    if (kU) {
+        CycleReputation();
+        return r;
+    }
     if (kL) {
         g_testPurpose = (g_testPurpose % 6) + 1;    // 1..6, round again
         Log("shipyard: next ship will be stamped PURPOSE %d (%s)",

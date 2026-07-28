@@ -1098,7 +1098,79 @@ inline int ShipPurposeOf(int index)
 //
 // The kind argument comes from a table at 0x007252D0 in the original; we pass
 // the one value the game is otherwise known to use.
+// The rest of the recipe, which is not optional -- the dispatch does four more
+// things after stamping the purpose, and a hunter missing them is a ship with a
+// label:
+//
+//     mov word [ebp + 0x85BF82], si     ; the CITY remembers which slot it sent
+//     or  [edi + 0x860B70], 0x800       ; and is flagged as having sent one
+//     mov word [ecx + 0x814322], ax     ; +0x2A = STRENGTH, the clamped 2..4
+//     call 0x0043A970(0xF, city, 0, 0)  ; the news item
+//
+// Which settles what `+0x2A` is. It was called "role" here for four rounds on
+// the strength of holding small integers; it is the hunter's STRENGTH, and the
+// other sites that write 1..4 to it are writing the same kind of quantity.
 constexpr uintptr_t HunterKindTable = 0x007252D0;
+
+// Second city table, stride 0x94, base 0x0085BF70. +0x12 holds the slot index
+// of the hunter this settlement currently has at sea.
+constexpr uintptr_t CityAuxRecords    = 0x0085BF70;
+constexpr int       kCityAuxStride    = 0x94;
+constexpr int       kCityAuxHunterIdx = 0x12;
+
+// City flags live at +0x08 of the 32-byte city record. 0x800 marks "this port
+// has a hunter out".
+constexpr uintptr_t CityFlags     = 0x00860B70;
+constexpr unsigned  kCitySentHunter = 0x800;
+
+// ---------------------------------------------------- reputation, per city
+// There are TWO levels of it, which the mutator at 0x004051C0 shows plainly:
+//
+//     FUN_004051C0(eax = cityIndex, esi = delta):
+//         [cityIndex*0x94 + 0x0085BF7C] += delta     ; this PORT's opinion
+//         [CityNation(city)*2 + 0x869A78] += delta   ; and the CROWN's follows
+//
+// So a nation's standing is the sum of what you have done to its ports, and
+// individual settlements remember you separately. Nothing in that function
+// clamps, so the range is open; the meaningful thresholds are the ones the
+// readers use -- 0 for "your ports are closed to me", -1 for a price on your
+// head, +3 to be eligible for promotion, and -20 or worse for a maximum-
+// strength hunter.
+constexpr uintptr_t CityReputation = 0x0085BF7C;   // int16, stride 0x94
+
+inline int CityReputationOf(int cityIndex)
+{
+    if (cityIndex < 0 || cityIndex >= addr::kMaxCities) return 0;
+    __try {
+        return *(const short*)(CityReputation +
+                               (uintptr_t)cityIndex * kCityAuxStride);
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER) { return 0; }
+}
+
+// Deliberately raw and deliberately probe-only. The engine's own mutator also
+// updates per-turn bookkeeping we do not want a debug key touching, so a test
+// that needs an exact value writes the value.
+inline void SetReputationRaw(int nation, int value)
+{
+    if (nation < 0 || nation >= addr::kNationsWithRank) return;
+    __try {
+        *(short*)(addr::PlayerReputation + (uintptr_t)nation * 2) = (short)value;
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER) {}
+}
+
+inline void MarkCitySentHunter(int cityIndex, int shipSlot)
+{
+    if (cityIndex < 0 || cityIndex >= addr::kMaxCities) return;
+    __try {
+        *(short*)(CityAuxRecords + (uintptr_t)cityIndex * kCityAuxStride
+                  + kCityAuxHunterIdx) = (short)shipSlot;
+        *(unsigned*)(CityFlags + (uintptr_t)cityIndex * addr::kCityRecStride)
+            |= kCitySentHunter;
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER) {}
+}
 
 inline int HunterStrengthFor(int nation)
 {
@@ -1117,6 +1189,15 @@ inline void SetShipPurposeRaw(int index, int purpose)
     __try {
         *(short*)(addr::ShipArray + (uintptr_t)index * addr::kShipStride
                   + kShipPurpose) = (short)purpose;
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER) {}
+}
+
+inline void OrShipFlagsRaw(int index, unsigned bits)
+{
+    __try {
+        *(unsigned*)(addr::ShipArray + (uintptr_t)index * addr::kShipStride
+                     + 0x58) |= bits;
     }
     __except (EXCEPTION_EXECUTE_HANDLER) {}
 }
