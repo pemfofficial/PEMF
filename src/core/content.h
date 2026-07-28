@@ -919,21 +919,39 @@ inline bool g_worldLive = false;
 // recorded next to it, and the render phase checks that the screen is STILL
 // that one before drawing or clearing anything. Two int reads per frame, and
 // it closes the whole class rather than this one instance of it.
-inline int  g_worldLiveId    = 0;
-inline int  g_worldLiveDepth = 0;
+inline int   g_worldLiveId    = 0;
+inline int   g_worldLiveDepth = 0;
+inline DWORD g_worldLiveAt    = 0;
+
+// How stale the published flag may be before the render phase stops trusting
+// it. The main loop runs many times a second, so anything approaching this is
+// not a slow frame -- it is the loop not running at all.
+constexpr DWORD kWorldLiveMaxAgeMs = 250;
 
 inline void PublishWorldLive(bool live, int screenId, int screenDepth)
 {
     g_worldLive      = live;
     g_worldLiveId    = screenId;
     g_worldLiveDepth = screenDepth;
+    g_worldLiveAt    = GetTickCount();
 }
 
 // Called from the render hook. False the moment the screen has changed out from
-// under the published flag, whatever it changed to.
+// under the published flag -- or the moment the flag is simply too old.
+//
+// The screen check alone was not enough. A MODAL DIALOG ("Which ship shall we
+// attack with our flagship?") is drawn over the sailing view without changing
+// the screen signature, and it runs its own loop, so the safe point stops
+// ticking and the flag stays true. Notices went on drawing over the top of the
+// game's own prompt.
+//
+// The age check catches that and everything like it, because it does not care
+// WHAT blocked the main loop. If the loop is not running, no decision it made
+// is worth acting on, and a stale "yes" is the most dangerous answer there is.
 inline bool WorldStillOnScreen()
 {
     if (!g_worldLive) return false;
+    if (GetTickCount() - g_worldLiveAt > kWorldLiveMaxAgeMs) return false;
     __try {
         return *(const int*)game::addr::ScreenId    == g_worldLiveId &&
                *(const int*)game::addr::ScreenDepth == g_worldLiveDepth;

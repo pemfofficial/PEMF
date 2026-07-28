@@ -1182,6 +1182,15 @@ at `+0x2A` that three test rounds here called "role". A spawned ship showing no
 hover text is the symptom: the builders leave `+0x02` at a value the label code
 does not name.
 
+✅ **Verified in game.** A ship stamped `+0x02 = 4` hovered as `English
+smuggler`; `= 1` hovered as `English pirate-hunter`.
+
+⛔ **It is a label, not a behaviour.** A ship stamped `1` and left with its
+destination at its home port does not hunt — it sits, exactly as any other ship
+with nowhere to go does. **There is no "chase the player" flag in this game.** A
+pirate hunter is a ship classified `1` *and* given a route that brings it at
+you; both halves have to be set.
+
 Values are written at: `0x0040DACA` (3, governor's dispatch), `0x00413FD0` (4),
 `0x0041412A` (2), `0x00414093` (3 — the raider branch, gated on the game-progress
 value at `0x0085A150` exceeding `0xBB8`), `0x0041535D` (2), `0x00414B3C` and

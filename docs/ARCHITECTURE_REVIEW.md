@@ -513,6 +513,28 @@ fires.
 
 ---
 
+### 23. A modal dialog does not change the screen signature — FIXED
+
+Notices drew over the game's own *"Which ship shall we attack with our
+flagship?"* prompt.
+
+The signature check added in pass 21 could not catch this. An in-world modal is
+drawn **over the sailing view without changing `ScreenId` or `ScreenDepth`**, so
+the screen genuinely still is the one the flag was published for. But the dialog
+runs its own loop, the safe point stops ticking, and the flag stays true
+indefinitely.
+
+Fixed by **timestamping the published flag** and refusing to act on it once it
+is more than 250 ms old. The main loop runs many times a second, so that
+threshold is not a slow frame — it is the loop not running at all.
+
+This closes the class properly, where pass 21 only closed the instance: the age
+check does not care *what* blocked the loop. If the loop is not running, no
+decision it made is worth acting on, and a stale "yes" is the most dangerous
+answer available.
+
+---
+
 ## Remaining, in priority order
 
 1. **Address single source of truth.** `re/out/offsets.json` and `src/core/game.h`
@@ -550,7 +572,7 @@ of bug that is expensive to diagnose.
 | **A notice's clock stops while it is off screen.** | Otherwise it expires unseen behind a menu and the player loses it for having glanced at the map. |
 | **A retained pointer to an engine object must be referenced.** | Gamebryo refcounts at `+4` and destroys at zero. Capturing flag textures without a reference crashed the game on first use. |
 | **Confirm a limit exists before building around it.** | "Flags must be replaced" was accepted for years; the game had enumerated them since 2004. One call site settled it. |
-| **A value published at the safe point is stale by the time the frame draws.** | The render hook runs an order of magnitude more often. Publish the evidence alongside the conclusion and re-check it where it is used. |
+| **A value published at the safe point is stale by the time the frame draws.** | The render hook runs an order of magnitude more often. Publish the evidence alongside the conclusion and re-check it where it is used, **and timestamp it** — a modal dialog stops the main loop without changing anything the evidence would catch. |
 | **Edge-triggered state must be observed before it is trusted.** | A fresh runtime knows nothing; assuming "armed" fires on edges crossed before we were watching. The first look sets state, it does not act. |
 | **Anything the player can see belongs to a career and dies with it.** | Notices, trigger progress, disguises. A line from the last captain's voyage over this one's ship is a bug. |
 | **Never write to the engine's shared buffers unless we wrote to them first.** | `0x00869B48` is the game's scratch. Clearing it when we put nothing in it throws away text nobody will re-compose. |
