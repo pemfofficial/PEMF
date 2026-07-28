@@ -170,9 +170,12 @@ namespace addr {
     // offers a way to change it. That is the lever false colours would use.
     // 84 code sites read it, so it is load-bearing rather than decorative.
     //
-    // NOT YET ESTABLISHED (this is what the probe is for): whether writing the
-    // player's field changes the flag drawn on the ship, changes how the AI
-    // treats you, both, or neither.
+    // SETTLED SINCE: writing the player's field does NOT change the flag drawn
+    // on the ship -- that is a texture, see below. So the two are separate
+    // switches, and PEMF has only ever thrown the visual one. Whether the AI
+    // consults this field is the open question, and the reason it matters:
+    // if it does, the disguise stops being cosmetic. state::SetNationality()
+    // already writes it safely and reversibly.
     constexpr uintptr_t ShipArray       = 0x008142F8;
     constexpr int       kShipStride     = 0x45C;
     constexpr uintptr_t ShipNationality = 0x008142FC;   // int16, +0x04
@@ -294,6 +297,125 @@ namespace addr {
 
     // The engine walks 128 settlement slots.
     constexpr int       kMaxCities      = 128;
+
+    // ------------------------------------------------ who hates whom
+    // The nation relations matrix. An 8x8 grid of int32, indexed
+    // [a * 8 + b], holding the state of the relationship between two powers:
+    //
+    //     1  at war        -1  treaty        0  neutral
+    //
+    // Size is not a guess. The new-game reset at 0x00404229 clears it with
+    //     mov ecx, 0x40 / mov edi, 0x85a168 / rep stosd
+    // which is exactly 64 dwords, and the next global (0x0085A268, the screen
+    // width) begins immediately after. Only 6x6 of it is ever used.
+    //
+    // The indexing came from gameplay sites that reach it through a CITY's
+    // nation byte, which pins both the stride and the meaning of the values:
+    //     0x0040C9A0  movsx ecx, byte [ebp + 0x860B74]   ; city nation
+    //     0x0040C9A7  lea   edx, [ebx + ecx*8]
+    //     0x0040C9AA  cmp   dword [edx*4 + 0x85A168], 1  ; ...at war?
+    // and the mirror of it at 0x0040CB2E comparing against -1 for a treaty.
+    // The Pedia's "International Relations" page (FUN_0043cde0) draws the same
+    // grid from the same memory, which is what made it findable.
+    //
+    // Slots 4 and 5 are set AT WAR with all four crowns and left that way --
+    // the reset loop at 0x004042E0-0x0040431D writes 1 into row 4, row 5, and
+    // columns 4 and 5 of every nation's row. Slot 4 is Pirate (it matches the
+    // flag-mesh table above); slot 5 is a sixth power the framework has not
+    // needed to identify yet.
+    constexpr uintptr_t NationRelations = 0x0085A168;
+    constexpr int       kRelationStride = 8;    // ints per row
+    constexpr int       kRelationSlots  = 6;    // 4 crowns + Pirate + one more
+    constexpr int       kAtWar          =  1;
+    constexpr int       kTreaty         = -1;
+
+    // ------------------------------------------- the player's standing
+    // Two parallel word[4] arrays in the player record, both indexed
+    // nation*2. They are what the game means by "how do they feel about you",
+    // and between them they replace the search for a single "chosen faction"
+    // global -- see DeriveHomeNation() in nations.h.
+    //
+    // Found together at the promotion check, 0x0040D38F onward:
+    //     movsx eax, byte [ebp + 0x860B74]        ; nation
+    //     cmp   word [eax*2 + 0x869A88], 9        ; already at the top rank?
+    //     cmp   word [eax*2 + 0x869A78], 3        ; reputation high enough?
+    //     inc   word [eax*2 + 0x869A88]           ; promote
+    //
+    // Rank 0 means NO LETTER OF MARQUE with that nation, and selects the
+    // "you hold no commission here" governor dialogue (0x0040C90C, 0x0040C92E,
+    // 0x0040CAB2). Ranks run 0..9 and index the name table below.
+    constexpr uintptr_t PlayerReputation = 0x00869A78;  // int16, stride 2
+    constexpr uintptr_t PlayerRank       = 0x00869A88;  // int16, stride 2
+
+    // THE NATION THE PLAYER SERVES. An int16, and the answer to a question this
+    // project spent a long time treating as unanswerable.
+    //
+    // The search kept looking for a value written at character creation and
+    // never finding one, because the game does not store the choice -- it
+    // stores a CONSEQUENCE of it, and recomputes it. At 0x0040D690, on every
+    // promotion:
+    //     esi = 1
+    //     for (n = 0; n <= 3; ++n)              ; every crown
+    //         if (n != cand && rank[n] >= rank[cand]) esi = 0
+    //     if (esi) PlayerNation = cand          ; strictly the highest rank
+    //
+    // So "your nation" is the one you outrank the others with, and this global
+    // is where the engine caches its own answer. Reading it beats deriving it:
+    // it is the value the game itself acts on.
+    //
+    // Corroborated three further ways:
+    //   * compared straight against a city's nation byte  (0x0040DA19)
+    //   * pushed where @NATIONALITY is expected, for "We do not trade with
+    //     @NATIONALITY heretics."                          (0x0040FF62)
+    //   * MEASURED: four careers begun under four different crowns read four
+    //     distinct values in 0..3, at record offset 56     (2026-07-28)
+    //
+    // Not to be confused with the ship record's nationality field, which was
+    // measured stuck at 0 for the player no matter which crown was chosen.
+    constexpr uintptr_t PlayerNation = 0x00869AA8;      // int16
+    constexpr int       kNationsWithRank = 4;           // the crowns only
+    constexpr int       kMaxRank         = 9;
+
+    // char* [10], indexed by rank. Read at 0x004BCDD9 while building the
+    // player's own outfit texture name:
+    //   Grunt, Grunt, Captain, Major, Colonel, Admiral, Baron, Count,
+    //   Marquis, Duke
+    constexpr uintptr_t RankNames    = 0x007272B4;
+    constexpr int       kRankNameMax = 10;
+
+    // The pending-career record. At career start the whole player block is
+    // copied out of here, at 0x00401BA6:
+    //     mov ecx, 0x2E / mov esi, 0x72C6B8 / mov edi, 0x869A70 / rep movsd
+    //     mov ecx, 0x24 / mov esi, 0x72C6E0 / mov edi, 0x869AA8 / rep movsd
+    // followed by zeroing the odd (high) bytes of the two arrays above.
+    //
+    // This address lies PAST the end of the file's raw .data, so it holds
+    // nothing on disk -- it is filled at runtime, by character creation. That
+    // makes it the place the game records what you chose before there is a
+    // career to record it in.
+    // Both buffers have EXACT sizes, and they come from the save serializer at
+    // 0x00401400 rather than from a guess. That function pushes (address, size)
+    // for every block the game persists and calls read-or-write on each; the
+    // player record goes over as 0xD8 bytes and the staging buffer as 0xB8:
+    //     push 0xB8 / push 0x72C6B8   ; only when the mode word is 2
+    //     push 0xD8 / push 0x869A70   ; otherwise
+    // Mode 2 is character creation -- that is the one case where the pending
+    // record is the thing worth saving, because no live career exists yet.
+    //
+    // The same function is the reason kRelationBytes below is not an estimate:
+    // the matrix is written out as exactly 0x100 bytes.
+    constexpr uintptr_t CareerStaging    = 0x0072C6B8;
+    constexpr size_t    kCareerStgBytes  = 0xB8;   // 184
+    constexpr uintptr_t PlayerRecord     = 0x00869A70;
+    constexpr size_t    kPlayerRecBytes  = 0xD8;   // 216, ending at MessageText
+    constexpr size_t    kRelationBytes   = 0x100;
+
+    // From the same serializer: the overworld ship array is written out as
+    // 0x45C00 bytes, which over a 0x45C stride is exactly 256 SLOTS -- not the
+    // 24 this framework has always scanned. The low indices are what the game
+    // keeps near the player, so 24 has been a serviceable window rather than a
+    // correct one, and anything that needs the whole sea has to know better.
+    constexpr int       kMaxShips = 256;
 
     // Screen state. NOT an enum -- an earlier playtest established that much and
     // recorded it as a dead end, which was too strong a conclusion. The values

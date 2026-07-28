@@ -800,6 +800,29 @@ inline ActiveNotice* SlotFor(NoticeChannel channel)
     return &g_notices[g_noticeCount++];
 }
 
+// As above, but a notice whose text is ALREADY LIVE reuses that slot instead of
+// taking a new one.
+//
+// Two notices reading the same words are not two pieces of news, and anchored
+// ones share a world position, so a duplicate does not stack visibly -- it
+// draws over itself and comes out bold and slightly wrong, which is a much
+// worse symptom than a missing line because it looks like a font problem.
+// (Observed with four copies of "Land ho! St. Eustatius off the bow!".)
+//
+// The cause of that particular pile-up is fixed in triggers.h, where the event
+// should never have fired four times. This is the guard rail underneath it:
+// whatever fires, identical text can only ever occupy one slot, and reposting
+// refreshes its clock.
+inline ActiveNotice* SlotForText(NoticeChannel channel, const char* text)
+{
+    if (text) {
+        for (int i = 0; i < g_noticeCount; ++i)
+            if (g_notices[i].channel == channel && g_notices[i].resolved == text)
+                return &g_notices[i];
+    }
+    return SlotFor(channel);
+}
+
 // A notice's life is measured in wall-clock time, which quietly meant it kept
 // running down while nobody could see it: open a menu with a notice up, stay a
 // while, and it had expired by the time you came back. The player loses a
@@ -881,6 +904,43 @@ inline int NoticeFade(const ActiveNotice& n, DWORD now)
 // than expiring unseen behind it.
 inline bool g_worldLive = false;
 
+// ...and the screen signature it was decided FROM. This flag is published once
+// per main-loop iteration, but the render hook runs thousands of times a
+// second -- a town entry, a menu, a battle all begin BETWEEN two safe points,
+// and until the next one the flag still says "the overworld is on screen".
+//
+// That window is not theoretical. It blanked the town screen: entering port
+// with a notice live left g_worldLive latched true, DrawNotices went on running
+// against the town, and its buffer clear below wiped the text the town screen
+// had just composed. The screen was fine the moment nothing was posted, which
+// is what made it look like a notice bug rather than a staleness bug.
+//
+// So the flag is not trusted on its own. The signature it was taken with is
+// recorded next to it, and the render phase checks that the screen is STILL
+// that one before drawing or clearing anything. Two int reads per frame, and
+// it closes the whole class rather than this one instance of it.
+inline int  g_worldLiveId    = 0;
+inline int  g_worldLiveDepth = 0;
+
+inline void PublishWorldLive(bool live, int screenId, int screenDepth)
+{
+    g_worldLive      = live;
+    g_worldLiveId    = screenId;
+    g_worldLiveDepth = screenDepth;
+}
+
+// Called from the render hook. False the moment the screen has changed out from
+// under the published flag, whatever it changed to.
+inline bool WorldStillOnScreen()
+{
+    if (!g_worldLive) return false;
+    __try {
+        return *(const int*)game::addr::ScreenId    == g_worldLiveId &&
+               *(const int*)game::addr::ScreenDepth == g_worldLiveDepth;
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
+}
+
 // The world phase, issued at BeginScene in the last render pass of the frame.
 // Anchored notices only: they build scene-graph nodes, so they have to exist
 // before the render walk that draws them.
@@ -890,7 +950,7 @@ inline bool g_worldLive = false;
 // is newer, and one failing is no reason to lose the other.
 inline void DrawWorldNotices()
 {
-    if (g_drawWorldOff || !g_worldLive || g_noticeCount <= 0) return;
+    if (g_drawWorldOff || !WorldStillOnScreen() || g_noticeCount <= 0) return;
 
     DWORD now = GetTickCount();
     for (int i = 0; i < g_noticeCount; ++i) {
@@ -914,17 +974,19 @@ inline void DrawWorldNotices()
 // notice, never a crashing game. The safe point reports it.
 inline void DrawNotices()
 {
-    if (g_drawOff || !g_worldLive || g_noticeCount <= 0) return;
+    if (g_drawOff || !WorldStillOnScreen() || g_noticeCount <= 0) return;
 
     DWORD now = GetTickCount();
     int y = 8;
     int write = 0;
+    int drew = 0;
     for (int i = 0; i < g_noticeCount; ++i) {
         ActiveNotice& n = g_notices[i];
         if ((int)(now - n.until) >= 0) continue;          // expired
         if (!n.anchor) {
             if (DrawScreenNotice(n.resolved.c_str(), y)) {
                 InterlockedIncrement(&g_drawOk);
+                ++drew;
             } else {
                 InterlockedIncrement(&g_drawFaults);
                 g_drawOff = true;
@@ -950,7 +1012,13 @@ inline void DrawNotices()
     // Clearing after our draws is safe: the game re-composes immediately
     // before each of its own draws, so an empty buffer between frames is
     // exactly the state it expects. This is the engine's own idiom for the job.
-    game::ClearMessageBuffer();
+    //
+    // Only when we actually DREW, though. The buffer is the game's, not ours,
+    // and clearing it is a write into shared state: if this pass put nothing
+    // in it there is nothing of ours to take out, and clearing anyway is a
+    // write we cannot justify. Not every screen re-composes every frame, so a
+    // gratuitous clear can throw away text nobody is going to write again.
+    if (drew > 0) game::ClearMessageBuffer();
 }
 
 // Safe-point reporting for the draw path: says plainly whether our own text
@@ -984,7 +1052,7 @@ inline void ReportDrawFromSafePoint()
 inline void PostDebugNotice(const char* text, int seconds, bool anchor = false,
                             NoticeChannel channel = kChannelStatus)
 {
-    ActiveNotice& n = *SlotFor(channel);
+    ActiveNotice& n = *SlotForText(channel, text);
     n.resolved = text;
     n.anchor   = anchor;
     n.channel  = channel;
@@ -997,17 +1065,23 @@ inline void PostDebugNotice(const char* text, int seconds, bool anchor = false,
 
 inline void PostNotice(const Event& ev)
 {
-    // Authored notices are narrative: several can be true at once, so they
-    // stack and the oldest is dropped when full.
-    ActiveNotice& n = *SlotFor(kChannelNarrative);
-    n.channel = kChannelNarrative;
     // Resolve the text ONCE, here at the safe point, rather than every frame
     // inside the render hook: composing uses the game's shared message buffer,
     // which is not something to be touching mid-frame.
+    //
+    // Resolved BEFORE a slot is chosen, because the resolved words are what
+    // decides whether this is news or a repeat -- two firings of the same event
+    // for two different ports are two notices, and for the same port they are
+    // one.
     int  args[kMaxArgs] = {0};
     int  argc = ResolveArgs(ev.bodyArgs, args, kMaxArgs);
     char buf[512];
     game::ComposeText(ev.body.c_str(), args, argc, buf, sizeof(buf));
+
+    // Authored notices are narrative: several can be true at once, so they
+    // stack and the oldest is dropped when full.
+    ActiveNotice& n = *SlotForText(kChannelNarrative, buf);
+    n.channel  = kChannelNarrative;
     n.resolved = buf;
     n.anchor   = ev.anchorShip;
     n.posted = GetTickCount();

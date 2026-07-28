@@ -461,6 +461,58 @@ faults at once. The trace is now permanent; see
 
 ---
 
+## Eighth pass (2026-07-28) — a stale flag and an assumed edge
+
+### 21. A per-frame gate published once per main loop — FIXED
+
+Entering a town with a notice on screen left the town rendered **with no UI text
+at all**.
+
+`content::g_worldLive` is decided at the safe point, once per main-loop
+iteration. The render hook runs far faster: the heartbeat measured **57,221
+`EndScene` calls in 15 seconds** in town, against ~3,000 while sailing. A town
+entry happens *between* two safe points, so for that window the flag still said
+"the overworld is on screen" — `DrawNotices()` kept running against the town and
+its shared-buffer clear wiped the text the town had just composed.
+
+The symptom only appeared with a notice live, because an empty list
+short-circuits before the clear. That is what disguised a staleness bug as a
+notice bug, and it cost one wrong hypothesis before the code was read.
+
+Two fixes, deliberately at different levels:
+
+* the published flag now carries **the screen signature it was decided from**,
+  and the render phase re-checks the screen is still that one. Two int reads per
+  frame, and it closes the class rather than the instance.
+* the shared buffer is cleared **only when we actually drew into it**.
+
+### 22. Triggers assumed "armed" rather than observing it — FIXED
+
+Four identical anchored notices drew at the same world point and came out bold —
+which reads as a font fault, not a duplicate.
+
+```
+12:24:05.708  'landfall_sighted' near port (city 1 at dist 2896)
+12:24:07.447  'landfall_sighted' near port (city 1 at dist 2896)
+12:24:08.446  'landfall_sighted' near port (city 1 at dist 2896)
+12:24:10.569  'landfall_sighted' near port (city 1 at dist 2896)
+```
+
+An identical distance four times: the ship never moved. A fresh `Runtime` starts
+`armed = true` because nothing has been observed yet — correct at sea, wrong in
+a harbour. Every career change reset the triggers while the ship sat inside the
+radius, arming an edge that had been crossed long before we were watching.
+
+The first evaluation after a reset now **observes rather than fires**, setting
+`armed` from the world as it is. Applied to `stateCrosses` too, which had the
+identical fault. Supporting fixes: notices are cleared on a career change, and
+identical resolved text can no longer occupy two slots.
+
+Verified: twelve `starts disarmed` lines across a run of career switches, zero
+fires.
+
+---
+
 ## Remaining, in priority order
 
 1. **Address single source of truth.** `re/out/offsets.json` and `src/core/game.h`
@@ -498,6 +550,11 @@ of bug that is expensive to diagnose.
 | **A notice's clock stops while it is off screen.** | Otherwise it expires unseen behind a menu and the player loses it for having glanced at the map. |
 | **A retained pointer to an engine object must be referenced.** | Gamebryo refcounts at `+4` and destroys at zero. Capturing flag textures without a reference crashed the game on first use. |
 | **Confirm a limit exists before building around it.** | "Flags must be replaced" was accepted for years; the game had enumerated them since 2004. One call site settled it. |
+| **A value published at the safe point is stale by the time the frame draws.** | The render hook runs an order of magnitude more often. Publish the evidence alongside the conclusion and re-check it where it is used. |
+| **Edge-triggered state must be observed before it is trusted.** | A fresh runtime knows nothing; assuming "armed" fires on edges crossed before we were watching. The first look sets state, it does not act. |
+| **Anything the player can see belongs to a career and dies with it.** | Notices, trigger progress, disguises. A line from the last captain's voyage over this one's ship is a bug. |
+| **Never write to the engine's shared buffers unless we wrote to them first.** | `0x00869B48` is the game's scratch. Clearing it when we put nothing in it throws away text nobody will re-compose. |
+| **When the engine already computes an answer, read the answer.** | The player's nation is derived and cached by the game. An independent derivation can only agree or be wrong. |
 | **Career presence comes from the screen state, never from `crew > 0`.** | The crew count does not reset at the main menu, so that test is true forever after the first career and stops seeing transitions entirely. |
 | **A save file being read is not a load.** | Starting a new career reads one too, and the load screen reads every save to list them. Only a fingerprint match against the live career proves it. |
 | **Verify a write landed, not that a symbol exists.** | The fingerprint had its field, parser and comparison, and no `fprintf`. A grep matched three real sites and the feature still did nothing. |

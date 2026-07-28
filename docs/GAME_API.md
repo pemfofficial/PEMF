@@ -1005,6 +1005,73 @@ about are unrelated systems that never touch, so the engine has no concept of
 flying false colours. That makes the mechanic entirely PEMF's to define rather
 than something to keep in step with engine behaviour.
 
+⛔ **The player's own nationality field is vestigial.** Four careers begun under
+four different crowns all read `0`. It does not track the nation you serve, and
+writing it is not a lever on the AI — a game deciding hostility from a field
+that is always `0` would treat every player as Spanish. For the player's real
+nation see `PlayerNation` below.
+
+## Nations
+
+### The relations matrix — `0x0085A168`
+
+An **8×8 int32** grid, indexed `[a * 8 + b]`. `1` = at war, `-1` = treaty,
+`0` = neutral. Live state, confirmed changing in game as wars ended.
+
+Size is stated twice by the binary: the new-game reset at `0x00404229` clears it
+with `rep stosd` over `0x40` dwords, and the save serializer writes it out as
+exactly `0x100` bytes.
+
+Slots 4 and 5 are initialised **permanently at war with all four crowns**
+(`0x004042E0`–`0x0040431D`). Slot 4 is Pirate. Slot 5 is a sixth power, at war
+with every crown and neutral toward pirates.
+
+### The player's standing — `0x00869A78` and `0x00869A88`
+
+Two parallel `word[4]` arrays, both indexed `nation * 2`:
+
+| Address | Meaning |
+|---|---|
+| `0x00869A78` | reputation with nation N |
+| `0x00869A88` | rank with nation N; `0` = no letter of marque |
+
+Ranks run 0..9 and index a `char*[10]` at `0x007272B4` — Grunt, Grunt, Captain,
+Major, Colonel, Admiral, Baron, Count, Marquis, Duke. Both arrays read `0` for a
+captain who has never taken a commission, which is the correct value rather than
+a failed read.
+
+### `PlayerNation` — `0x00869AA8`, int16
+
+**The crown the player serves.** The game does not store your choice at
+character creation; it stores a consequence and recomputes it. At `0x0040D690`,
+on every promotion, the nation you hold a **strictly higher rank** with than any
+other is written here.
+
+Confirmed against a city's nation byte (`0x0040DA19`), pushed where
+`@NATIONALITY` is expected (`0x0040FF62`), and measured across four careers:
+English → `1`, Dutch → `3`, Spanish → `0`, French → `2`. Same enum as the
+flag-mesh table.
+
+Read it rather than deriving it — it is the value the engine itself acts on.
+Full account in [`re/experiments/nations/`](../re/experiments/nations/README.md).
+
+### The save serializer — `0x00401400`
+
+Pushes `(address, size)` for every block the game persists, so it doubles as a
+map of what game state *is*. Sizes worth having:
+
+| Block | Size | Meaning |
+|---|---|---|
+| `0x00869A70` | `0xD8` | the player record — 216 bytes, ending at `MessageText` |
+| `0x0072C6B8` | `0xB8` | the pending-career record, serialised **only in mode 2** (character creation) |
+| `0x0085A168` | `0x100` | the relations matrix |
+| `0x008142F8` | `0x45C00` | the overworld ship array |
+| `0x00860B68` | `0x1000` | 128 settlement records |
+
+⚠️ **The ship array is 256 slots**, not the 24 every loop in this framework
+walks (`0x45C00 / 0x45C`). Twenty-four has been a serviceable window on the
+water near the player, never a correct bound.
+
 ### Screen state also answers "am I in a career"
 
 The same `ScreenId`/`ScreenDepth` pair that gates notice drawing. **Depth alone

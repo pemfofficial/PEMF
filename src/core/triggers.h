@@ -217,6 +217,19 @@ struct Runtime {
     DWORD lastFired = 0;
     int   fireCount = 0;
     bool  armed     = true;   // NearPort: false while still inside the radius
+
+    // "armed" above is an assumption, not an observation: a fresh Runtime says
+    // armed because nothing has been seen yet, which is fine at sea and wrong
+    // in a harbour. Resetting the triggers while the ship is already INSIDE a
+    // nearPort radius armed a trigger whose entering edge had long since
+    // passed, and it fired at once -- four times in five seconds during a run
+    // of career switches, at an identical distance of 2896, because each
+    // career change reset the triggers and the ship had not moved.
+    //
+    // So the first evaluation after a reset observes rather than fires: it
+    // sets armed from the world as it actually is, and only then does the
+    // edge logic mean anything.
+    bool  fresh     = true;
 };
 
 inline std::vector<Runtime> g_rt;
@@ -291,6 +304,18 @@ inline void Tick()
             if (!sailing || s.nearestCity < 0) break;
             const int d = s.nearestDist;
 
+            // First look after a reset: adopt the world's state rather than
+            // firing on an edge that was crossed before we were watching.
+            if (rt.fresh) {
+                rt.fresh = false;
+                rt.armed = (d > ev->trigger.distance);
+                if (!rt.armed)
+                    Log("trigger: '%s' starts disarmed -- already inside the "
+                        "radius (dist %d <= %d)",
+                        ev->id.c_str(), d, ev->trigger.distance);
+                break;
+            }
+
             // Edge-triggered: fire on entering the radius, and only re-arm once
             // clearly outside it, so drifting along the boundary cannot spam.
             if (!rt.armed) {
@@ -335,6 +360,18 @@ inline void Tick()
                                                      : ev->trigger.above;
             const bool inside = ev->trigger.useBelow ? (value <  limit)
                                                      : (value >  limit);
+
+            // Same first-look rule as NearPort: a career that begins already
+            // past the threshold has not CROSSED it in front of us.
+            if (rt.fresh) {
+                rt.fresh = false;
+                rt.armed = !inside;
+                if (!rt.armed)
+                    Log("trigger: '%s' starts disarmed -- %s is already %s %d "
+                        "(now %d)", ev->id.c_str(), what,
+                        ev->trigger.useBelow ? "below" : "above", limit, value);
+                break;
+            }
 
             // Edge-triggered, exactly as NearPort is: fire on crossing in, and
             // re-arm only on crossing back out. A value that merely sits past

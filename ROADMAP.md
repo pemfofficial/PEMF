@@ -211,11 +211,22 @@ Findings in [`re/experiments/flags/`](re/experiments/flags/README.md).
 - 💡 **Custom nation art at runtime** — retexture the five nation flag nodes in
   memory instead of replacing files. Additive, reversible, and immune to the
   "pink flags" trap that catches people who install a partial flag pack.
+- ✅ **The nation you serve is found** — `0x00869AA8`, an int16. It went unfound
+  for a long time because the game never stores the choice made at character
+  creation: it stores a consequence, recomputing "your nation" as the crown you
+  hold a strictly higher rank with and caching the result. Confirmed against the
+  disassembly three ways and measured across four careers under four crowns.
+  See [`re/experiments/nations/`](re/experiments/nations/README.md).
+- ✅ **Nation relations are readable** — an 8×8 matrix at `0x0085A168`, war and
+  treaty, verified changing live in game. Together with the standing arrays this
+  is everything Suspicion needs to know who would care about a false flag.
+- ⛔ **The AI lever is NOT the ship record's nationality.** That was the plan of
+  record and it is dead: the player's field read `0` in four careers begun under
+  four different crowns, so it neither records who you are nor plausibly tells
+  the AI anything. What the game does use is once again unlocated.
 - 📐 **Starting on your faction's colours.** A custom flag in `Config.ini`
   overrides the faction flag on every career — that is the game's own behaviour,
-  not a PEMF effect. Making a new career start on the colours of the nation you
-  chose would be an improvement on the game, and needs the player's chosen
-  faction, which is not yet located.
+  not a PEMF effect. Now unblocked: the chosen nation can be read directly.
 - 💡 **Lowering and raising the flag** when colours change. Flags attach via
   `bone_flag_*_pivot` and are ordinary named scene nodes, so driving the node
   transform from the frame hook is the plausible route. Unproven.

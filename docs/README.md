@@ -16,7 +16,7 @@ The game executable is never modified.
 | **[EVENT_AUTHORING.md](EVENT_AUTHORING.md)** | Players & modders | Writing events for `PEMF\events\` — schema, tokens, effects, error messages |
 | **[DEVELOPER.md](DEVELOPER.md)** | Developers | Architecture, build, RE workflow, conventions, roadmap, lessons |
 | **[GAME_API.md](GAME_API.md)** | Developers | Reverse-engineered engine reference: functions, addresses, conventions |
-| **[ARCHITECTURE_REVIEW.md](ARCHITECTURE_REVIEW.md)** | Developers | Seven passes: hazards found, fixed, and the invariants they establish |
+| **[ARCHITECTURE_REVIEW.md](ARCHITECTURE_REVIEW.md)** | Developers | Eight passes: hazards found, fixed, and the invariants they establish |
 | **[`re/experiments/`](../re/experiments/)** | Developers | Write-ups of specific investigations — the question, the method, what the numbers said, and what was concluded (including the answers that were "no") |
 
 ---
@@ -112,6 +112,9 @@ levels are used throughout the docs:
 | City tokens — `@CITYNAME` / `@NATIONALITY` / `@LOCTYPE` | **Verified** — "Land ho! Nevis off the bow!" |
 | `{placeholder}` authoring layer | **Verified** — every shipped event uses it |
 | Notices confined to the sailing view | **Verified** |
+| Reading nation relations — war, treaty, neutral | **Verified** — seen changing live as wars ended |
+| Reading the nation the player serves | **Verified** — four careers, four crowns, four values |
+| Reading the player's rank and reputation per crown | **Built** — addresses confirmed in the disassembly; every career tested so far holds no commission, so the values have not yet moved |
 | Playing a named game sound with an event | **Verified** |
 | Officer simulation | Not started |
 | Factions and divisions | Not started |

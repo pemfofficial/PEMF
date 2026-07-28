@@ -26,6 +26,7 @@
 #include "log.h"
 #include "game.h"
 #include "state.h"
+#include "nations.h"
 #include "session.h"
 #include "events.h"
 #include "content.h"
@@ -318,6 +319,10 @@ static void RunSafePoint()
     // the career they were earned in.
     if (session::Tick()) {
         triggers::Reset("career context changed");
+        // Anything still on screen belongs to the career that just ended. A
+        // lookout's call from the last captain's voyage has no business
+        // hanging over this one's ship.
+        content::ClearNotices();
         // A disguise belongs to the career it was put on in. The new career's
         // own value is whatever the game loaded, so all we must do is stop
         // believing we have something of theirs to give back.
@@ -337,8 +342,21 @@ static void RunSafePoint()
     // across the Load/Save map. The ship being under way is the same
     // playtest-validated test the triggers use, and it is false in every menu
     // because the position is frozen there.
-    content::g_worldLive = state::InGame() && triggers::WorldOnScreen() &&
-                           *(void**)game::addr::WorldLabelManager != nullptr;
+    // Published WITH the screen signature it was decided from, because this
+    // runs once per main-loop iteration and the render hook runs thousands of
+    // times a second. Anything that changes the screen between two safe points
+    // -- entering a town, opening a menu, dropping into a battle -- would
+    // otherwise leave the flag saying "overworld" until the next tick caught
+    // up. See content::WorldStillOnScreen().
+    int screenId = 0, screenDepth = 0;
+    __try {
+        screenId    = *(const int*)game::addr::ScreenId;
+        screenDepth = *(const int*)game::addr::ScreenDepth;
+    } __except (EXCEPTION_EXECUTE_HANDLER) { screenId = screenDepth = 0; }
+
+    content::PublishWorldLive(state::InGame() && triggers::WorldOnScreen() &&
+                              *(void**)game::addr::WorldLabelManager != nullptr,
+                              screenId, screenDepth);
 
     // A notice should not spend its life expiring behind a menu, so its clock
     // only runs while the overworld is actually on screen.
@@ -790,6 +808,165 @@ static void ReportColours(const char* when)
     }
 }
 
+// ------------------------------------------------------- the nations probe
+// Everything nations.h claims, printed from a running game so it can be
+// checked rather than believed. The addresses behind it were read out of the
+// disassembly, which establishes SHAPE but not meaning: that the relations
+// matrix is 8x8 int32 is settled by the instruction that clears it, but that
+// 1 means war is an inference until a war is declared on screen and the grid
+// is seen to change.
+//
+// So this dump is arranged around the three claims that could be wrong:
+//
+//   1. rank[] identifies the nation chosen at character creation
+//      -> start a career per crown; exactly one rank should be non-zero
+//   2. the relations grid is live
+//      -> sail until the news announces a war; the grid should change to match
+//   3. slots 4 and 5 are permanently hostile to every crown
+//      -> should be a solid row and column of W, in every career, always
+//
+// Read-only from first line to last.
+static void ReportNations(const char* when)
+{
+    static const char* const kSlotName[game::addr::kRelationSlots] = {
+        "Spanish", "English", "French", "Dutch", "Pirate", "slot5"
+    };
+
+    __try {
+        Log("nations [%s]: -------------------------------------------", when);
+
+        // The grid. Rows are "how does A regard B", though the engine keeps it
+        // symmetrical -- the reset writes both [a][b] and [b][a] together, so
+        // an asymmetry appearing here would itself be a finding.
+        Log("nations: relations grid (W = at war, T = treaty, . = neutral)");
+        Log("nations:            Sp  En  Fr  Du  Pi  s5");
+        for (int a = 0; a < game::addr::kRelationSlots; ++a) {
+            char row[96];
+            int  used = _snprintf_s(row, sizeof(row), _TRUNCATE,
+                                    "nations:   %-7s ", kSlotName[a]);
+            for (int b = 0; b < game::addr::kRelationSlots; ++b) {
+                const int  v = nations::Relation(a, b);
+                const char c = (a == b) ? '-'
+                             : (v == game::addr::kAtWar)  ? 'W'
+                             : (v == game::addr::kTreaty) ? 'T'
+                             : (v == 0)                   ? '.' : '?';
+                // A '?' is worth seeing raw: it means the matrix holds a value
+                // this framework has no name for, and the reading is incomplete.
+                used += _snprintf_s(row + used, sizeof(row) - used, _TRUNCATE,
+                                    "  %c ", c);
+            }
+            Log("%s", row);
+        }
+
+        // Where the player stands. Rank 0 is the interesting value, not a gap:
+        // it is how the game says "you hold no commission with this crown".
+        Log("nations: the player's standing --");
+        for (int n = 0; n < game::addr::kNationsWithRank; ++n) {
+            const int rank = nations::Rank(n);
+            Log("nations:   %-7s rank %d (%-8s)  reputation %d",
+                game::NationName(n), rank, nations::RankName(rank),
+                nations::Reputation(n));
+        }
+
+        // The engine's cached answer, and our reimplementation of how it got
+        // there. They are logged together so a disagreement cannot go unseen.
+        const int home    = nations::HomeNation();
+        const int derived = nations::DeriveHomeNation();
+        Log("nations: home nation = %d (%s)%s",
+            home, home >= 0 ? game::NationName(home) : "none",
+            nations::ServesMoreThanOne() ? "  [holds more than one commission]"
+                                         : "");
+        if (derived != home) {
+            Log("nations: NOTE derived-from-rank says %d (%s) -- the engine's "
+                "own value disagrees. Expected while every rank is 0; a "
+                "disagreement once ranks are set means an address is wrong.",
+                derived, derived >= 0 ? game::NationName(derived) : "none");
+        }
+
+        // The flag we fly against the ship record's nationality field.
+        //
+        // MEASURED 2026-07-28 and worth stating plainly, because it closed off
+        // the approach this probe was built to open: across four careers begun
+        // under DIFFERENT crowns, the player's field read 0 every single time.
+        // It does not track the nation you chose -- it is simply never set for
+        // entry 0. So it cannot be read to learn who we are, and writing it is
+        // unlikely to tell the AI anything either, since a game that decided
+        // hostility from it would treat every player as Spanish.
+        //
+        // Kept in the dump because a value that is reliably 0 is worth SEEING
+        // stay 0: if it ever moves, that is a finding.
+        int nameLen = 0;
+        const char* chosen = game::EngineString(game::addr::CustomFlagName, &nameLen);
+        char safeName[128] = "(none)";
+        if (chosen && nameLen > 0) SafeStr(chosen, safeName, sizeof(safeName));
+        const int seen = state::Nationality();
+        Log("nations: we FLY '%s' (a texture); ship-record nationality reads "
+            "%d (%s) -- measured vestigial for the player, expected 0",
+            safeName, seen, game::NationName(seen));
+
+        // The whole player record, and the pending one it was copied from.
+        //
+        // Sizes are the save serializer's own (see game.h): 216 bytes live, 184
+        // staging. Dumped ENTIRE and raw, because the point is no longer to
+        // read a field we have already identified -- it is to find one we have
+        // not. Whatever records the nation chosen at character creation is
+        // inside these bytes, and the way to find it is to start a career under
+        // each crown and see which offset tracks the choice.
+        //
+        // Naming the bytes would be pretending to know. Printing all of them
+        // and diffing four careers is the measurement.
+        for (int half = 0; half < 2; ++half) {
+            const uintptr_t base = half ? game::addr::PlayerRecord
+                                        : game::addr::CareerStaging;
+            const size_t    len  = half ? game::addr::kPlayerRecBytes
+                                        : game::addr::kCareerStgBytes;
+            const char*     tag  = half ? "live   " : "staging";
+
+            for (size_t row = 0; row < len; row += 16) {
+                char line[160];
+                int  used = _snprintf_s(line, sizeof(line), _TRUNCATE,
+                                        "nations:   %s +%03u:", tag,
+                                        (unsigned)row);
+                for (size_t i = 0; i < 16 && row + i < len; ++i) {
+                    const unsigned char* p =
+                        (const unsigned char*)(base + row + i);
+                    if (!PageReadable(p, 1)) {
+                        used += _snprintf_s(line + used, sizeof(line) - used,
+                                            _TRUNCATE, " --");
+                        continue;
+                    }
+                    used += _snprintf_s(line + used, sizeof(line) - used,
+                                        _TRUNCATE, " %02x", *p);
+                }
+                Log("%s", line);
+            }
+
+            // The same bytes again, as offset=value pairs for the non-zero ones
+            // only. Most of the record is zero, so this is the line that can
+            // actually be read side by side across four careers -- the hex
+            // block above is there so nothing is lost if the summary misleads.
+            char sum[512];
+            int  used = _snprintf_s(sum, sizeof(sum), _TRUNCATE,
+                                    "nations:   %s non-zero:", tag);
+            for (size_t i = 0; i < len; ++i) {
+                const unsigned char* p = (const unsigned char*)(base + i);
+                if (!PageReadable(p, 1) || *p == 0) continue;
+                const int n = _snprintf_s(sum + used, sizeof(sum) - used,
+                                          _TRUNCATE, " %u=%02x",
+                                          (unsigned)i, *p);
+                if (n < 0) break;              // summary full; the hex has it all
+                used += n;
+            }
+            Log("%s", sum);
+        }
+        Log("nations: -------------------------------------------------");
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER) {
+        Log("nations: EXCEPTION 0x%08X -- one of the addresses in game.h is "
+            "wrong, or this was hit outside a career", GetExceptionCode());
+    }
+}
+
 typedef HANDLE(WINAPI *CreateFileA_t)(LPCSTR, DWORD, DWORD, LPSECURITY_ATTRIBUTES,
                                       DWORD, DWORD, HANDLE);
 typedef HANDLE(WINAPI *CreateFileW_t)(LPCWSTR, DWORD, DWORD, LPSECURITY_ATTRIBUTES,
@@ -841,7 +1018,9 @@ static DWORD WINAPI Hook_timeGetTime(void)
     bool k8 = mods && (GetAsyncKeyState('8') & 0x8000);
     bool k9 = mods && (GetAsyncKeyState('9') & 0x8000);
     bool k0 = mods && (GetAsyncKeyState('0') & 0x8000);
-    bool down = k1 || k2 || k3 || k4 || k5 || k6 || k7 || k8 || k9 || k0;
+    // The digits were all spoken for by the time the nations probe arrived.
+    bool kN = mods && (GetAsyncKeyState('N') & 0x8000);
+    bool down = k1 || k2 || k3 || k4 || k5 || k6 || k7 || k8 || k9 || k0 || kN;
 
     bool rising = down && !g_prevKeyDown;
     g_prevKeyDown = down;
@@ -891,6 +1070,14 @@ static DWORD WINAPI Hook_timeGetTime(void)
                                          : "off");
         content::PostDebugNotice(g_fileProbe ? "File probe ON."
                                              : "File probe off.", 5);
+        return r;
+    }
+    // Ctrl+Shift+N dumps the relations grid and the player's standing with each
+    // crown. Unlike the false-colours keys below it, this one is NOT behind the
+    // marker file: it only reads, so there is nothing to opt in to.
+    if (kN) {
+        ReportNations("asked");
+        content::PostDebugNotice("Nations reported to pemf.log.", 5);
         return r;
     }
 
