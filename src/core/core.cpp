@@ -909,6 +909,110 @@ static void ReportColours(const char* when)
     }
 }
 
+// ----------------------------------------------------------- WASD by default
+// The game already supports rebinding, and does it properly: a documented,
+// user-editable KeyMap.ini in My Documents, one section per context, with a
+// shortcut to it sitting in the install folder. No reverse engineering was
+// needed for any of this.
+//
+// TWO COLLISIONS have to be resolved before WASD is even possible, which is
+// presumably why the game did not ship it:
+//     'a' is Attack Ship  -> moved to Space
+//     'S' is Quick Save   -> moved to F5, with Quick Load to F9 to match
+//
+// The file is UTF-16LE with a BOM, and is written back the same way: the game
+// reads what it wrote, and a plain-ASCII file is not what it wrote.
+//
+// INSTALLED ONCE. The original is backed up, a marker line goes in the footer,
+// and PEMF never touches the file again -- so a player who rebinds something
+// afterwards keeps it. Deleting the marker line asks for the layout back.
+static void InstallWasdKeymap(const char* gameDir)
+{
+    char docs[MAX_PATH] = {0};
+    if (SHGetFolderPathA(nullptr, CSIDL_PERSONAL, nullptr, 0, docs) != S_OK) {
+        Log("keymap: could not find My Documents -- WASD not installed");
+        return;
+    }
+
+    char target[MAX_PATH];
+    _snprintf_s(target, sizeof(target), _TRUNCATE,
+                "%s\\My Games\\Sid Meier's Pirates!\\KeyMap.ini", docs);
+
+    // Already ours? Then the file belongs to the player now.
+    {
+        FILE* f = nullptr;
+        if (fopen_s(&f, target, "rb") == 0 && f) {
+            fseek(f, 0, SEEK_END);
+            const long n = ftell(f);
+            fseek(f, 0, SEEK_SET);
+            if (n > 0 && n < 200000) {
+                char* buf = (char*)malloc((size_t)n);
+                if (buf) {
+                    const size_t got = fread(buf, 1, (size_t)n, f);
+                    // The marker is UTF-16, so look for its letters spaced by
+                    // nulls rather than decoding the whole file.
+                    static const char kNeedle[] =
+                        "P\0E\0M\0F\0-\0W\0A\0S\0D\0-\0I\0N\0S\0T\0A\0L\0L\0E\0D";
+                    const size_t nlen = sizeof(kNeedle) - 1;
+                    bool found = false;
+                    for (size_t i = 0; i + nlen <= got; ++i) {
+                        if (memcmp(buf + i, kNeedle, nlen) == 0) { found = true; break; }
+                    }
+                    free(buf);
+                    if (found) {
+                        fclose(f);
+                        Log("keymap: WASD already installed -- the player's "
+                            "KeyMap.ini is left alone");
+                        return;
+                    }
+                }
+            }
+            fclose(f);
+        }
+    }
+
+    char source[MAX_PATH];
+    _snprintf_s(source, sizeof(source), _TRUNCATE,
+                "%s\\PEMF\\KeyMap_WASD.ini", gameDir);
+
+    FILE* in = nullptr;
+    if (fopen_s(&in, source, "rb") != 0 || !in) {
+        Log("keymap: no %s -- WASD not installed", source);
+        return;
+    }
+    fseek(in, 0, SEEK_END);
+    const long len = ftell(in);
+    fseek(in, 0, SEEK_SET);
+    char* ascii = (char*)malloc((size_t)len + 1);
+    if (!ascii) { fclose(in); return; }
+    const size_t read = fread(ascii, 1, (size_t)len, in);
+    ascii[read] = 0;
+    fclose(in);
+
+    // Back up whatever is there, once, before replacing it.
+    char backup[MAX_PATH];
+    _snprintf_s(backup, sizeof(backup), _TRUNCATE, "%s.pemf-backup", target);
+    if (GetFileAttributesA(backup) == INVALID_FILE_ATTRIBUTES)
+        CopyFileA(target, backup, TRUE);
+
+    FILE* out = nullptr;
+    if (fopen_s(&out, target, "wb") != 0 || !out) {
+        Log("keymap: could not write %s -- WASD not installed", target);
+        free(ascii);
+        return;
+    }
+    const unsigned char bom[2] = { 0xFF, 0xFE };
+    fwrite(bom, 1, 2, out);
+    for (size_t i = 0; i < read; ++i) {
+        const unsigned char pair[2] = { (unsigned char)ascii[i], 0 };
+        fwrite(pair, 1, 2, out);
+    }
+    fclose(out);
+    free(ascii);
+
+    Log("keymap: WASD installed -> %s (original saved as %s)", target, backup);
+}
+
 // ---------------------------------------------------- the shipyard experiment
 // Ask the engine to build a ship, and find out whether it works.
 //
@@ -1968,6 +2072,7 @@ static DWORD WINAPI Init(LPVOID)
     strncpy_s(g_gameDir, sizeof(g_gameDir), dir, _TRUNCATE);
     ScanFlags();
     suspicion::LoadTuning(dir);
+    InstallWasdKeymap(dir);
 
     // False colours writes game state, so it is opt-in the same way.
     {

@@ -1641,3 +1641,37 @@ Worth stating plainly, since this file may be read as authoritative:
   the first three (x, y, sound) are understood.
 - The `.pirates_savegame` format itself has not been examined at all. We detect
   saves and load by file access, never by parsing them.
+
+---
+
+## Key bindings — no reverse engineering required
+
+The game ships a **documented, user-editable `KeyMap.ini`** at
+`My Documents\My Games\Sid Meier's Pirates!\KeyMap.ini`, with a shortcut to it
+in the install folder. UTF-16LE with a BOM; one section per context —
+`[Battle]`, `[Dance]`, `[Duel]`, `[Fight]`, `[Menu]`, `[Sail]`, `[Shell]`,
+`[Sneak]`.
+
+Entries read `CommandName_default = key`. **The suffix on the left is
+documentation** — the binding is the value on the right, and the names are worth
+leaving alone so the file still matches the game's own reference.
+
+### Why WASD is not simply a matter of typing it in
+
+Two of the four letters are already taken in the sailing context:
+
+| Collision | Was | Moved to |
+|---|---|---|
+| `AttackShip_a` | `a` | `Space` |
+| `QuickSave_S` | `S` | `F5` (with Quick Load to `F9` to match) |
+
+That is presumably why the game never shipped a WASD preset.
+
+PEMF installs one **once**, backs the original up as `KeyMap.ini.pemf-backup`,
+and leaves a marker line in the footer so it never touches the file again —
+anything a player rebinds afterwards survives. Deleting the marker asks for the
+layout back.
+
+**Worth remembering generally:** before reverse engineering a behaviour, check
+whether the game already exposes it. This one was a shortcut sitting in the
+install folder the whole time.

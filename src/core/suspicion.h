@@ -579,9 +579,12 @@ inline void RefreshPanel()
     for (int k = 0; k < kMaxHuntsPerNation; ++k)
         if (g_hunts[g_wearing][k].active) ++hunters;
 
+    // '=' and '.', NOT '|'. The game's font has no pipe glyph and rendered the
+    // whole bar as a row of question marks -- the engine draws what it has and
+    // says nothing. Stick to characters the game itself uses on screen.
     char bar[13];
     const int filled = (s.level * 12) / 100;
-    for (int i = 0; i < 12; ++i) bar[i] = (i < filled) ? '|' : '.';
+    for (int i = 0; i < 12; ++i) bar[i] = (i < filled) ? '=' : '.';
     bar[12] = 0;
 
     _snprintf_s(g_panel[g_panelLines++], 96, _TRUNCATE, "%s colours",

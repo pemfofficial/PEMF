@@ -877,11 +877,14 @@ inline bool DrawSuspicionPanel()
 {
     if (suspicion::g_panelLines <= 0) return false;
     __try {
-        // Right-hand side, and BELOW the notice band -- the first placement put
-        // it at y=12 where the centred notices are, and the two overlapped into
-        // an unreadable smear at the top of the screen.
-        const int x = (game::ScreenW() * 7) / 9;
-        int y = 96;
+        // TOP RIGHT, properly. The engine CENTRES text on the x it is given,
+        // so an x of three-quarters across put the block in the middle-right of
+        // the screen rather than in the corner -- which is why it read as an
+        // awkward floating position rather than a panel. Seven-eighths puts the
+        // centre of a short line near the corner, and every line here is short
+        // by design.
+        const int x = (game::ScreenW() * 7) / 8;
+        int y = 40;
         for (int i = 0; i < suspicion::g_panelLines; ++i) {
             game::DrawHudLineAt(suspicion::g_panel[i], x, y);
             y += 22;
@@ -1007,18 +1010,28 @@ inline void DrawWorldNotices()
 {
     if (g_drawWorldOff || !WorldStillOnScreen() || g_noticeCount <= 0) return;
 
+    // The WORLD phase dirties the shared buffer too, and it runs at BeginScene
+    // -- before the game draws the sea. So anything it leaves behind is painted
+    // across the water in the SAME frame, which is how "A French captain is
+    // studying our rigging" came to be written in enormous letters over the
+    // ship. Clearing only at EndScene was always one phase too late.
+    bool anyWorldDraw = false;
+
     DWORD now = GetTickCount();
     for (int i = 0; i < g_noticeCount; ++i) {
         ActiveNotice& n = g_notices[i];
         if (!n.anchor || (int)(now - n.until) >= 0) continue;
+        anyWorldDraw = true;
         if (DrawOneWorldNotice(n.resolved.c_str(), NoticeFade(n, now))) {
             InterlockedIncrement(&g_drawWorldOk);
         } else {
             InterlockedIncrement(&g_drawFaults);
             g_drawWorldOff = true;
+            game::ClearMessageBuffer();
             return;
         }
     }
+    if (anyWorldDraw) game::ClearMessageBuffer();
 }
 
 // The screen phase, issued at EndScene: fixed HUD lines, on top of everything.
@@ -1029,12 +1042,21 @@ inline void DrawWorldNotices()
 // notice, never a crashing game. The safe point reports it.
 inline void DrawNotices()
 {
-    if (g_drawOff || !WorldStillOnScreen() || g_noticeCount <= 0) return;
+    if (g_drawOff || !WorldStillOnScreen()) return;
+
+    // The panel is not a notice and must not depend on one existing. An early
+    // return on `g_noticeCount <= 0` meant it vanished the moment the last
+    // notice expired, which is most of the time.
+    int drew = DrawSuspicionPanel() ? 1 : 0;
+
+    if (g_noticeCount <= 0) {
+        if (drew) game::ClearMessageBuffer();
+        return;
+    }
 
     DWORD now = GetTickCount();
     int y = 8;
     int write = 0;
-    int drew = 0;
     for (int i = 0; i < g_noticeCount; ++i) {
         ActiveNotice& n = g_notices[i];
         if ((int)(now - n.until) >= 0) continue;          // expired
@@ -1068,8 +1090,6 @@ inline void DrawNotices()
     // before each of its own draws, so an empty buffer between frames is
     // exactly the state it expects. This is the engine's own idiom for the job.
     //
-    if (DrawSuspicionPanel()) ++drew;
-
     // Only when we actually DREW, though. The buffer is the game's, not ours,
     // and clearing it is a write into shared state: if this pass put nothing
     // in it there is nothing of ours to take out, and clearing anyway is a
