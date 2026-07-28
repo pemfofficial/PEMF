@@ -867,20 +867,31 @@ inline bool          g_drawWorldOff = false; // world phase latched off
 // on the x we hand it, and there is no width query. An x of three-quarters
 // across sits the block clear of the compass and the button grid at every
 // resolution tested.
-inline void DrawSuspicionPanel()
+// Returns true if it put anything on screen -- which matters, because drawing
+// at all leaves our text in the game's shared buffer and the sailing render
+// will paint whatever is left there across the middle of the sea next frame.
+// The panel produced exactly that: "She's coming about" in enormous letters
+// over the water, once per frame, because the buffer was only cleared when a
+// NOTICE had drawn and the panel was not counted.
+inline bool DrawSuspicionPanel()
 {
-    if (suspicion::g_panelLines <= 0) return;
+    if (suspicion::g_panelLines <= 0) return false;
     __try {
-        const int x = (game::ScreenW() * 3) / 4;
-        int y = 12;
+        // Right-hand side, and BELOW the notice band -- the first placement put
+        // it at y=12 where the centred notices are, and the two overlapped into
+        // an unreadable smear at the top of the screen.
+        const int x = (game::ScreenW() * 7) / 9;
+        int y = 96;
         for (int i = 0; i < suspicion::g_panelLines; ++i) {
             game::DrawHudLineAt(suspicion::g_panel[i], x, y);
-            y += 20;
+            y += 22;
         }
+        return true;
     }
     __except (EXCEPTION_EXECUTE_HANDLER) {
         // One bad panel draw should cost the panel, never the frame.
         suspicion::g_panelLines = 0;
+        return false;
     }
 }
 
@@ -1057,7 +1068,7 @@ inline void DrawNotices()
     // before each of its own draws, so an empty buffer between frames is
     // exactly the state it expects. This is the engine's own idiom for the job.
     //
-    DrawSuspicionPanel();
+    if (DrawSuspicionPanel()) ++drew;
 
     // Only when we actually DREW, though. The buffer is the game's, not ours,
     // and clearing it is a write into shared state: if this pass put nothing

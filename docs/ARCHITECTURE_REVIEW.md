@@ -535,6 +535,47 @@ answer available.
 
 ---
 
+## Ninth pass (2026-07-28) — Suspicion, found by playing it
+
+Five faults, none visible in review, all obvious within a minute of sailing.
+
+### 24. Integer truncation made a whole system inert — FIXED
+
+`level += rate * dt / 1000`, with `dt` around 16 ms and `rate` 12, is **zero**.
+Every tick, forever. The panel reported a correct rate beside a level that could
+not move. Both readings were right; nothing joined them. Fixed by carrying the
+fraction in point-milliseconds.
+
+**The lesson is about accumulators, not about this system.** Any rate applied
+per-frame in integer arithmetic needs somewhere for the remainder to live.
+
+### 25. A flag name was used as an allegiance — FIXED
+
+Whose colours counted as "ours" was decided from the *name* of the career's true
+flag. Careers usually fly a personal device, which resolves to no nation, so an
+English captain in English colours was hunted by England. Now read from
+`PlayerNation`.
+
+### 26. Announcing a state change is not making it — FIXED
+
+Unmasking said *"Colours struck!"* and left the false flag flying, so the meter
+reset and climbed again on the spot, indefinitely.
+
+### 27. Drawing anything at all dirties the engine's shared buffer — FIXED
+
+The panel painted its text across the middle of the sea in giant letters. The
+HUD call uses `0x00869B48` as scratch, so **any** draw leaves something there.
+The clear was conditional on a *notice* having drawn and did not count the
+panel. Pass 21's rule was right and its implementation was too narrow.
+
+### 28. Instrumentation shipped as a HUD — FIXED
+
+Four lines of diagnostics in the corner, at the same height as the centred
+notices, overlapping into a smear. Reduced to two lines; the rest went to the
+log.
+
+---
+
 ## Remaining, in priority order
 
 1. **Address single source of truth.** `re/out/offsets.json` and `src/core/game.h`
@@ -584,6 +625,10 @@ of bug that is expensive to diagnose.
 | **An unexplained reading is data, not an absence.** | "No hover text on the spawned ship" was reported and passed over. It was a direct measurement of the classification field, and chasing it immediately would have found `+0x02` three rounds earlier. |
 | **Change one thing.** | The role test stamped a role AND wrote a destination, so it could not answer the question it existed for. Its conclusion — "role does not gate movement" — was unsupported by its own design. |
 | **What the game shows the player is a map of what it stores.** | The four hover labels (`pirate-hunter`, `privateer`, `raider`, `smuggler`) are a jump table over one field. UI strings are the cheapest route into an unknown enum. |
+| **A per-frame rate needs somewhere for the remainder to live.** | `rate * 16 / 1000` is zero in integer arithmetic. Suspicion could not rise at all, while reporting a correct rate. |
+| **Any draw dirties `0x00869B48`, not just a composed one.** | The engine's HUD call uses it as scratch. Clear after drawing anything, or the sailing render paints it across the sea next frame. |
+| **Announcing a state change is not making it.** | Unmasking said "colours struck" without striking them, so the meter reset and climbed forever. |
+| **Identity comes from the engine, not from a name we chose.** | A career's flag is a personal device; comparing flag names made an English captain an impostor to England. |
 | **Career presence comes from the screen state, never from `crew > 0`.** | The crew count does not reset at the main menu, so that test is true forever after the first career and stops seeing transitions entirely. |
 | **A save file being read is not a load.** | Starting a new career reads one too, and the load screen reads every save to list them. Only a fingerprint match against the live career proves it. |
 | **Verify a write landed, not that a symbol exists.** | The fingerprint had its field, parser and comparison, and no `fprintf`. A grep matched three real sites and the feature still did nothing. |

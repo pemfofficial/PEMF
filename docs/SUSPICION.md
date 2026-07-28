@@ -1,10 +1,27 @@
-# Suspicion — design
+# Suspicion
 
 False colours, and what it costs to wear them.
 
-**Status: design. Nothing here is built.** The engine work it rests on is
-recorded in [`GAME_API.md`](GAME_API.md) and
-[`re/experiments/nations/`](../re/experiments/nations/README.md).
+**Status: built and running in game.** Suspicion climbs, the beats fire, being
+unmasked drops your reputation and strikes your colours, and pirate-hunters
+sail. The engine work it rests on is in [`GAME_API.md`](GAME_API.md),
+[`re/experiments/nations/`](../re/experiments/nations/README.md) and
+[`re/experiments/shipyard/`](../re/experiments/shipyard/README.md).
+
+Tuning lives in **`PEMF\suspicion.ini`**, which is commented and never
+overwritten by a rebuild. This will be balanced by playing it.
+
+## Verified in game
+
+- Suspicion rises near the ships and ports of the crown whose flag you wear,
+  and falls in open water
+- All four beats fire on the way up
+- Unmasking drops reputation, strikes the false colours, and dispatches hunters
+- Hunters spawn from a port of the offended nation, hover as
+  `"Dutch pirate-hunter"`, and are treated as **genuinely hostile by the
+  engine** — they hail you with the game's own `"Stand and fight you
+  yellow-bellied Pirate!"`, which is not a line PEMF wrote
+- Hunter strength and number both scale with reputation
 
 ---
 
@@ -183,6 +200,56 @@ Every input the design needs is confirmed working in a running game.
 4. **The hunter**, if step 1 says yes.
 5. **Blame and witnesses** last — it is the most interesting part and the least
    understood, and it should be built on a system that is already working.
+
+---
+
+## Faults found by playing it
+
+Every one of these was invisible in the code and obvious within a minute of
+sailing.
+
+### A rate is not progress
+
+The panel showed a correct `+12` beside a level that never left `0`. The safe
+point runs about every 16 ms, so `level += rate * dt / 1000` is `12 * 16 / 1000`
+— **zero**, in integer arithmetic, sixty times a second, forever. The remainder
+was discarded on every tick.
+
+Fixed by carrying the fraction in point-milliseconds. The same truncation was in
+the decay path.
+
+### A flag name is not an allegiance
+
+Whose colours counted as *ours* was decided by comparing against the name of the
+career's true flag. A career's own flag is usually a personal device
+(`flag_jack.dds`) which resolves to no nation at all — so **an English captain
+flying English colours was treated as an impostor and hunted by his own crown**.
+
+Now compared against `PlayerNation`, the engine's own record of who you serve.
+
+### Saying it is not doing it
+
+Unmasking announced *"Colours struck!"* and left the false flag flying. So
+suspicion reset to zero and immediately began climbing again, over and over,
+with the player never told why. It now actually strikes the colours and ends the
+ruse.
+
+### Drawing anything dirties the shared buffer
+
+The panel rendered *"She's coming about"* in enormous letters across the middle
+of the sea, once per frame. The engine's HUD call uses `0x00869B48` as scratch,
+so **drawing at all** leaves text in it, and the sailing render paints whatever
+is there over the water next frame. The buffer was only being cleared when a
+*notice* had drawn; the panel was not counted.
+
+### Instrumentation is not a HUD
+
+The first panel stacked four lines of diagnostics into the corner, at the same
+height as the centred notices, and the two overlapped into a smear. It is now
+two lines — whose colours, and how far the lie has got. The rate and the hunter
+count are diagnostics and belong in the log.
+
+---
 
 ## Principles
 

@@ -297,6 +297,9 @@ static void RunContentEvent(int index)
 
 // Defined with the false-colours probe below; called from the safe point.
 static void WatchTheWater();
+static void NoteColoursFlown(const char* flagName);
+extern char g_trueFlagName[128];
+extern bool g_haveTrueFlag;
 static void ApplyCareerFlag();
 // Latches cleared on a career change: a disguise, and our memory of the
 // captain's honest colours, both belong to the career they were formed in.
@@ -378,6 +381,20 @@ static void RunSafePoint()
 
         // Suspicion composes no text of its own -- it hands us a line and we
         // put it on screen through the channel it belongs in.
+        // Being unmasked ends the ruse. Suspicion asks for the true colours
+        // back rather than reaching into the flag layer itself.
+        if (suspicion::g_pendingStrikeColours) {
+            suspicion::g_pendingStrikeColours = false;
+            if (g_haveTrueFlag && game::SetPlayerFlagByName(g_trueFlagName)) {
+                session::RecordFlag(g_trueFlagName);
+                NoteColoursFlown(g_trueFlagName);
+                Log("suspicion: true colours run back up -- '%s'", g_trueFlagName);
+            } else {
+                Log("suspicion: unmasked, but no true colours were recorded to "
+                    "go back to -- the flag stays as it is");
+            }
+        }
+
         if (suspicion::g_pendingNotice) {
             content::PostDebugNotice(suspicion::g_pendingNotice, 7, false,
                                      suspicion::g_pendingIsBeat
@@ -512,18 +529,27 @@ static int NationFromFlagName(const char* name)
     return -1;      // our own device, or the black flag: honest either way
 }
 
-// Called wherever the flown flag changes. The TRUE colours are the career's
-// own, so wearing them is not a disguise however they are spelled.
-static void NoteColoursFlown(const char* flagName, const char* trueFlagName)
+// Called wherever the flown flag changes.
+//
+// Whose colours count as OURS is the nation the player serves -- read from the
+// engine's own PlayerNation, not inferred from the name of whatever flag the
+// career happens to have recorded. The first version compared against the true
+// FLAG NAME, and since a career's own flag is usually a personal device
+// ("flag_jack.dds") that resolves to no nation at all, an English captain
+// flying English colours was treated as an impostor and hunted by his own
+// crown. Reported from a playtest, and obvious in hindsight: a flag name is not
+// an allegiance.
+static void NoteColoursFlown(const char* flagName)
 {
     const int worn = NationFromFlagName(flagName);
-    const int own  = NationFromFlagName(trueFlagName);
+    const int own  = nations::HomeNation();
     const int wearing = (worn >= 0 && worn != own) ? worn : -1;
 
     if (wearing != suspicion::g_wearing) {
-        Log("suspicion: colours now %s (flag '%s')",
-            wearing >= 0 ? game::NationName(wearing) : "our own",
-            flagName ? flagName : "?");
+        Log("suspicion: colours now %s (flag '%s'; we serve %s)",
+            wearing >= 0 ? game::NationName(wearing) : "honest",
+            flagName ? flagName : "?",
+            own >= 0 ? game::NationName(own) : "no crown");
     }
     suspicion::SetWearing(wearing);
 }
@@ -655,7 +681,7 @@ static void WatchTheWater()
 // What is still worth remembering is the name the player actually chose, so a
 // disguise can always be taken off. Captured live rather than re-read from
 // Config.ini, because they may have changed it this session.
-static char g_trueFlagName[128] = {0};
+char        g_trueFlagName[128] = {0};
 bool        g_haveTrueFlag      = false;
 static int  g_flagCursor        = 0;
 
@@ -715,7 +741,7 @@ static void ApplyCareerFlag()
                                                       : "this career's own")
                               : "nothing recorded, so the player's own flag");
                 g_careerFlagApplied = true;
-                NoteColoursFlown(want, g_haveTrueFlag ? g_trueFlagName : nullptr);
+                NoteColoursFlown(want);
             }
             // No latch on failure: the world may simply not be built yet, and
             // this costs one guarded call a frame until it is.
@@ -1689,7 +1715,7 @@ static DWORD WINAPI Hook_timeGetTime(void)
             }
             if (game::SetPlayerFlagByName(g_trueFlagName)) {
                 session::RecordFlag(g_trueFlagName);
-                NoteColoursFlown(g_trueFlagName, g_trueFlagName);
+                NoteColoursFlown(g_trueFlagName);
                 Log("falsecolours: true colours restored -- '%s'", g_trueFlagName);
                 content::PostDebugNotice("True colours restored.", 5);
             } else {
@@ -1715,7 +1741,7 @@ static DWORD WINAPI Hook_timeGetTime(void)
 
         if (game::SetPlayerFlagByName(pick)) {
             session::RecordFlag(pick);          // travels with the save
-            NoteColoursFlown(pick, g_haveTrueFlag ? g_trueFlagName : nullptr);
+            NoteColoursFlown(pick);
             Log("falsecolours: flying flag[%d] '%s'", g_flagCursor, pick);
             char msg[160];
             _snprintf_s(msg, sizeof(msg), _TRUNCATE, "Flying %s.", pick);

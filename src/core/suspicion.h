@@ -118,7 +118,11 @@ struct Hunt {
     int   aimCity  = -1;
 };
 
-inline Hunt g_hunts[game::addr::kNationsWithRank];
+// Several per nation, because a crown that truly wants you does not send one
+// ship. How many actually sail is decided by reputation at the moment of
+// dispatch -- see HunterCountFor().
+constexpr int kMaxHuntsPerNation = 4;
+inline Hunt g_hunts[game::addr::kNationsWithRank][kMaxHuntsPerNation];
 
 // The nation whose colours we are currently wearing, or -1 for honest sailing.
 // Set by the flag layer; suspicion does not guess it.
@@ -129,10 +133,26 @@ inline void SetWearing(int nation) { g_wearing = nation; }
 inline void ResetAll()
 {
     for (int n = 0; n < game::addr::kNationsWithRank; ++n) {
-        g_sus[n]  = NationSuspicion{};
-        g_hunts[n] = Hunt{};
+        g_sus[n] = NationSuspicion{};
+        for (int k = 0; k < kMaxHuntsPerNation; ++k) g_hunts[n][k] = Hunt{};
     }
     g_wearing = -1;
+}
+
+// How many ships a crown sends. One while they merely dislike you; a squadron
+// once there is a price on your head. Reputation is the same number the engine
+// uses to decide how STRONG each one is, so the two scale together and a
+// thoroughly hated captain gets four strong ships rather than one weak one.
+inline int HunterCountFor(int nation)
+{
+    const int rep = nations::Reputation(nation);
+    int n = 1;
+    if (rep <= -10) n = 2;
+    if (rep <= -25) n = 3;
+    if (rep <= -45) n = 4;
+    if (n > g_tune.maxPerNation) n = g_tune.maxPerNation;
+    if (n > kMaxHuntsPerNation)  n = kMaxHuntsPerNation;
+    return n;
 }
 
 // ------------------------------------------------------------------ tuning io
@@ -277,14 +297,11 @@ inline int RateFor(int nation, const Look& look)
 // The game has no "chase that ship" behaviour to borrow -- a vessel sails to a
 // PLACE. So a hunt is a ship rebuilt toward the player every few seconds, and
 // from the deck that is a warship that will not let go.
-inline void DispatchHunter(int nation)
+inline bool DispatchOneHunter(int nation, Hunt& h)
 {
-    if (!g_tune.hunterEnabled) return;
-    if (nation < 0 || nation >= game::addr::kNationsWithRank) return;
-    if (g_hunts[nation].active) return;
     if (!game::SpawnShipCallable()) {
         Log("suspicion: cannot dispatch -- the ship factory did not verify");
-        return;
+        return false;
     }
 
     // From one of THEIR ports, so she comes from somewhere plausible.
@@ -298,13 +315,13 @@ inline void DispatchHunter(int nation)
     if (from < 0) {
         Log("suspicion: %s has no port near enough to send anyone from",
             game::NationName(nation));
-        return;
+        return false;
     }
 
     const int slot = game::SpawnShipAtCity(from, 0x0B);
     if (slot < 8 || slot >= game::addr::kMaxShips) {
         Log("suspicion: the yard could not build a hunter (returned %d)", slot);
-        return;
+        return false;
     }
 
     // The engine's own recipe: strength scales with how badly they think of us.
@@ -313,7 +330,6 @@ inline void DispatchHunter(int nation)
     game::SetShipRoleRaw(slot, strength);
     game::MarkCitySentHunter(from, slot);
 
-    Hunt& h = g_hunts[nation];
     h.active = true; h.slot = slot; h.nation = nation;
     h.strength = strength;
     h.startedAt = h.lastAimAt = GetTickCount();
@@ -322,6 +338,25 @@ inline void DispatchHunter(int nation)
     Log("suspicion: %s dispatches a pirate-hunter from city %d -- slot %d, "
         "strength %d (reputation %d)", game::NationName(nation), from, slot,
         strength, nations::Reputation(nation));
+    return true;
+}
+
+inline void DispatchHunters(int nation)
+{
+    if (!g_tune.hunterEnabled) return;
+    if (nation < 0 || nation >= game::addr::kNationsWithRank) return;
+
+    const int want = HunterCountFor(nation);
+    int have = 0;
+    for (int k = 0; k < kMaxHuntsPerNation; ++k)
+        if (g_hunts[nation][k].active) ++have;
+
+    for (int k = 0; k < kMaxHuntsPerNation && have < want; ++k) {
+        if (g_hunts[nation][k].active) continue;
+        if (DispatchOneHunter(nation, g_hunts[nation][k])) ++have;
+    }
+    Log("suspicion: %s now has %d hunter(s) at sea (wanted %d, reputation %d)",
+        game::NationName(nation), have, want, nations::Reputation(nation));
 }
 
 // Point her at us. Her destination is a PORT, so we pick whichever of theirs is
@@ -351,8 +386,9 @@ inline void EndHunt(Hunt& h, const char* why)
 inline void TickHunts()
 {
     const DWORD now = GetTickCount();
-    for (int n = 0; n < game::addr::kNationsWithRank; ++n) {
-        Hunt& h = g_hunts[n];
+    for (int n = 0; n < game::addr::kNationsWithRank; ++n)
+    for (int k = 0; k < kMaxHuntsPerNation; ++k) {
+        Hunt& h = g_hunts[n][k];
         if (!h.active) continue;
 
         // She may have been sunk, despawned, or had her slot reused.
@@ -393,21 +429,43 @@ inline void Say(const char* text, bool beat)
     g_pendingIsBeat = beat;
 }
 
+// The flag layer owns the player's colours, so unmasking ASKS for them back
+// rather than reaching over and setting them. Read and cleared at the safe
+// point by the caller.
+inline bool g_pendingStrikeColours = false;
+
 // Unmasked. One number, and the world does the rest.
 inline void Unmask(int nation)
 {
+    // How hard the lie lands depends on how close you were when it came apart.
+    // Being seen through under the guns of their own harbour is a different
+    // matter from being doubted at the horizon, and a captain would expect
+    // that. Full penalty inside closeRange, half of it at the edge of sight.
+    const Look look = Observe(nation);
+    int penalty = g_tune.repPenalty;
+    if (look.nearest > g_tune.closeRange && look.port < 0) penalty = (penalty + 1) / 2;
+
     const int before = nations::Reputation(nation);
-    const int after  = before - g_tune.repPenalty;
+    const int after  = before - penalty;
     game::SetReputationRaw(nation, after);
 
-    Log("suspicion: UNMASKED by the %s -- reputation %d -> %d (%s), "
-        "true colours restored", game::NationName(nation), before, after,
+    Log("suspicion: UNMASKED by the %s -- reputation %d -> %d (penalty %d, "
+        "nearest of theirs %d) -- %s", game::NationName(nation), before, after,
+        penalty, look.nearest,
         after < 0 ? "their ports are now closed to us"
                   : "still tolerated, but barely");
 
+    // The ruse is over, so END it. Saying "colours struck" and then leaving the
+    // false flag flying is what made the meter reset to zero and climb again
+    // on the spot, over and over, with the player never told why.
     g_sus[nation].level = 0;
+    g_sus[nation].carry = 0;
     g_sus[nation].spokenAt = 0;
-    DispatchHunter(nation);
+    g_sus[nation].hasHeat = false;
+    g_wearing = -1;
+    g_pendingStrikeColours = true;
+
+    DispatchHunters(nation);
 
     char msg[192];
     _snprintf_s(msg, sizeof(msg), _TRUNCATE,
@@ -512,26 +570,31 @@ inline void RefreshPanel()
     // vanished and, since the level could never rise, never came back.
     const NationSuspicion& s = g_sus[g_wearing];
 
-    // A bar rather than a bare number: it reads at a glance while sailing.
-    char bar[21];
-    const int filled = (s.level * 20) / 100;
-    for (int i = 0; i < 20; ++i) bar[i] = (i < filled) ? '=' : '.';
-    bar[20] = 0;
+    // TWO LINES, and only what a captain would want at a glance: whose flag we
+    // are wearing, and how far the lie has got. The first version stacked four
+    // lines of instrumentation into the corner and read as clutter over the
+    // sea -- the rate and the hunter count are diagnostics, and they belong in
+    // the log, not on the horizon.
+    int hunters = 0;
+    for (int k = 0; k < kMaxHuntsPerNation; ++k)
+        if (g_hunts[g_wearing][k].active) ++hunters;
 
-    _snprintf_s(g_panel[g_panelLines++], 96, _TRUNCATE, "Flying %s colours",
+    char bar[13];
+    const int filled = (s.level * 12) / 100;
+    for (int i = 0; i < 12; ++i) bar[i] = (i < filled) ? '|' : '.';
+    bar[12] = 0;
+
+    _snprintf_s(g_panel[g_panelLines++], 96, _TRUNCATE, "%s colours",
                 game::NationName(g_wearing));
-    _snprintf_s(g_panel[g_panelLines++], 96, _TRUNCATE, "[%s] %d", bar, s.level);
-    if (s.lastRate > 0) {
+
+    // The watching mark is one character rather than a sentence: a dot when
+    // nobody is looking, an eye-ish glyph when they are.
+    _snprintf_s(g_panel[g_panelLines++], 96, _TRUNCATE, "%s %s",
+                bar, s.lastRate > 0 ? "<" : " ");
+
+    if (hunters > 0) {
         _snprintf_s(g_panel[g_panelLines++], 96, _TRUNCATE,
-                    "They are watching  (+%d)", s.lastRate);
-    } else {
-        _snprintf_s(g_panel[g_panelLines++], 96, _TRUNCATE,
-                    "Unobserved  (%d)", s.lastRate);
-    }
-    if (g_hunts[g_wearing].active) {
-        _snprintf_s(g_panel[g_panelLines++], 96, _TRUNCATE,
-                    "A hunter is out, strength %d",
-                    g_hunts[g_wearing].strength);
+                    "%d hunting", hunters);
     }
 }
 

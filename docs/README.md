@@ -16,8 +16,8 @@ The game executable is never modified.
 | **[EVENT_AUTHORING.md](EVENT_AUTHORING.md)** | Players & modders | Writing events for `PEMF\events\` — schema, tokens, effects, error messages |
 | **[DEVELOPER.md](DEVELOPER.md)** | Developers | Architecture, build, RE workflow, conventions, roadmap, lessons |
 | **[GAME_API.md](GAME_API.md)** | Developers | Reverse-engineered engine reference: functions, addresses, conventions |
-| **[SUSPICION.md](SUSPICION.md)** | Developers | Design for false colours — what raises suspicion, what it costs, and what is still missing |
-| **[ARCHITECTURE_REVIEW.md](ARCHITECTURE_REVIEW.md)** | Developers | Eight passes: hazards found, fixed, and the invariants they establish |
+| **[SUSPICION.md](SUSPICION.md)** | Developers | False colours: what raises suspicion, what being unmasked costs, tuning, and the faults playing it exposed |
+| **[ARCHITECTURE_REVIEW.md](ARCHITECTURE_REVIEW.md)** | Developers | Nine passes: hazards found, fixed, and the invariants they establish |
 | **[`re/experiments/`](../re/experiments/)** | Developers | Write-ups of specific investigations — the question, the method, what the numbers said, and what was concluded (including the answers that were "no") |
 
 ---
@@ -32,6 +32,7 @@ The game executable is never modified.
 └── PEMF/
     ├── events/
     │   └── core_events.json
+    ├── suspicion.ini
     └── docs/
 ```
 
@@ -49,7 +50,7 @@ Build a release archive with `.\build.ps1 -Package`.
 PiratesMod/
 ├── build.ps1              build, install, package
 ├── INSTALL.txt            ships in the release archive
-├── content/PEMF/events/   authored narrative content
+├── content/PEMF/         authored content + suspicion.ini tuning
 ├── docs/                  you are here
 ├── dist/                  release archives
 ├── src/
@@ -62,6 +63,8 @@ PiratesMod/
 │   │   ├── content.h      JSON event loader + validation
 │   │   ├── triggers.h     when events fire (world sampling)
 │   │   ├── render.h       the render phase (where things are shown)
+│   │   ├── nations.h      relations, standing, the crown you serve
+│   │   ├── suspicion.h    false colours, hunters, the panel
 │   │   └── core.cpp       hooks and wiring
 │   └── vendor/            nlohmann/json
 └── re/
@@ -118,8 +121,10 @@ levels are used throughout the docs:
 | Reading the player's rank and reputation per crown | **Built** — addresses confirmed in the disassembly; every career tested so far holds no commission, so the values have not yet moved |
 | Building a ship through the engine's own factory | **Verified** — any nation, any port |
 | Giving a spawned ship a destination it sails to | **Verified** — across all four role values |
-| A hunter that chases the player rather than a port | Not started |
-| Suspicion | Not started |
+| Suspicion — rises on observation, falls in open water | **Verified** |
+| Being unmasked: reputation drops, colours struck | **Verified** |
+| Pirate-hunters dispatched, scaling with reputation | **Verified** — engine treats them as hostile |
+| Suspicion tuning via `PEMF\suspicion.ini` | **Verified** |
 | Playing a named game sound with an event | **Verified** |
 | Officer simulation | Not started |
 | Factions and divisions | Not started |
