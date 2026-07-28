@@ -323,6 +323,8 @@ static void RunSafePoint()
         // lookout's call from the last captain's voyage has no business
         // hanging over this one's ship.
         content::ClearNotices();
+        // Suspicion belongs to the career that earned it, hunters included.
+        suspicion::ResetAll();
         // A disguise belongs to the career it was put on in. The new career's
         // own value is whatever the game loaded, so all we must do is stop
         // believing we have something of theirs to give back.
@@ -361,6 +363,29 @@ static void RunSafePoint()
     // A notice should not spend its life expiring behind a menu, so its clock
     // only runs while the overworld is actually on screen.
     content::HoldNoticeClock(content::g_worldLive);
+
+    // ------------------------------------------------------- suspicion
+    // Evaluated here, never in the render hook: it reads the ship array and the
+    // city table, and it can decide to build a ship.
+    {
+        static DWORD lastSusAt = 0;
+        const DWORD now = GetTickCount();
+        const DWORD dt  = lastSusAt ? (now - lastSusAt) : 0;
+        lastSusAt = now;
+
+        suspicion::Tick(dt);
+        suspicion::RefreshPanel();
+
+        // Suspicion composes no text of its own -- it hands us a line and we
+        // put it on screen through the channel it belongs in.
+        if (suspicion::g_pendingNotice) {
+            content::PostDebugNotice(suspicion::g_pendingNotice, 7, false,
+                                     suspicion::g_pendingIsBeat
+                                         ? content::kChannelNarrative
+                                         : content::kChannelStatus);
+            suspicion::g_pendingNotice = nullptr;
+        }
+    }
 
     // Measures whether vessels are steering at us, so the false-colours
     // experiment is answered by numbers rather than by an impression.
@@ -463,10 +488,54 @@ extern bool g_fileProbe;
 // rather than being a key anyone can hit. See the hotkey handler.
 bool g_falseColours = false;
 
+// --------------------------------------------- which colours are we wearing
+// Suspicion needs to know whose flag we are flying, and the flag layer works in
+// NAMES. The nation flags are the five the game ships; anything else is a
+// personal device, which is nobody's national colours and so is not a lie.
+//
+// Matched on the stem rather than the whole filename so a player's
+// "flag_spa_weathered.dds" still reads as Spanish -- if it looks like their
+// ensign at a cable's length, it is their ensign.
+static int NationFromFlagName(const char* name)
+{
+    if (!name || !*name) return -1;
+    struct Stem { const char* stem; int nation; };
+    static const Stem kStems[] = {
+        { "flag_spa", game::addr::kSpanish },
+        { "flag_eng", game::addr::kEnglish },
+        { "flag_fre", game::addr::kFrench  },
+        { "flag_dut", game::addr::kDutch   },
+    };
+    for (const Stem& s : kStems) {
+        if (_strnicmp(name, s.stem, strlen(s.stem)) == 0) return s.nation;
+    }
+    return -1;      // our own device, or the black flag: honest either way
+}
+
+// Called wherever the flown flag changes. The TRUE colours are the career's
+// own, so wearing them is not a disguise however they are spelled.
+static void NoteColoursFlown(const char* flagName, const char* trueFlagName)
+{
+    const int worn = NationFromFlagName(flagName);
+    const int own  = NationFromFlagName(trueFlagName);
+    const int wearing = (worn >= 0 && worn != own) ? worn : -1;
+
+    if (wearing != suspicion::g_wearing) {
+        Log("suspicion: colours now %s (flag '%s')",
+            wearing >= 0 ? game::NationName(wearing) : "our own",
+            flagName ? flagName : "?");
+    }
+    suspicion::SetWearing(wearing);
+}
+
 // The shipyard experiment gets its own marker. It does not write game state so
 // much as CREATE it, and unlike every other probe here that cannot be undone by
 // pressing the key a second time.
 bool g_shipyard = false;
+
+// The last slot we built, so Ctrl+Shift+P can diff it against a ship the game
+// made. Declared here because the shipyard sets it well before the diff code.
+static int g_lastSpawned = -1;
 
 // ------------------------------------------------------ watching the water
 // "Did they attack me?" is not a measurement. Whether a vessel is CLOSING on
@@ -646,6 +715,7 @@ static void ApplyCareerFlag()
                                                       : "this career's own")
                               : "nothing recorded, so the player's own flag");
                 g_careerFlagApplied = true;
+                NoteColoursFlown(want, g_haveTrueFlag ? g_trueFlagName : nullptr);
             }
             // No latch on failure: the world may simply not be built yet, and
             // this costs one guarded call a frame until it is.
@@ -1006,6 +1076,7 @@ static void RunShipyardExperiment(ShipyardKind which)
             const unsigned before = game::ShipFlagBits(slot);
             game::OrShipFlagsRaw(slot, 0x8);
 
+            g_lastSpawned = slot;                 // for Ctrl+Shift+P to diff
             Log("shipyard: slot %d DISPATCHED -- %s pirate-hunter, strength %d "
                 "(reputation %d -> 2 - rep/10, clamped 2..4)",
                 slot, game::NationName(game::ShipNationality(slot)), str,
@@ -1059,6 +1130,144 @@ static void RunShipyardExperiment(ShipyardKind which)
         Log("shipyard: EXCEPTION 0x%08X -- the factory is not callable this "
             "way. Shipyard disarmed for the session; do NOT save this game.",
             GetExceptionCode());
+    }
+}
+
+// ------------------------------------------- diffing a ship against a real one
+// Four rounds of "set the field the disassembly points at, watch her sit there"
+// is enough. The engine builds ships that work; we build ships that do not. The
+// difference is in the 1116 bytes of the record, and reading both is cheaper
+// and more honest than guessing which field is next.
+//
+// Dumps our most recently built ship beside a vessel the GAME made, as
+// offset-by-offset differences. Anything that matters is in that list.
+static void DiffShipAgainstNatural()
+{
+    if (!state::InGame()) { Log("shipdiff: refused -- not in a career"); return; }
+    if (g_lastSpawned < 0) {
+        Log("shipdiff: nothing built yet this session -- press Ctrl+Shift+O "
+            "first, then this");
+        return;
+    }
+
+    __try {
+        // A ship the game made: any occupied slot that is not ours and not the
+        // player's. Prefer one that is actually moving, since a natural ship
+        // sitting in port is no better a reference than ours.
+        int natural = -1;
+        for (int i = 1; i < game::addr::kMaxShips; ++i) {
+            if (i == g_lastSpawned) continue;
+            if (game::ShipType(i) == -1) continue;
+            natural = i;
+            if (game::ShipPurposeOf(i) != 0) break;   // an interesting one
+        }
+        if (natural < 0) {
+            Log("shipdiff: no other ship on the water to compare against");
+            return;
+        }
+
+        const uintptr_t ours = game::ShipRecord(g_lastSpawned);
+        const uintptr_t nat  = game::ShipRecord(natural);
+
+        Log("shipdiff: ours = slot %d (purpose %d), natural = slot %d "
+            "(purpose %d). Differences across the whole 0x45C record:",
+            g_lastSpawned, game::ShipPurposeOf(g_lastSpawned),
+            natural, game::ShipPurposeOf(natural));
+
+        int shown = 0;
+        for (int off = 0; off + 4 <= game::addr::kShipStride; off += 4) {
+            const unsigned a = *(const unsigned*)(ours + off);
+            const unsigned b = *(const unsigned*)(nat + off);
+            if (a == b) continue;
+            // Position, heading and anything obviously per-ship will always
+            // differ; they are printed anyway because "obviously" is exactly
+            // the judgement that has been wrong four times running.
+            Log("shipdiff:   +0x%03X  ours 0x%08X (%d)   natural 0x%08X (%d)",
+                off, a, (int)a, b, (int)b);
+            if (++shown > 60) { Log("shipdiff:   ...truncated"); break; }
+        }
+        if (shown == 0)
+            Log("shipdiff:   none -- the records are identical, which would be "
+                "a finding in itself");
+
+        content::PostDebugNotice("Ship diff written to pemf.log.", 6);
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER) {
+        Log("shipdiff: EXCEPTION 0x%08X", GetExceptionCode());
+    }
+}
+
+// ------------------------------------- borrowing a working ship's control state
+// The diff is short, so rather than guess which of seven fields matters, copy
+// them all from a vessel the game made and see whether ours comes alive. If it
+// does, bisecting the list is a couple of minutes; if it does not, the answer
+// is not in the record at all and that is worth knowing before another round of
+// disassembly.
+//
+// Position and nationality are deliberately NOT copied -- ours should stay
+// where she is, flying her own colours, so any movement is her own.
+static void BorrowControlState()
+{
+    if (!g_shipyard) { Log("borrow: needs PEMF\\shipyard.on"); return; }
+    if (!state::InGame()) { Log("borrow: refused -- not in a career"); return; }
+    if (g_lastSpawned < 0) {
+        Log("borrow: build one first with Ctrl+Shift+O");
+        return;
+    }
+
+    __try {
+        // Prefer a ship that is demonstrably underway: one whose position has
+        // changed since we last looked is the only kind worth copying from.
+        int natural = -1;
+        for (int i = 1; i < game::addr::kMaxShips; ++i) {
+            if (i == g_lastSpawned || game::ShipType(i) == -1) continue;
+            if (game::ShipPurposeOf(i) == 0) continue;   // wants a real errand
+            natural = i;
+            break;
+        }
+        if (natural < 0) {
+            for (int i = 1; i < game::addr::kMaxShips; ++i) {
+                if (i == g_lastSpawned || game::ShipType(i) == -1) continue;
+                natural = i; break;
+            }
+        }
+        if (natural < 0) { Log("borrow: no ship to copy from"); return; }
+
+        const uintptr_t ours = game::ShipRecord(g_lastSpawned);
+        const uintptr_t nat  = game::ShipRecord(natural);
+
+        // Every offset the diff flagged, except position (+0x0C/+0x10) and
+        // nationality (+0x04).
+        static const int kCopy[] = {
+            0x14,   // heading
+            0x18,   // ?
+            0x24, 0x28, 0x2C, 0x30,
+            0x38,   // ours 0, natural 1
+            0x3C, 0x40,
+            0x44,   // ours 0, natural 0x80000000
+            0x48, 0x4C,
+            0x50,   // ours 0, natural 100
+            0x58,   // flags: ours 0x208, natural 0x14600
+            0x5C, 0x64
+        };
+        for (int k = 0; k < (int)(sizeof(kCopy) / sizeof(int)); ++k) {
+            const int off = kCopy[k];
+            *(unsigned*)(ours + off) = *(const unsigned*)(nat + off);
+        }
+
+        Log("borrow: copied %d control fields from slot %d onto our slot %d. "
+            "Position and colours left alone, so any movement is hers.",
+            (int)(sizeof(kCopy) / sizeof(int)), natural, g_lastSpawned);
+        Log("borrow:   ours now -- purpose %d, flags 0x%08X, dest city %d, "
+            "+0x50 %d",
+            game::ShipPurposeOf(g_lastSpawned),
+            game::ShipFlagBits(g_lastSpawned),
+            game::ShipDestCity(g_lastSpawned),
+            *(const short*)(ours + 0x50));
+        content::PostDebugNotice("Control state borrowed. Watch her.", 8);
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER) {
+        Log("borrow: EXCEPTION 0x%08X", GetExceptionCode());
     }
 }
 
@@ -1348,8 +1557,10 @@ static DWORD WINAPI Hook_timeGetTime(void)
     bool kL = mods && (GetAsyncKeyState('L') & 0x8000);
     bool kO = mods && (GetAsyncKeyState('O') & 0x8000);
     bool kU = mods && (GetAsyncKeyState('U') & 0x8000);
+    bool kP = mods && (GetAsyncKeyState('P') & 0x8000);
+    bool kY = mods && (GetAsyncKeyState('Y') & 0x8000);
     bool down = k1 || k2 || k3 || k4 || k5 || k6 || k7 || k8 || k9 || k0 ||
-                kN || kH || kJ || kK || kL || kO || kU;
+                kN || kH || kJ || kK || kL || kO || kU || kP || kY;
 
     bool rising = down && !g_prevKeyDown;
     g_prevKeyDown = down;
@@ -1427,6 +1638,17 @@ static DWORD WINAPI Hook_timeGetTime(void)
         CycleReputation();
         return r;
     }
+    // Ctrl+Shift+P diffs the last ship we built against one the game built.
+    // Read-only, so no marker needed.
+    if (kP) {
+        DiffShipAgainstNatural();
+        return r;
+    }
+    // Ctrl+Shift+Y borrows a working ship's control state wholesale.
+    if (kY) {
+        BorrowControlState();
+        return r;
+    }
     if (kL) {
         g_testPurpose = (g_testPurpose % 6) + 1;    // 1..6, round again
         Log("shipyard: next ship will be stamped PURPOSE %d (%s)",
@@ -1467,6 +1689,7 @@ static DWORD WINAPI Hook_timeGetTime(void)
             }
             if (game::SetPlayerFlagByName(g_trueFlagName)) {
                 session::RecordFlag(g_trueFlagName);
+                NoteColoursFlown(g_trueFlagName, g_trueFlagName);
                 Log("falsecolours: true colours restored -- '%s'", g_trueFlagName);
                 content::PostDebugNotice("True colours restored.", 5);
             } else {
@@ -1492,6 +1715,7 @@ static DWORD WINAPI Hook_timeGetTime(void)
 
         if (game::SetPlayerFlagByName(pick)) {
             session::RecordFlag(pick);          // travels with the save
+            NoteColoursFlown(pick, g_haveTrueFlag ? g_trueFlagName : nullptr);
             Log("falsecolours: flying flag[%d] '%s'", g_flagCursor, pick);
             char msg[160];
             _snprintf_s(msg, sizeof(msg), _TRUNCATE, "Flying %s.", pick);
@@ -1717,6 +1941,7 @@ static DWORD WINAPI Init(LPVOID)
 
     strncpy_s(g_gameDir, sizeof(g_gameDir), dir, _TRUNCATE);
     ScanFlags();
+    suspicion::LoadTuning(dir);
 
     // False colours writes game state, so it is opt-in the same way.
     {

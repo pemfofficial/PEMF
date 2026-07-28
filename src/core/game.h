@@ -1542,6 +1542,14 @@ inline void ShowNotice(const char* resolved, int y, unsigned colour)
     DrawHudTextRaw(resolved, ScreenW() / 2, y, kNoticeStyle, colour, 4, -1, 0);
 }
 
+// Draw already-resolved text at an explicit position. Same call as ShowNotice,
+// without the centring, for panels that live somewhere other than the middle.
+inline void DrawHudLineAt(const char* resolved, int x, int y)
+{
+    *(int*)addr::HudTextStyle = kNoticeStyle;
+    DrawHudTextRaw(resolved, x, y, kNoticeStyle, kNoticeWhite, 4, -1, 0);
+}
+
 // Empty the game's shared message buffer. Anything left in it is redrawn over
 // the player's ship by the sailing render, on its own, next frame -- so this
 // must be called after any use of it, including a plain HUD draw, which uses

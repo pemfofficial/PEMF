@@ -32,6 +32,8 @@
 #include "../vendor/json.hpp"
 #include "log.h"
 #include "state.h"
+#include "nations.h"
+#include "suspicion.h"
 #include "render.h"
 #include "d3d9hook.h"
 
@@ -858,6 +860,30 @@ inline volatile LONG g_drawFaults  = 0;  // draws that raised an exception
 inline bool          g_drawOff      = false; // screen phase latched off
 inline bool          g_drawWorldOff = false; // world phase latched off
 
+// The suspicion panel, top right, where the game parks nothing. The strings are
+// composed at the safe point (suspicion::RefreshPanel) so this only blits.
+//
+// Right-aligned by eye rather than by measuring: the engine's text call centres
+// on the x we hand it, and there is no width query. An x of three-quarters
+// across sits the block clear of the compass and the button grid at every
+// resolution tested.
+inline void DrawSuspicionPanel()
+{
+    if (suspicion::g_panelLines <= 0) return;
+    __try {
+        const int x = (game::ScreenW() * 3) / 4;
+        int y = 12;
+        for (int i = 0; i < suspicion::g_panelLines; ++i) {
+            game::DrawHudLineAt(suspicion::g_panel[i], x, y);
+            y += 20;
+        }
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER) {
+        // One bad panel draw should cost the panel, never the frame.
+        suspicion::g_panelLines = 0;
+    }
+}
+
 // Draw one line. Wrapped so the SEH frame contains nothing with a destructor.
 inline bool DrawScreenNotice(const char* text, int y)
 {
@@ -1031,6 +1057,8 @@ inline void DrawNotices()
     // before each of its own draws, so an empty buffer between frames is
     // exactly the state it expects. This is the engine's own idiom for the job.
     //
+    DrawSuspicionPanel();
+
     // Only when we actually DREW, though. The buffer is the game's, not ours,
     // and clearing it is a write into shared state: if this pass put nothing
     // in it there is nothing of ours to take out, and clearing anyway is a

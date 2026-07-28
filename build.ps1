@@ -147,6 +147,13 @@ function Copy-Payload([string]$dest) {
     Copy-Item (Join-Path $build 'version.dll')   $dest -Force
     Copy-Item (Join-Path $build 'pemf_core.dll') $dest -Force
     Copy-Item (Join-Path $root 'content\PEMF\events\*.json') (Join-Path $dest 'PEMF\events') -Force
+    # Tuning files are edited in place by players, so never overwrite one that
+    # is already there -- a rebuild must not discard someone's balance pass.
+    $susSrc = Join-Path $root 'content\PEMF\suspicion.ini'
+    $susDst = Join-Path $dest 'PEMF\suspicion.ini'
+    if ((Test-Path $susSrc) -and -not (Test-Path $susDst)) {
+        Copy-Item $susSrc $susDst -Force
+    }
     $docs = Join-Path $dest 'PEMF\docs'
     New-Item -ItemType Directory -Force $docs | Out-Null
     foreach ($d in @('PLAYER_MANUAL.md', 'EVENT_AUTHORING.md')) {
