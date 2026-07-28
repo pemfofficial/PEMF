@@ -1040,6 +1040,37 @@ Major, Colonel, Admiral, Baron, Count, Marquis, Duke. Both arrays read `0` for a
 captain who has never taken a commission, which is the correct value rather than
 a failed read.
 
+### ✅ Reputation IS the hostility value
+
+**Negative reputation with a nation is that nation being hostile to you.** This
+corrects an earlier conclusion in this document that no hostility model had been
+found — the search was looking for a per-*ship* flag, and the game keeps a
+per-*nation* number instead.
+
+Two independent sites settle it:
+
+```
+0x0040B5DC  cmp word [nation*2 + 0x869A78], -1
+0x0040B5EA  jge skip
+            ...composes "'I see that the @NATIONALITY have put a price on
+            your head, yet I sense that you are a basically good person."
+            followed by the offer of an amnesty
+```
+
+and, in the loop that searches settlements (`0x00406265`), **cities are skipped
+entirely when their nation's reputation is below zero** — which is the game
+declining to let you make port where you are not welcome.
+
+| Reputation | Meaning |
+|---|---|
+| `> 0` | welcome; ports usable |
+| `< 0` | hostile; that nation's settlements are excluded from port searches |
+| `< -1` | a price on your head, and an amnesty becomes purchasable |
+
+This is **player state**, inside the 216-byte player record, and it is saved with
+the career. Writing it is a far smaller step than touching the nation relations
+matrix, which is world state — see the note in `nations.h`.
+
 ### `PlayerNation` — `0x00869AA8`, int16
 
 **The crown the player serves.** The game does not store your choice at

@@ -100,11 +100,27 @@ Blame accrues in **PEMF's own ledger** first, not in the engine's relations
 matrix. A framed nation's standing with the victim's nation worsens in our
 model, and the player sees it.
 
-⚠️ **Open decision:** whether a large enough frame should actually write the
-engine's relations matrix (`0x0085A168`) and start a real war. It is one int,
-it is saved with the game, and the payoff would be spectacular — but it is the
-single most invasive thing PEMF would do to a career, and `nations.h` currently
-states as policy that the matrix is the engine's to maintain. **Not to be
+### Blame lands on reputation, and that is not a hack
+
+**Negative reputation with a nation IS that nation being hostile to you** — the
+game's own model, not one we invent. Below zero its ports stop being available
+to you; below `-1` there is a price on your head and an amnesty to buy.
+
+So a frame that sticks does exactly what it should: it drives the framed
+nation's reputation down, and the world responds using machinery that already
+exists. Ports close. The amnesty offer appears. That is a real consequence, in
+the game's own terms, from one word of player state that is already saved with
+the career.
+
+This is a much smaller step than it first looked. Reputation lives in the
+216-byte player record — **player state**, ours to affect. It is the nation
+relations matrix that is world state.
+
+⚠️ **Open decision, narrowed:** whether a large enough frame should *also* write
+the relations matrix (`0x0085A168`) and start an actual war between two crowns.
+That remains the most invasive thing PEMF could do to a career, and `nations.h`
+states as policy that the matrix is the engine's to maintain. Reputation alone
+gives the mechanic teeth, so this can stay unanswered for now. **Not to be
 decided quietly during implementation.**
 
 ---
