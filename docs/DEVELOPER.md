@@ -18,12 +18,25 @@ Pirates!.exe                     stock GOG binary, never modified on disk
     └── pemf_core.dll            PEMF
         ├── game.h               raw addresses + calling shims
         ├── state.h              VALIDATED access to live game state
+        ├── nations.h            relations, standing, the crown you serve
         ├── session.h            career lifecycle, save/load, our persistence
         ├── events.h             deferred dispatch (the queue)
         ├── content.h            JSON event loading + validation
+        ├── triggers.h           when events fire (world sampling)
+        ├── suspicion.h          false colours, hunters, the panel
         ├── render.h             the render phase (where things are shown)
+        ├── d3d9hook.h           the device vtable hook
         └── core.cpp             hooks and wiring
 ```
+
+`nations.h` **only reads**. The relations matrix is the engine's to maintain, and
+a framework that edited it would be rewriting the world rather than reacting to
+it. The one number PEMF does write is the player's own reputation, from
+`suspicion.h`, because that is player state rather than world state.
+
+`suspicion.h` owns a whole mechanic and touches the engine in exactly two places:
+it writes reputation when you are unmasked, and it calls the ship factory to
+dispatch a hunter. Everything else it does is its own.
 
 Content lives outside the DLL entirely, in `PEMF\events\*.json` beside the game.
 
@@ -96,6 +109,16 @@ boundary comes from the safe point, **not** `Present` — this game never calls
   and must be re-issued every frame.
 - **Never** draw world-anchored text at `EndScene`, or screen text at
   `BeginScene`. Both are silent failures, not errors.
+- **Never** apply a per-frame rate in integer arithmetic without carrying the
+  remainder. `rate * 16 / 1000` is zero; suspicion could not rise at all while
+  reporting a correct rate.
+- **Never** assume a draw left the shared buffer clean. The engine's HUD call
+  uses `0x00869B48` as scratch, so *any* draw dirties it — clear after drawing in
+  BOTH phases, or the sailing render paints it across the sea.
+- **Never** trust a value published at the safe point without checking its age.
+  A modal dialog stops the main loop without changing the screen signature.
+- **Never** verify a packed build from its file. The Steam exe's `.text` unpacks
+  1,176,576 -> 5,177,344 bytes; only runtime signature checks mean anything.
 - **Never** hand the engine a token argument count, or an `@ITEM` index, that has
   not been read out of the disassembly. It does not bounds check; `@ITEM` past
   the end of its list access-violates.
@@ -415,3 +438,39 @@ Each of these cost real debugging time. Do not relearn them.
 - **Don't tune a threshold to the smallest value you have observed.** Closest
   approach to a port measured 988 in one session and 1620 in another; a
   threshold of 1200 fired in one and never in the other.
+
+---
+
+## Releasing
+
+```powershell
+.\build.ps1 -Package -Version 0.2.0
+```
+
+Produces `dist\PEMF-<version>.zip` with no wrapping folder, so a player extracts
+it straight into the game directory. Contents: both DLLs, `INSTALL.txt`, the
+events, `suspicion.ini`, `KeyMap_WASD.ini` and the player-facing docs.
+
+**Extract it into a clean folder and check it before linking anyone to it.** The
+packager has silently skipped a missing `INSTALL.txt` for most of this project's
+life; nobody noticed because nobody looked in the archive.
+
+### What a player gets versus what we get
+
+Marker files in `PEMF\`, none of which ship in the archive:
+
+| File | Turns on |
+|---|---|
+| *(none)* | Flag keys `Ctrl+Shift+8/9/0`. Always live — this is the mechanic. |
+| `dev.on` | Every probe: event firing, engine dumps, nations report, the reputation cheat, ship diffs. |
+| `shipyard.on` | Keys that **build ships**. Creates state that persists into a save and cannot be undone by pressing the key again. |
+
+Nothing is compiled out of a release build. A player who hits a bug can enable
+the whole toolkit with an empty file, which is what makes their report useful.
+
+### Signing
+
+The archive is **unsigned**, so Windows Smart App Control refuses to load it —
+`Bad Image ... 0xC0E90002`. See [`SIGNING.md`](SIGNING.md). Until that is
+resolved it belongs in the release notes and the FAQ, because it is the one
+failure a player cannot diagnose from the log.
