@@ -1714,4 +1714,76 @@ inline bool VerifyTarget(char* whyNot, size_t cch)
     return true;
 }
 
+// ------------------------------------------------- per-feature verification
+// VerifyTarget above is a GATE: fail it and PEMF loads nothing and touches no
+// memory. That is right for the handful of addresses everything depends on.
+//
+// The engine calls added since are different. If the ship factory has moved,
+// there is no reason suspicion, notices and flags should stop working -- the
+// honest response is to lose hunters and say so. So these are checked
+// individually and each caller refuses on its own.
+//
+// WHY THIS MATTERS MORE THAN IT LOOKS: the GOG executable is byte-identical to
+// the reference this project was mapped against, so a static check settles it.
+// The STEAM executable is DRM-packed -- `.text` unpacks from 1,176,576 bytes on
+// disk to 5,177,344 in memory -- so nothing about it can be verified from the
+// file at all. Runtime signature checks, after the unpacker has run, are the
+// ONLY way to know the addresses are right on that build.
+struct FeatureProbe {
+    uintptr_t   va;
+    const uint8_t* bytes;
+    size_t      n;
+    const char* what;
+    const char* feature;
+};
+
+inline const FeatureProbe* FeatureProbes(int* count)
+{
+    static const FeatureProbe probes[] = {
+        { 0x004F4ED0, (const uint8_t*)"\x51\xA0\xF8\xAC\x8C\x00\x53\x32", 8,
+          "AssetExists",       "flying flags by name" },
+        { 0x00500850, (const uint8_t*)"\x8B\x0D\xE0\xA4\x8C\x00\x83\xEC", 8,
+          "LoadTexture",       "flying flags by name" },
+        { 0x004AF760, (const uint8_t*)"\xA1\xB0\x8F\x8E\x00\x85\xC0\x56", 8,
+          "RefreshPlayerSkin", "flying flags by name" },
+        { 0x004AEC30, (const uint8_t*)"\x81\xEC\xFC\x00\x00\x00\x53\x55", 8,
+          "DrawWorldText",     "notices anchored to the ship" },
+        { 0x00430190, (const uint8_t*)"\xA1\xD8\xAC\x8C\x00\x81\xEC\xB4", 8,
+          "PresentDialog",     "event choice cards" },
+        { 0x004B00E0, (const uint8_t*)"\x81\xEC\x70\x01\x00\x00\x53\x55", 8,
+          "EnumerateCustom",   "finding custom flags" },
+        { SpawnShipFn,
+          (const uint8_t*)"\x83\xEC\x08\x56\xBE\x08\x00\x00", 8,
+          "SpawnShip",         "dispatching pirate-hunters" },
+        { SpawnShipRole4Fn,
+          (const uint8_t*)"\x83\xEC\x0C\x53\x55\x8B\xD8\xBD", 8,
+          "SpawnShipRole4",    "shipyard experiments" },
+        { SpawnShipRole3Fn,
+          (const uint8_t*)"\x51\x56\xBE\x08\x00\x00\x00\x89", 8,
+          "SpawnShipRole3",    "shipyard experiments" },
+    };
+    if (count) *count = (int)(sizeof(probes) / sizeof(probes[0]));
+    return probes;
+}
+
+// Logged once at startup. A player whose build has drifted gets a plain list of
+// what will and will not work, rather than a crash or a silent absence.
+inline int ReportFeatureProbes()
+{
+    int n = 0, bad = 0;
+    const FeatureProbe* p = FeatureProbes(&n);
+    for (int i = 0; i < n; ++i) {
+        const bool ok = !IsBadReadPtr((void*)p[i].va, p[i].n) &&
+                        memcmp((void*)p[i].va, p[i].bytes, p[i].n) == 0;
+        if (!ok) {
+            ++bad;
+            Log("  engine: %-18s 0x%08X MISMATCH -- %s will be unavailable",
+                p[i].what, (unsigned)p[i].va, p[i].feature);
+        }
+    }
+    if (bad == 0) Log("  engine: all %d engine entry points verified", n);
+    else          Log("  engine: %d of %d entry points did not match", bad, n);
+    return bad;
+}
+
 } // namespace game

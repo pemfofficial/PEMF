@@ -1,103 +1,97 @@
 PEMF - Pirates! Expanded Modding Framework
-==========================================
-
-INSTALL
--------
-
-1. Copy everything in this archive into your Sid Meier's Pirates! (2004) folder,
-   next to Pirates!.exe.  Typically:
-
-       C:\GOG Games\Sid Meier's Pirates\
-
-   You should end up with:
-
-       Pirates!.exe          (already there)
-       version.dll           <- new
-       pemf_core.dll         <- new
-       PEMF\                 <- new
-           events\
-               core_events.json
-           docs\
-
-2. Start the game normally.  That is the whole install.
-
-Nothing is patched and no game file is modified.  Your saves are untouched.
+False Flag release
 
 
-REQUIREMENTS
+INSTALLING
+----------
+
+1. Find your game folder - the one containing Pirates!.exe.
+
+       GOG     C:\GOG Games\Sid Meier's Pirates\
+       Steam   C:\Program Files (x86)\Steam\steamapps\common\Sid Meier's Pirates!\
+
+   In Steam you can get there with:
+       right-click the game -> Manage -> Browse local files
+
+2. Copy everything from this archive into that folder.
+
+   You should end up with version.dll and pemf_core.dll sitting beside
+   Pirates!.exe, and a new PEMF folder next to them.
+
+3. Launch the game as you normally would.
+
+That is all. The game executable is never modified.
+
+
+CHECKING IT WORKED
+------------------
+
+A file called pemf.log appears in the game folder the first time you run it.
+Open it - the first few lines say which build was detected and whether every
+engine entry point verified. If something is wrong it says so in plain English.
+
+
+UNINSTALLING
 ------------
 
-* Sid Meier's Pirates! (2004), GOG edition
-* The STOCK Pirates!.exe
+Delete version.dll, pemf_core.dll and the PEMF folder. Nothing else was
+touched.
 
-If you have used mods that patch Pirates!.exe - the Challenge Pack in particular
-- restore the original executable first.  PEMF checks on startup and will
-disable itself rather than risk your game if it does not recognise the build.
+If you want your original key bindings back, PEMF saved them:
 
+    My Documents\My Games\Sid Meier's Pirates!\KeyMap.ini.pemf-backup
 
-DID IT WORK?
-------------
-
-PEMF writes pemf.log next to Pirates!.exe.  A healthy start looks like:
-
-    === PEMF loaded ===
-    target verified: offsets match the expected build
-    content: 3 event(s) from 1 file(s)
-    safe point reached (main loop PeekMessageA) -- deferred dispatch live
-
-Events fire on their own while you sail.  To see one on demand, load a game,
-get sailing, then:
-
-    Ctrl+Shift+1    fire the first event
-    Ctrl+Shift+2    fire the second
-
-These hotkeys are for authors testing their own events; they are not needed to
-play.
+Rename that over KeyMap.ini.
 
 
-UNINSTALL
----------
+WHAT CHANGES IMMEDIATELY
+------------------------
 
-Delete version.dll, pemf_core.dll and the PEMF folder.  The game is back to
-stock immediately.
+WASD steering, in every part of the game - sailing, ship battles, land
+battles, duels, sneaking. Two keys had to move to make room:
 
-PEMF keeps its own state in a small file beside each save (<name>.pemf).  Those
-are harmless to leave, and safe to delete.
+    Attack ship   was 'a'   now Space
+    Quick save    was 'S'   now F5      (quick load is now F9)
 
-
-WRITING YOUR OWN EVENTS
------------------------
-
-Drop a .json file into PEMF\events\.  Every file in that folder is loaded, so
-add-ons live side by side and a broken one is skipped rather than breaking the
-rest.
-
-There are two kinds of event:
-
-    "kind": "choice"   a card that stops you and asks something.  Options,
-                       consequences, an outcome.  This is the default.
-
-    "kind": "notice"   a line of text while sailing that never interrupts -
-                       a lookout's call, a passing observation.  It fades on
-                       its own.
-
-Events fire while you are sailing the overworld, either after a stretch of
-sailing or on approaching a port.
-
-See PEMF\docs\EVENT_AUTHORING.md for the full format.
+PEMF writes this once, keeps a backup, and never touches the file again - so
+anything you rebind afterwards stays rebound.
 
 
-TROUBLESHOOTING
----------------
+PLAYING FALSE FLAG
+------------------
 
-No pemf.log at all
-    version.dll is not next to Pirates!.exe.
+    Ctrl+Shift+8    run up a different flag
+    Ctrl+Shift+9    run your own colours back up
+    Ctrl+Shift+0    write a report to pemf.log
 
-"TARGET MISMATCH" in the log
-    Your Pirates!.exe is not the stock GOG build.  Restore the original.
+Fly another nation's flag and a meter appears in the top right. It fills while
+their ships and ports can see you, and empties in open water. Fill it and they
+see through you - your reputation with them drops, your colours are struck, and
+they send pirate-hunters after you.
 
-"no event files found"
-    The PEMF\events folder did not come across.  Check the layout above.
+Sail away and the trail goes cold. The further you get, the faster it cools.
 
-An event of yours did not appear
-    Look for "REJECTED" in pemf.log - it names the event and the exact problem.
+Tuning lives in PEMF\suspicion.ini. It is commented, and a reinstall will not
+overwrite one you have edited.
+
+
+REPORTING A PROBLEM
+-------------------
+
+Send pemf.log along with a sentence about what you were doing. The log is
+where everything useful is.
+
+
+BOTH STORE VERSIONS ARE SUPPORTED
+---------------------------------
+
+GOG and Steam both work. The Steam executable is compressed on disk, so PEMF
+waits for it to unpack before touching anything and verifies every address it
+uses at runtime.
+
+The Challenge Pack executable is a DIFFERENT build of the game and is not
+supported. PEMF detects it and disables itself rather than risk your save.
+
+
+PEMF is free to use and redistribute.
+Not affiliated with Firaxis, 2K or Atari.

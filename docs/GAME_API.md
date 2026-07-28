@@ -1675,3 +1675,41 @@ layout back.
 **Worth remembering generally:** before reverse engineering a behaviour, check
 whether the game already exposes it. This one was a shortcut sitting in the
 install folder the whole time.
+
+---
+
+## Store builds: GOG and Steam are not the same file
+
+Verified 2026-07-28 against both live installs.
+
+| Build | Size | Notes |
+|---|---|---|
+| **GOG** | 3,323,288 | **Byte-identical** to the reference this project was mapped against (`sha256 6e88b90e…`). Every address can be checked statically. |
+| **Steam** | 1,189,888 | **DRM-packed.** `.text` has a virtual size of 5,177,344 against 1,176,576 on disk. |
+| Challenge Pack | 3,334,144 | A **different build**. Not supported; contains a code cave the others lack. |
+
+### ⛔ You cannot verify the Steam build from its file
+
+The on-disk bytes at any address are compressed. Reading `Pirates!.exe` at
+`0x00414FC0` and comparing against the reference is meaningless — it will differ,
+and that says nothing about whether the address is correct at runtime.
+
+**This produced a false alarm.** A parity script compared the GOG exe against the
+staged *Challenge Pack* exe and reported fifteen mismatches, which read as "Steam
+is broken" — while the Steam build was in fact running every feature correctly in
+a playtest at that moment. Two errors at once: the wrong file, and a method that
+could not work on the right one.
+
+### How PEMF actually verifies it
+
+At runtime, after the unpacker has run:
+
+* `VerifyTarget()` gates loading entirely on a handful of load-bearing addresses
+* `ReportFeatureProbes()` signature-checks **every engine function PEMF calls**
+  and logs a per-feature verdict, so a drifted build loses one feature with an
+  explanation rather than crashing
+* hooks are installed **by absolute slot address** rather than by name, and
+  retried, because a packed import table is not populated at load
+
+**The rule:** for a packed target, static analysis maps the code and only runtime
+checks confirm it. Never report parity from a file comparison alone.

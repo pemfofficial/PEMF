@@ -501,9 +501,22 @@ typedef BOOL  (WINAPI *PeekMessageA_t)(LPMSG, HWND, UINT, UINT, UINT);
 static void ProbeItemNames(int first, int last);
 extern bool g_fileProbe;
 
-// The false-colours probe writes game state, so it is armed by a marker file
-// rather than being a key anyone can hit. See the hotkey handler.
-bool g_falseColours = false;
+// False colours is no longer a probe -- it is the mechanic, and the key that
+// changes your flag is how a player uses it. Live for everyone.
+//
+// It began behind a marker because writing the flag was an open question. That
+// question is answered, so the gate is gone. The gate that remains is for tools
+// that are genuinely developer-only.
+bool g_falseColours = true;
+
+// PEMF\dev.on. Everything behind this is instrumentation: probes that dump
+// engine memory, keys that fabricate ships out of nothing, and a reputation
+// cheat. All useful, none of it something a player should hit by accident
+// while reaching for Ctrl+Shift+8.
+//
+// Nothing is deleted for a release build -- it is switched off. A player who
+// wants to look under the hood drops the file in.
+bool g_devTools = false;
 
 // --------------------------------------------- which colours are we wearing
 // Suspicion needs to know whose flag we are flying, and the flag layer works in
@@ -1159,7 +1172,7 @@ static void RunShipyardExperiment(ShipyardKind which)
             return;
         }
         if (slot < 8 || slot >= game::addr::kMaxShips) {
-            Log("shipyard: ⚠ returned slot %d is OUTSIDE the pool the allocator "
+            Log("shipyard: WARNING returned slot %d is OUTSIDE the pool the allocator "
                 "should use (8..%d). Treating the reading as wrong rather than "
                 "the game.", slot, game::addr::kMaxShips - 1);
             return;
@@ -1696,6 +1709,25 @@ static DWORD WINAPI Hook_timeGetTime(void)
     g_prevKeyDown = down;
     if (!rising) return r;
 
+    // Everything from here to the false-colours block is INSTRUMENTATION, and
+    // it stays off unless PEMF\dev.on is present. The keys that play the
+    // mechanic -- Ctrl+Shift+8/9/0 -- are past it and always live.
+    //
+    // Nothing is compiled out. A release build has the whole toolkit in it,
+    // one file away, which is what makes a player's bug report useful.
+    const bool devKey = k1 || k2 || k3 || k4 || k5 || k6 || k7 || kN ||
+                        kH || kJ || kK || kL || kO || kU || kP || kY;
+    if (devKey && !g_devTools) {
+        static bool told = false;
+        if (!told) {
+            told = true;
+            Log("dev tools: that key is a developer probe -- drop an empty file "
+                "named PEMF\\dev.on next to the exe to enable them. The flag "
+                "keys (Ctrl+Shift+8/9/0) do not need it.");
+        }
+        return r;
+    }
+
     // Ctrl+Shift+3 draws our own text with no authored event behind it -- the
     // shortest possible test of the frame hook. Posting is all that happens
     // here; the notice is drawn from inside the frame.
@@ -1791,21 +1823,13 @@ static DWORD WINAPI Hook_timeGetTime(void)
     }
 
     // ------------------------------------------------------ false colours
-    // Ctrl+Shift+8 cycles the colours the player's vessel is seen to be flying,
-    // Ctrl+Shift+9 puts the true ones back, Ctrl+Shift+0 just reports without
-    // touching anything.
+    // THE PLAYER-FACING KEYS. Ctrl+Shift+8 runs up the next flag, 9 runs your
+    // own colours back up, 0 writes a report to the log.
     //
-    // This is the ONE probe in this build that writes game state, which is why
-    // it is armed by a marker file rather than being live for anyone who
-    // presses a key. It exists to answer, in game, what static analysis cannot:
-    // does writing this field change the flag DRAWN on the ship, change how the
-    // AI TREATS you, both, or neither?
+    // These were behind a marker file while writing the flag was still an open
+    // question. It is not any more -- this is how the mechanic is played, so it
+    // is live for everyone.
     if (k8 || k9 || k0) {
-        if (!g_falseColours) {
-            Log("falsecolours: not armed -- drop PEMF\\falsecolours.on next to "
-                "the exe to enable (it writes game state, so it is opt-in)");
-            return r;
-        }
         if (k0) {
             ReportColours("asked");
             content::PostDebugNotice("Colours reported to pemf.log.", 5);
@@ -2074,23 +2098,28 @@ static DWORD WINAPI Init(LPVOID)
     suspicion::LoadTuning(dir);
     InstallWasdKeymap(dir);
 
-    // False colours writes game state, so it is opt-in the same way.
+    Log("false colours: Ctrl+Shift+8 changes your flag, 9 runs your own back "
+        "up, 0 writes a report to this log");
+
+    // PEMF\dev.on -- instrumentation, off unless asked for.
     {
         char marker[MAX_PATH];
-        _snprintf_s(marker, sizeof(marker), _TRUNCATE,
-                    "%s\\PEMF\\falsecolours.on", dir);
+        _snprintf_s(marker, sizeof(marker), _TRUNCATE, "%s\\PEMF\\dev.on", dir);
         if (GetFileAttributesA(marker) != INVALID_FILE_ATTRIBUTES) {
-            g_falseColours = true;
-            Log("falsecolours: ARMED (found %s) -- pick flags in Options to "
-                "capture them, then Ctrl+Shift+8 flies the next captured one, "
-                "9 restores the first, 0 reports", marker);
+            g_devTools = true;
+            Log("dev tools: ARMED (found %s)", marker);
+            Log("dev tools:   Ctrl+Shift+1..7  event and engine probes");
+            Log("dev tools:   Ctrl+Shift+N     nations, relations and standing");
+            Log("dev tools:   Ctrl+Shift+U     cycle reputation with the "
+                "nearest port's crown");
+            Log("dev tools:   Ctrl+Shift+P     diff our last built ship "
+                "against one the game made");
         }
     }
 
-    // The shipyard gets its OWN marker, deliberately not shared with false
-    // colours. Everything else behind a marker can be undone by pressing the
-    // key again; this one creates a ship that persists into the save. A
-    // different risk deserves a different opt-in.
+    // The shipyard keeps its OWN marker even so. Every other tool can be undone
+    // by pressing the key again; this one creates a ship that persists into the
+    // save. A different risk deserves a separate opt-in.
     {
         char marker[MAX_PATH];
         _snprintf_s(marker, sizeof(marker), _TRUNCATE,
@@ -2135,6 +2164,12 @@ static DWORD WINAPI Init(LPVOID)
     } else {
         if (waited) Log("target verified after %d ms (host unpacked)", waited * 100);
         else        Log("target verified: offsets match the expected build");
+
+        // ...and every engine entry point we CALL, individually. The GOG exe is
+        // byte-identical to the reference so this is a formality there; the
+        // Steam exe is DRM-packed and cannot be checked from the file at all,
+        // so this is the only verification that build ever gets.
+        game::ReportFeatureProbes();
 
         // Install the hooks. On the packed build a slot may be filled slightly
         // after .text unpacks, so retry until all four take (or time out). Each

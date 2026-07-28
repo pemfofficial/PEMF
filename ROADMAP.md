@@ -204,7 +204,8 @@ Findings in [`re/experiments/flags/`](re/experiments/flags/README.md).
   [`re/experiments/career_state/`](re/experiments/career_state/README.md).
 - 📐 **Your captain's own colours** — a flag chosen per captain at career start,
   rather than inherited from the one global setting every captain shares.
-- 📐 **Suspicion** — the system that gives a false flag stakes: rising with
+- ✅ **Suspicion** — BUILT and playing. Rises on being observed, falls in open water, per-nation with a memory of where it was earned. Being unmasked drops reputation, strikes your colours and dispatches hunters whose strength and number scale with how badly that crown wants you. Tunable in `PEMF\suspicion.ini`. See [`docs/SUSPICION.md`](docs/SUSPICION.md).
+- 📐 *(original design note)* the system that gives a false flag stakes: rising with
   proximity to warships and ports, with time spent under false colours, and with
   infamy; falling with distance and time. Thresholds drive hails, challenges and
   being unmasked. Without it a disguise is a cheat rather than a gamble.

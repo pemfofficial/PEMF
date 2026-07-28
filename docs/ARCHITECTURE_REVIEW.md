@@ -628,6 +628,9 @@ of bug that is expensive to diagnose.
 | **A per-frame rate needs somewhere for the remainder to live.** | `rate * 16 / 1000` is zero in integer arithmetic. Suspicion could not rise at all, while reporting a correct rate. |
 | **Any draw dirties `0x00869B48`, not just a composed one.** | The engine's HUD call uses it as scratch. Clear after drawing anything, or the sailing render paints it across the sea next frame. |
 | **Announcing a state change is not making it.** | Unmasking said "colours struck" without striking them, so the meter reset and climbed forever. |
+| **A packed target can only be verified at runtime.** | The Steam exe's .text unpacks 1,176,576 -> 5,177,344 bytes. Comparing its file bytes proves nothing; a script that did reported fifteen false mismatches while the build was running correctly. |
+| **Verify the file you are actually shipping against.** | The false alarm compared GOG against the Challenge Pack exe, which is neither store build. |
+| **A feature whose engine call has drifted should fail alone.** | `VerifyTarget` gates loading on the load-bearing few; every other call is signature-checked per feature so a mismatch costs one feature and logs why. |
 | **Identity comes from the engine, not from a name we chose.** | A career's flag is a personal device; comparing flag names made an English captain an impostor to England. |
 | **Career presence comes from the screen state, never from `crew > 0`.** | The crew count does not reset at the main menu, so that test is true forever after the first career and stops seeing transitions entirely. |
 | **A save file being read is not a load.** | Starting a new career reads one too, and the load screen reads every save to list them. Only a fingerprint match against the live career proves it. |

@@ -18,26 +18,44 @@ those opinions into events with real consequences.
 
 | | |
 |---|---|
-| Game | **Sid Meier's Pirates! (2004)**, GOG edition |
+| Game | **Sid Meier's Pirates! (2004)** — **GOG and Steam both work** |
 | Executable | The **stock** `Pirates!.exe` — see the warning below |
 | OS | Windows |
 
+### Both store versions are supported
+
+The **GOG** executable is the one PEMF was mapped against.
+
+The **Steam** executable is DRM-packed — its code is compressed on disk and only
+becomes real once the game has started unpacking itself. PEMF handles this: it
+waits for the unpack, hooks by absolute address rather than by name, and
+signature-checks every engine function it calls at runtime. If anything does not
+match, it says so in the log and disables the affected feature instead of
+guessing.
+
 ### Important: stock executable only
 
-This mod will refuse to run against a modified `Pirates!.exe`. In particular the
-**Challenge Pack** base executable is a completely different build of the game,
-and every internal address the mod relies on differs.
+PEMF refuses to run against a modified `Pirates!.exe`. In particular the
+**Challenge Pack** base executable is a completely different build, and every
+internal address differs.
 
-If you have used other exe-patching mods, restore the original before installing.
-GOG installs keep a copy, and the mod checks on startup — if it does not match,
-it disables itself rather than risk corrupting your game.
+If you have used other exe-patching mods, restore the original first. The mod
+checks on startup — if it does not match, it disables itself rather than risk
+corrupting your game.
 
 ---
 
 ## Installing
 
-Extract the archive into your game folder, next to `Pirates!.exe` — typically
-`C:\GOG Games\Sid Meier's Pirates\`. You should end up with:
+Extract the archive into your game folder, next to `Pirates!.exe`:
+
+| Store | Typical path |
+|---|---|
+| GOG | `C:\GOG Games\Sid Meier's Pirates\` |
+| Steam | `C:\Program Files (x86)\Steam\steamapps\common\Sid Meier's Pirates!\` |
+
+In Steam, **right-click the game → Manage → Browse local files** gets you there.
+You should end up with:
 
 ```
 Pirates!.exe          (already there)
@@ -71,6 +89,68 @@ content: 3 event(s) from 1 file(s)
 game thread latched: 15180
 safe point reached (main loop PeekMessageA) -- deferred dispatch live
 ```
+
+---
+
+## Playing False Flag
+
+The first complete new mechanic in PEMF. Fly another nation's colours, and find
+out what it costs when they stop believing you.
+
+### The keys
+
+| Key | Does |
+|---|---|
+| **Ctrl+Shift+8** | Run up the next flag |
+| **Ctrl+Shift+9** | Run your own colours back up |
+| **Ctrl+Shift+0** | Write a report to `pemf.log` |
+
+Every `flag_*.dds` in your `custom\` folder is available, including any you have
+added yourself. The game has always supported adding flags — PEMF just lets you
+change them at sea instead of in a menu.
+
+### How it works
+
+Raise a nation's flag that is not your own and a meter appears in the top right:
+
+```
+                                        Spanish colours
+                                        ======......  <
+```
+
+It fills while their ships and ports can **see** you, and empties in open water.
+The `<` means someone is watching right now.
+
+**Getting close is the point, and getting close is the risk.** A disguise is
+worth wearing because it lets you be somewhere you should not be — and being
+there is exactly what gives you away.
+
+Along the way they will signal for your colours, then study your rigging, then
+come about. If the meter fills:
+
+- your **reputation with that nation drops** — real, and the game's own number
+- their **ports close** to you, and above a certain point there is a price on
+  your head and an amnesty to buy back
+- your **colours are struck** — the ruse is over
+- **pirate-hunters sail** from their nearest port
+
+### Getting away
+
+Distance and time. The further you get from where it happened, the faster it
+cools — the people over there have not heard yet.
+
+Hunters break off if you get clear enough, or after long enough. **How many come
+and how strong they are depends on how much that nation already hates you**, so a
+first offence is one ship and a long history is a squadron.
+
+### Tuning it
+
+Everything is in **`PEMF\suspicion.ini`** — how fast suspicion rises and falls,
+the distances, the thresholds, what being caught costs, and how doggedly hunters
+pursue. The file is commented, and reinstalling PEMF will not overwrite one you
+have edited.
+
+If it feels too fast, the three `rise*` values are the ones to lower.
 
 ---
 
@@ -119,20 +199,45 @@ The mod keeps its own state — which events have fired, and in time your office
 you get that save's state back, exactly as you left it. Nothing carries across
 into a career it does not belong to.
 
-### Testing hotkeys
+### WASD steering
 
-Events fire on their own during play. These are for **authors**, so you can see
-your own event without waiting for its conditions to come round.
+Installed automatically the first time you run the game. Sailing, ship battles,
+land battles, duels, sneaking — all of it.
+
+Two keys had to move to free up the letters:
+
+| | Was | Now |
+|---|---|---|
+| Attack ship | `a` | **Space** |
+| Quick save | `S` | **F5** (quick load is **F9**) |
+
+Your original bindings are kept as `KeyMap.ini.pemf-backup` in
+`My Documents\My Games\Sid Meier's Pirates!\`. PEMF writes the layout **once**
+and never touches the file again, so anything you rebind afterwards stays put.
+
+### Developer tools
+
+Everything above is live for everyone. The probes PEMF uses to read engine
+memory are not — they are off unless you ask for them, so nobody hits one by
+accident reaching for the flag keys.
+
+To turn them on, put an **empty file named `dev.on`** in your `PEMF\` folder.
+Then:
 
 | Keys | What it does |
 |---|---|
-| **Ctrl+Shift+1** | Fires the first loaded event |
-| **Ctrl+Shift+2** | Fires the second |
-| **Ctrl+Shift+3** | A test notice at the top of the screen |
-| **Ctrl+Shift+4** | A test notice over your ship |
+| **Ctrl+Shift+1 / 2** | Fire the first or second loaded event |
+| **Ctrl+Shift+3 / 4** | A test notice, at the top of the screen or over your ship |
+| **Ctrl+Shift+N** | Report nation relations and your standing with each crown |
+| **Ctrl+Shift+U** | Cycle your reputation with the nearest port's nation |
+| **Ctrl+Shift+P** | Compare a ship PEMF built against one the game made |
 
-You must be **in an actual game** (sailing, not at the main menu) — events read
-your live crew state.
+A second file, `shipyard.on`, enables keys that **build ships out of nothing**.
+Those create state that persists into your save and cannot be undone by pressing
+the key again — use a career you do not mind losing.
+
+You must be **in an actual game** (sailing, not at the main menu) — these read
+live state.
 
 ---
 
