@@ -174,6 +174,42 @@ Investigated 2026-07-26; findings in [`docs/GAME_API.md`](docs/GAME_API.md).
   proving the text result — but a real lever for anyone changing how the world
   looks.
 
+## Flags & false colours
+
+Findings in [`re/experiments/flags/`](re/experiments/flags/README.md).
+
+- ✅ **Adding flags and sail emblems needs no mod** — and this is worth stating
+  plainly, because the opposite is widely believed. The game enumerates
+  `custom\flag_*.dds` and `custom\ship_sail_emblem_lrg_*.dds` with a directory
+  scan into a growable array; the Options picker is a carousel that wraps around
+  however many it found, and the choice is stored **by name** in `Config.ini`.
+  Drop eleven flags in and you get eleven. Measured. What *does* require
+  replacing files is the five **nation** flags — a different system, and where
+  the belief comes from.
+- ✅ **The player's flag is a single texture pointer** (`0x008E8FB4`), which the
+  engine re-applies on its own. Changing it changes the flag on the mast,
+  verified in game. That is the whole presentation half of false colours.
+- ✅ **The flag and the game's notion of nationality are unrelated** — measured
+  twice, including on a career started under a different nation. The engine has
+  no concept of flying false colours, which means the mechanic is **entirely
+  PEMF's to define** rather than something to keep in step with engine
+  behaviour. Better news than it sounds.
+- 📐 **Naming a flag** — today a flag can be flown but not *identified*. A real
+  feature needs `flag_spa.dds` by name, which means driving the engine's texture
+  loader or capturing names as the picker resolves them. Next piece of work.
+- 📐 **Per-career colours** — `Config.ini` is global; a disguise belongs to a
+  save. The sidecar already exists for exactly this.
+- 📐 **Suspicion** — the system that gives a false flag stakes: rising with
+  proximity to warships and ports, with time spent under false colours, and with
+  infamy; falling with distance and time. Thresholds drive hails, challenges and
+  being unmasked. Without it a disguise is a cheat rather than a gamble.
+- 💡 **Custom nation art at runtime** — retexture the five nation flag nodes in
+  memory instead of replacing files. Additive, reversible, and immune to the
+  "pink flags" trap that catches people who install a partial flag pack.
+- 💡 **Lowering and raising the flag** when colours change. Flags attach via
+  `bone_flag_*_pivot` and are ordinary named scene nodes, so driving the node
+  transform from the frame hook is the plausible route. Unproven.
+
 ## Crew & morale
 
 - ✅ **Morale model understood** — the game's own crew-happiness math is mapped

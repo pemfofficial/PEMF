@@ -152,6 +152,74 @@ namespace addr {
     constexpr uintptr_t PlayerX = 0x00814304;
     constexpr uintptr_t PlayerY = 0x00814308;
 
+    // ...and those two turn out to be FIELDS of a record. The overworld ship
+    // array is based at 0x008142F8 with a stride of 0x45C, and the player is
+    // entry 0 -- PlayerX and PlayerY land exactly on +0x0C and +0x10 of it,
+    // which is how the array was found at all.
+    //
+    // Recovered from the "She's flying @NATIONALITY colors." site (0x0046BA80),
+    // which reads +0x04 of the ship being looked at:
+    //     FUN_004f6090("She's flying @NATIONALITY colors.",
+    //                  *(short*)(0x008142FC + idx * 0x45C))
+    //
+    // So +0x04 is the nationality a vessel is SEEN to be -- the colours she
+    // flies. The player has one like everybody else; the game simply never
+    // offers a way to change it. That is the lever false colours would use.
+    // 84 code sites read it, so it is load-bearing rather than decorative.
+    //
+    // NOT YET ESTABLISHED (this is what the probe is for): whether writing the
+    // player's field changes the flag drawn on the ship, changes how the AI
+    // treats you, both, or neither.
+    constexpr uintptr_t ShipArray       = 0x008142F8;
+    constexpr int       kShipStride     = 0x45C;
+    constexpr uintptr_t ShipNationality = 0x008142FC;   // int16, +0x04
+    constexpr uintptr_t ShipFlags       = 0x00814350;   // dword, +0x58
+
+    // Nation indices, fixed by the flag-mesh table that FUN_0046baa0 builds:
+    //   prototypes 0x00860B40 + nation*4   (Flag_Sp/En/Fr/Du/Pi .nif)
+    //   live nodes 0x00860B54 + nation*4   (clones via FUN_004bb500)
+    // Five slots, hardcoded -- the same shape as the cargo array. Custom nation
+    // ART is possible (retexture the node); a SIXTH NATION is not.
+    constexpr uintptr_t FlagMeshProto = 0x00860B40;
+    constexpr uintptr_t FlagMeshLive  = 0x00860B54;
+    constexpr int       kNationCount  = 5;
+    enum Nation { kSpanish = 0, kEnglish = 1, kFrench = 2, kDutch = 3, kPirate = 4 };
+
+    // ------------------------------------------------- the PLAYER's flag
+    // The nation table above dresses AI vessels. The player's own flag is a
+    // TEXTURE, held here and re-applied by FUN_004AF760 to every scene node
+    // named "flag*":
+    //
+    //     if (PlayerFlagTex != 0) {
+    //         node = FindNode("flag*");
+    //         if (node->texture != PlayerFlagTex) ApplyTexture(PlayerFlagTex);
+    //     }
+    //
+    // So the player's flag is driven by a single pointer, re-asserted every
+    // time round -- which is exactly the shape a false-colours feature wants.
+    // Written by the Options picker (0x4B888E / 0x4B88B5 / 0x4B89CF) and by
+    // config load (0x4293FB), i.e. the "Change Sails and Flags" screen and the
+    // CustomFlag line in Config.ini.
+    //
+    // MEASURED THE HARD WAY (2026-07-28): the ship-record nationality field is
+    // NOT the player's flag. Cycling it changed nothing on screen, and it reads
+    // 0 on a career started under the English flag -- so it does not even track
+    // the nation you sail for. Kept above as a real find about AI vessels; it
+    // is simply not this.
+    constexpr uintptr_t PlayerColorTex   = 0x008E8FB0;  // ship_playercolor*
+    constexpr uintptr_t PlayerFlagTex    = 0x008E8FB4;  // flag*
+    constexpr uintptr_t PlayerSailLrgTex = 0x008E8FB8;  // ship_sail_emblem_lrg*
+    constexpr uintptr_t PlayerSailSmlTex = 0x008E8FBC;  // ship_sail_emblem_sml*
+
+    // Re-applies the four textures above to the matching scene nodes. Cheap,
+    // and a no-op when nothing has changed -- it compares before applying.
+    constexpr uintptr_t RefreshPlayerSkin = 0x004AF760;
+
+    // How many custom flags / sails the startup scan found. See
+    // re/experiments/screen_state for how that enumeration works.
+    constexpr uintptr_t CustomFlagCount = 0x008C9560;
+    constexpr uintptr_t CustomSailCount = 0x008C9564;
+
     // The game's own nearest-city search, FUN_0045FD40.
     //   int FindNearestCity(int x, int y, uint typeMask, int maxDist, uint exclude)
     // Walks the city tables, uses an octagonal distance approximation, and
@@ -596,6 +664,57 @@ inline int ShowEventCard(const char* body, const char* const* options = nullptr,
 // ------------------------------------------------------------ world queries
 inline int PlayerX() { return *(const int*)addr::PlayerX; }
 inline int PlayerY() { return *(const int*)addr::PlayerY; }
+
+// ------------------------------------------------------- overworld vessels
+// Raw record access. The player is index 0; see the note on ShipArray.
+inline uintptr_t ShipRecord(int index)
+{
+    return addr::ShipArray + (uintptr_t)index * addr::kShipStride;
+}
+
+// The nationality a vessel is SEEN to be -- what "She's flying @NATIONALITY
+// colors." reports. Read as int16, which is how the engine reads it.
+inline int ShipNationality(int index)
+{
+    return *(const short*)(addr::ShipNationality + (uintptr_t)index * addr::kShipStride);
+}
+
+// Deliberately raw and deliberately NOT called from content: writing this is
+// the whole open question, so it goes through state.h where it can be
+// validated, logged and reverted. Nothing else should call it.
+inline void SetShipNationalityRaw(int index, int nation)
+{
+    *(short*)(addr::ShipNationality + (uintptr_t)index * addr::kShipStride) = (short)nation;
+}
+
+// ------------------------------------------------------ the player's flag
+// The texture currently flown. A pointer to a Gamebryo texture object, or null
+// before one has been chosen.
+inline void* PlayerFlagTexture() { return *(void**)addr::PlayerFlagTex; }
+
+// Fly a texture the game has already loaded. Deliberately takes a pointer we
+// captured from the game itself rather than a name: obtaining a texture by name
+// means driving the engine's loader and its refcounting, and this answers
+// whether the pointer drives the flag at all before any of that is worth doing.
+//
+// The game re-asserts the texture on its own (RefreshPlayerSkin compares before
+// applying), so writing this is enough -- there is nothing to call afterwards.
+inline void SetPlayerFlagTexture(void* tex) { *(void**)addr::PlayerFlagTex = tex; }
+
+inline int CustomFlagCount() { return *(const int*)addr::CustomFlagCount; }
+inline int CustomSailCount() { return *(const int*)addr::CustomSailCount; }
+
+inline const char* NationName(int n)
+{
+    switch (n) {
+        case addr::kSpanish: return "Spanish";
+        case addr::kEnglish: return "English";
+        case addr::kFrench:  return "French";
+        case addr::kDutch:   return "Dutch";
+        case addr::kPirate:  return "Pirate";
+        default:             return "?";
+    }
+}
 
 // The game's own nearest-city search. Plain cdecl, five int args.
 // typeMask 0xFFFFFFFF = any city type; exclude 0x80000000 matches the game's

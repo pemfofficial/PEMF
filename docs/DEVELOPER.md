@@ -99,6 +99,13 @@ boundary comes from the safe point, **not** `Present` — this game never calls
 - **Never** hand the engine a token argument count, or an `@ITEM` index, that has
   not been read out of the disassembly. It does not bounds check; `@ITEM` past
   the end of its list access-violates.
+- **Never** keep a pointer to an engine object past the call that produced it
+  without **taking a reference**. Gamebryo objects are refcounted — the count is
+  the dword at `+4`, and dropping to zero calls `vtable[0](1)`, the destructor.
+  Capturing flag textures as the player browsed the picker crashed the game
+  instantly, because the picker releases each one as it scrolls away. Take the
+  reference (`obj[1] += 1`), and check the object still reads back sanely before
+  handing it to the engine.
 - **Never** infer "the overworld is on screen" from ship movement. Menus freeze
   the ship, so motion cannot tell a menu from a becalmed ship at sea — that
   mistake put a lookout's call across the Load/Save screen. Drawing is gated on

@@ -292,6 +292,10 @@ static void RunContentEvent(int index)
     content::Fire(index);
 }
 
+// Defined with the false-colours probe below; called from the safe point.
+static void WatchTheWater();
+static void CaptureFlagTexture();
+
 // ------------------------------------------------------- the safe point
 // Everything that touches the game or presents UI happens here, and nowhere
 // else. Called from the top of the main loop.
@@ -306,7 +310,13 @@ static void RunSafePoint()
     // A career starting, ending, or being loaded invalidates all trigger
     // progress -- accumulated sailing time and armed/disarmed state belong to
     // the career they were earned in.
-    if (session::Tick()) triggers::Reset("career context changed");
+    if (session::Tick()) {
+        triggers::Reset("career context changed");
+        // A disguise belongs to the career it was put on in. The new career's
+        // own value is whatever the game loaded, so all we must do is stop
+        // believing we have something of theirs to give back.
+        state::ForgetNationalityOverride();
+    }
 
     triggers::Tick();       // may Post(); never presents anything
 
@@ -325,6 +335,14 @@ static void RunSafePoint()
     // A notice should not spend its life expiring behind a menu, so its clock
     // only runs while the overworld is actually on screen.
     content::HoldNoticeClock(content::g_worldLive);
+
+    // Measures whether vessels are steering at us, so the false-colours
+    // experiment is answered by numbers rather than by an impression.
+    WatchTheWater();
+
+    // Picks up any flag texture the player selects in Options, so the pointers
+    // are ours to swap without reversing the engine's texture loader.
+    CaptureFlagTexture();
 
     // The game's Direct3D device only exists once the game has created it, and
     // the engine has been seen rebuilding its vtable mid-session -- so the hook
@@ -413,6 +431,243 @@ typedef BOOL  (WINAPI *PeekMessageA_t)(LPMSG, HWND, UINT, UINT, UINT);
 static void ProbeItemNames(int first, int last);
 extern bool g_fileProbe;
 
+// The false-colours probe writes game state, so it is armed by a marker file
+// rather than being a key anyone can hit. See the hotkey handler.
+bool g_falseColours = false;
+
+// ------------------------------------------------------ watching the water
+// "Did they attack me?" is not a measurement. Whether a vessel is CLOSING on
+// the player or drifting away is, so the probe tracks each one's distance over
+// time and reports the trend. That way the question the experiment actually
+// asks -- does changing our colours change how the AI behaves toward us -- is
+// answered by numbers in the log rather than by an impression of the sea.
+//
+// Distance uses the engine's own octagonal approximation (game::CityDistance
+// reproduces it for cities) so our figures agree with the game's.
+// FIRST ATTEMPT WAS WRONG, and the way it was wrong is worth keeping: it
+// measured the DISTANCE between us and each vessel and called a shrinking gap
+// "closing". That reads the player's own sailing, not the AI's intent -- a
+// session showed eight vessels "converging" in the same tick, each by an
+// identical 802 units, which was simply the player moving. It also reported
+// closing just as often under our true colours as under a false flag, so it
+// could not have answered the question it existed for.
+//
+// What actually matters is whether a vessel is STEERING TOWARD US regardless of
+// what we do. That is its own displacement between samples, projected onto the
+// direction from it to the player: positive means it chose to come at us.
+// Player movement cancels out entirely.
+struct VesselTrack {
+    int  lastX = 0, lastY = 0;
+    int  pursuing = 0;      // consecutive samples moving toward the player
+    bool have  = false;
+    bool seen  = false;
+};
+static VesselTrack g_track[24];
+
+static int OctagonalDistance(int dx, int dy)
+{
+    if (dx < 0) dx = -dx;
+    if (dy < 0) dy = -dy;
+    const int lo = dx < dy ? dx : dy;
+    const int hi = dx < dy ? dy : dx;
+    return (lo + hi * 2) / 2;
+}
+
+// One line per vessel, at most every couple of seconds. Read-only.
+static void WatchTheWater()
+{
+    if (!g_falseColours || !state::InGame()) return;
+
+    static DWORD lastAt = 0;
+    const DWORD now = GetTickCount();
+    if (lastAt && (now - lastAt) < 2000) return;
+    lastAt = now;
+
+    __try {
+        const int px = game::PlayerX() / 1000;
+        const int py = game::PlayerY() / 1000;
+        const int mine = state::Nationality();
+
+        for (int i = 1; i < 24; ++i) {
+            const int n = game::ShipNationality(i);
+            const int x = *(const int*)(game::ShipRecord(i) + 0x0C) / 1000;
+            const int y = *(const int*)(game::ShipRecord(i) + 0x10) / 1000;
+            VesselTrack& t = g_track[i];
+
+            if (n < 0 || n >= game::addr::kNationCount || (x == 0 && y == 0)) {
+                t = VesselTrack{};
+                continue;
+            }
+
+            const int d = OctagonalDistance(x - px, y - py);
+
+            // The vessel's OWN movement since the last sample, and how much of
+            // it points at us. Player motion is not in this figure at all.
+            int   moved   = 0;
+            long long toward = 0;
+            if (t.have) {
+                const int vx = x - t.lastX, vy = y - t.lastY;
+                moved = OctagonalDistance(vx, vy);
+                // Direction from the vessel to the player, unnormalised: the
+                // sign of the dot product is all we need.
+                toward = (long long)vx * (px - x) + (long long)vy * (py - y);
+                if (moved > 20 && toward > 0) ++t.pursuing;
+                else if (moved > 20)          t.pursuing = 0;
+            }
+            t.lastX = x; t.lastY = y; t.have = true;
+
+            // Report only vessels near enough for an encounter to be possible.
+            // The whole map is ~422,000 units across and a harbour is a few
+            // thousand, so anything beyond this is on the far side of the sea
+            // and its behaviour tells us nothing. The first session logged
+            // vessels at 400,000 and drowned the signal.
+            constexpr int kInterestingRange = 30000;
+            if (d > kInterestingRange) { t.seen = true; continue; }
+
+            const bool notable = (t.pursuing >= 2) || !t.seen;
+            t.seen = true;
+            if (notable) {
+                Log("falsecolours: vessel %2d flies %-7s dist %6d  moved %5d  "
+                    "%s   (we fly %s)",
+                    i, game::NationName(n), d, moved,
+                    t.pursuing >= 2 ? "** PURSUING **"
+                                    : (moved > 20 ? "not toward us" : "idle"),
+                    game::NationName(mine));
+            }
+        }
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER) {
+        Log("falsecolours: EXCEPTION 0x%08X watching the water; probe off",
+            GetExceptionCode());
+        g_falseColours = false;
+    }
+}
+
+// ------------------------------------------------- captured flag textures
+// We cannot yet ask the engine for "the texture called flag_spa.dds" -- that
+// means driving its loader and its refcounting. But we do not need to in order
+// to answer the question in front of us. The game loads every custom flag
+// itself when the player picks one in Options, and parks the chosen one in
+// PlayerFlagTex. So: let the player select each flag in turn, capture the
+// pointer the game put there, and then try writing those pointers back while
+// under way.
+//
+// If the flag on the mast follows the pointer, false colours is a pointer swap
+// and the rest is bookkeeping. If it does not, the flag is bound somewhere
+// further down and no amount of loader work would have helped.
+// THESE OBJECTS ARE REFCOUNTED, and forgetting that crashed the game the first
+// time this ran. The picker RELEASES a texture as soon as it scrolls away from
+// it -- the very function we read this from does so four lines below the line
+// we copied:
+//
+//     refcount = *(dword*)((char*)obj + 4);
+//     if (--refcount == 0) (*(void(**)(int))*(void**)obj)(1);   // destructor
+//
+// so every pointer captured while browsing was dead before we ever wrote it
+// back. Holding a pointer to a refcounted object means TAKING A REFERENCE, and
+// the engine's own idiom for that is on the next line again: obj[1] += 1.
+//
+// We deliberately never release ours. A handful of flag textures held for the
+// life of the process is the correct trade for pointers that cannot dangle,
+// and it is what "we intend to keep this" means in a refcounted world.
+constexpr int kRefCountOffset = 4;
+
+static bool LooksLikeRefObject(void* p)
+{
+    // A Gamebryo ref object begins with a vtable pointer and a refcount. Both
+    // must at least be readable before we touch either.
+    if (!p || !PageReadable(p, 8)) return false;
+    void* vtbl = *(void**)p;
+    return vtbl && PageReadable(vtbl, sizeof(void*));
+}
+
+static bool AddRefTexture(void* p)
+{
+    if (!LooksLikeRefObject(p)) return false;
+    __try {
+        ++*(volatile long*)((char*)p + kRefCountOffset);
+        return true;
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
+}
+
+struct CapturedFlag {
+    void* tex = nullptr;
+    int   seq = 0;          // the order we saw it in, for the log
+};
+static CapturedFlag g_flagSlot[8];
+static int          g_flagSlots  = 0;
+static int          g_flagCursor = 0;
+
+// Watches PlayerFlagTex and records anything new. Called from the safe point,
+// so selecting a flag in the menu is picked up without the player doing
+// anything else.
+static void CaptureFlagTexture()
+{
+    if (!g_falseColours) return;
+    __try {
+        void* cur = game::PlayerFlagTexture();
+        if (!cur) return;
+        for (int i = 0; i < g_flagSlots; ++i)
+            if (g_flagSlot[i].tex == cur) return;               // already known
+        if (g_flagSlots >= 8) return;
+
+        // Take a reference BEFORE recording it, and record nothing if we could
+        // not -- a slot we cannot keep alive is a crash waiting to be pressed.
+        if (!AddRefTexture(cur)) {
+            Log("falsecolours: 0x%p does not look like a texture object -- "
+                "not captured", cur);
+            return;
+        }
+        g_flagSlot[g_flagSlots].tex = cur;
+        g_flagSlot[g_flagSlots].seq = g_flagSlots;
+        ++g_flagSlots;
+        Log("falsecolours: captured flag texture #%d = 0x%p (referenced) "
+            "(%d custom flags / %d sails known to the game)",
+            g_flagSlots - 1, cur, game::CustomFlagCount(), game::CustomSailCount());
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER) {
+        Log("falsecolours: EXCEPTION 0x%08X reading the flag texture; probe off",
+            GetExceptionCode());
+        g_falseColours = false;
+    }
+}
+
+// What the world looks like from where we are standing, logged around a change
+// so the before and after can be compared. Reads only, and guarded: this walks
+// other vessels' records, which is new ground.
+static void ReportColours(const char* when)
+{
+    __try {
+        const int mine = state::Nationality();
+        const int px = game::PlayerX() / 1000, py = game::PlayerY() / 1000;
+        Log("falsecolours [%s]: flag texture 0x%p (%d captured), "
+            "ship-record nation %d (%s -- NOT the flag, see game.h)",
+            when, game::PlayerFlagTexture(), g_flagSlots, mine,
+            game::NationName(mine));
+
+        // Whatever else is on the water right now. The player is index 0, so
+        // start at 1. A modest window: this is orientation, not a census.
+        int shown = 0;
+        for (int i = 1; i < 24 && shown < 8; ++i) {
+            const int n = game::ShipNationality(i);
+            if (n < 0 || n >= game::addr::kNationCount) continue;   // empty slot
+            const int x = *(const int*)(game::ShipRecord(i) + 0x0C);
+            const int y = *(const int*)(game::ShipRecord(i) + 0x10);
+            if (x == 0 && y == 0) continue;
+            Log("falsecolours:   vessel %2d flies %d (%s) at (%d,%d) dist %d",
+                i, n, game::NationName(n), x / 1000, y / 1000,
+                OctagonalDistance(x / 1000 - px, y / 1000 - py));
+            ++shown;
+        }
+        if (shown == 0) Log("falsecolours:   no other vessels in the array");
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER) {
+        Log("falsecolours: EXCEPTION 0x%08X reading the ship array",
+            GetExceptionCode());
+    }
+}
+
 typedef HANDLE(WINAPI *CreateFileA_t)(LPCSTR, DWORD, DWORD, LPSECURITY_ATTRIBUTES,
                                       DWORD, DWORD, HANDLE);
 typedef HANDLE(WINAPI *CreateFileW_t)(LPCWSTR, DWORD, DWORD, LPSECURITY_ATTRIBUTES,
@@ -461,7 +716,10 @@ static DWORD WINAPI Hook_timeGetTime(void)
     bool k5 = mods && (GetAsyncKeyState('5') & 0x8000);
     bool k6 = mods && (GetAsyncKeyState('6') & 0x8000);
     bool k7 = mods && (GetAsyncKeyState('7') & 0x8000);
-    bool down = k1 || k2 || k3 || k4 || k5 || k6 || k7;
+    bool k8 = mods && (GetAsyncKeyState('8') & 0x8000);
+    bool k9 = mods && (GetAsyncKeyState('9') & 0x8000);
+    bool k0 = mods && (GetAsyncKeyState('0') & 0x8000);
+    bool down = k1 || k2 || k3 || k4 || k5 || k6 || k7 || k8 || k9 || k0;
 
     bool rising = down && !g_prevKeyDown;
     g_prevKeyDown = down;
@@ -511,6 +769,72 @@ static DWORD WINAPI Hook_timeGetTime(void)
                                          : "off");
         content::PostDebugNotice(g_fileProbe ? "File probe ON."
                                              : "File probe off.", 5);
+        return r;
+    }
+
+    // ------------------------------------------------------ false colours
+    // Ctrl+Shift+8 cycles the colours the player's vessel is seen to be flying,
+    // Ctrl+Shift+9 puts the true ones back, Ctrl+Shift+0 just reports without
+    // touching anything.
+    //
+    // This is the ONE probe in this build that writes game state, which is why
+    // it is armed by a marker file rather than being live for anyone who
+    // presses a key. It exists to answer, in game, what static analysis cannot:
+    // does writing this field change the flag DRAWN on the ship, change how the
+    // AI TREATS you, both, or neither?
+    if (k8 || k9 || k0) {
+        if (!g_falseColours) {
+            Log("falsecolours: not armed -- drop PEMF\\falsecolours.on next to "
+                "the exe to enable (it writes game state, so it is opt-in)");
+            return r;
+        }
+        if (k0) {
+            ReportColours("asked");
+            for (int i = 0; i < g_flagSlots; ++i)
+                Log("falsecolours:   captured #%d = 0x%p", i, g_flagSlot[i].tex);
+            content::PostDebugNotice("Colours reported to pemf.log.", 5);
+            return r;
+        }
+        if (k9) {
+            // Back to whatever the player actually chose.
+            if (g_flagSlots > 0 && LooksLikeRefObject(g_flagSlot[0].tex)) {
+                game::SetPlayerFlagTexture(g_flagSlot[0].tex);
+                g_flagCursor = 0;
+                Log("falsecolours: flag texture restored to #0 = 0x%p",
+                    g_flagSlot[0].tex);
+                content::PostDebugNotice("First captured flag restored.", 5);
+            }
+            return r;
+        }
+        // Ctrl+Shift+8 flies the next captured texture. This is THE test: if
+        // the mast follows this pointer, false colours is a pointer swap.
+        if (g_flagSlots < 2) {
+            Log("falsecolours: only %d flag texture(s) captured -- open "
+                "Options > Change Sails and Flags and pick a DIFFERENT flag, "
+                "then come back to sea. Each distinct one is captured "
+                "automatically.", g_flagSlots);
+            content::PostDebugNotice("Pick another flag in Options first.", 7);
+            return r;
+        }
+        g_flagCursor = (g_flagCursor + 1) % g_flagSlots;
+        void* pick = g_flagSlot[g_flagCursor].tex;
+        // We hold a reference, so this should always pass. Checked anyway:
+        // handing the renderer a bad pointer is exactly how this crashed, and
+        // a refused swap is worth infinitely more than a repeat of that.
+        if (!LooksLikeRefObject(pick)) {
+            Log("falsecolours: captured texture #%d = 0x%p no longer looks "
+                "valid -- REFUSING to fly it", g_flagCursor, pick);
+            content::PostDebugNotice("Captured flag looks invalid; refused.", 6);
+            return r;
+        }
+        game::SetPlayerFlagTexture(pick);
+        Log("falsecolours: flying captured texture #%d = 0x%p", g_flagCursor, pick);
+        {
+            char msg[96];
+            _snprintf_s(msg, sizeof(msg), _TRUNCATE,
+                        "Flying captured flag #%d.", g_flagCursor);
+            content::PostDebugNotice(msg, 6);
+        }
         return r;
     }
 
@@ -721,6 +1045,19 @@ static DWORD WINAPI Init(LPVOID)
         }
     }
 
+    // False colours writes game state, so it is opt-in the same way.
+    {
+        char marker[MAX_PATH];
+        _snprintf_s(marker, sizeof(marker), _TRUNCATE,
+                    "%s\\PEMF\\falsecolours.on", dir);
+        if (GetFileAttributesA(marker) != INVALID_FILE_ATTRIBUTES) {
+            g_falseColours = true;
+            Log("falsecolours: ARMED (found %s) -- pick flags in Options to "
+                "capture them, then Ctrl+Shift+8 flies the next captured one, "
+                "9 restores the first, 0 reports", marker);
+        }
+    }
+
     // Build diagnostics -- at load, and again after any unpacker has run.
     DiagnoseImage("at-load");
     CloseHandle(CreateThread(nullptr, 0, DelayedDiag, nullptr, 0, nullptr));
@@ -782,7 +1119,8 @@ static DWORD WINAPI Init(LPVOID)
     Log("debug hotkeys: Ctrl+Shift+1 = event #0, Ctrl+Shift+2 = event #1, "
         "Ctrl+Shift+3 = notice at the top, Ctrl+Shift+4 = notice on the ship, "
         "Ctrl+Shift+5 = probe item names 0-6, Ctrl+Shift+6 = probe item 7 "
-        "(past the stock list), Ctrl+Shift+7 = toggle the data-file probe");
+        "(past the stock list), Ctrl+Shift+7 = toggle the data-file probe, "
+        "Ctrl+Shift+8/9/0 = false colours cycle/restore/report (needs arming)");
     return 0;
 }
 

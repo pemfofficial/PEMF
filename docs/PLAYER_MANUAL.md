@@ -193,6 +193,29 @@ Deeper factional politics, and divisions *within* your own crew. Later.
 
 Longer term: new interface elements, new event artwork, and new models.
 
+### Flags — something you can do today, with no mod at all
+
+Worth knowing, because the opposite is widely believed: **Pirates! already lets
+you add as many flags and sail emblems as you like.** You do not need PEMF for
+it, and you should not replace anything.
+
+Put your own `.dds` files in the game's `custom\` folder, named
+`flag_<whatever>.dds` (256×256) or `ship_sail_emblem_lrg_<whatever>.dds`
+(512×512), then pick them in **Options → Change Sails and Flags**. The game
+scans the folder and offers everything it finds — eleven flags, thirty, however
+many you put there. Your choice is remembered by name, so adding more later
+never disturbs it.
+
+Two cautions. **Keep the original files.** The five nation flags
+(`flag_spa`, `flag_eng`, `flag_fre`, `flag_dut`, `flag_pir`) double as the flags
+every other ship in the world flies, and a `custom\` folder missing them shows
+bright pink sails and flags — the usual symptom of installing a flag pack that
+overwrote them. And that is also why *changing* a nation's flag still means
+replacing a file, while adding your own never does.
+
+What PEMF will add later is not more flags but a reason to change them: flying
+another nation's colours to get close, and the risk of being found out.
+
 ---
 
 ## Troubleshooting

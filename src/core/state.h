@@ -109,6 +109,81 @@ inline bool AddCrew(int delta, const char* reason)
     return SetCrew(game::CrewCount() + delta, reason);
 }
 
+// ------------------------------------------------------- colours we fly
+// The nationality the player's vessel is SEEN to be. Every other write in this
+// file adjusts a number the player already owns; this one changes what the rest
+// of the game believes about them, and 84 code sites read it. So it is the most
+// cautious thing here:
+//
+//   * the ORIGINAL value is remembered the first time it is changed, and
+//     RestoreNationality() puts it back -- nothing should be able to strand a
+//     career flying somebody else's flag;
+//   * the value is checked against the five real nations rather than clamped,
+//     because an out-of-range nation would index the flag-mesh table off the
+//     end, and that table is exactly five entries long;
+//   * every change is logged with both names, since the whole point of the
+//     probe is reading afterwards what happened.
+//
+// Whether this write actually changes the flag drawn, the AI's behaviour, both
+// or neither is UNVERIFIED -- that is what it exists to find out.
+inline bool g_nationalityOverridden = false;
+inline int  g_originalNationality   = -1;
+
+inline int Nationality() { return game::ShipNationality(0); }
+
+inline bool SetNationality(int nation, const char* reason)
+{
+    const char* why = nullptr;
+    if (!CanMutate(&why)) {
+        Log("  state: REFUSED SetNationality(%d) [%s] -- %s", nation, reason, why);
+        return false;
+    }
+    if (nation < 0 || nation >= game::addr::kNationCount) {
+        Log("  state: REFUSED SetNationality(%d) [%s] -- only 0..%d are real "
+            "nations, and the flag table is exactly that long",
+            nation, reason, game::addr::kNationCount - 1);
+        return false;
+    }
+
+    int before = game::ShipNationality(0);
+    if (!g_nationalityOverridden) {
+        g_originalNationality   = before;
+        g_nationalityOverridden = true;
+        Log("  state: remembering true colours as %d (%s)",
+            before, game::NationName(before));
+    }
+
+    game::SetShipNationalityRaw(0, nation);
+    Log("  state: colours %d (%s) -> %d (%s) [%s]",
+        before, game::NationName(before), nation, game::NationName(nation), reason);
+    return true;
+}
+
+// Put the true colours back. Safe to call when nothing was changed.
+inline bool RestoreNationality(const char* reason)
+{
+    if (!g_nationalityOverridden) return true;
+    const char* why = nullptr;
+    if (!CanMutate(&why)) {
+        Log("  state: REFUSED RestoreNationality [%s] -- %s", reason, why);
+        return false;
+    }
+    game::SetShipNationalityRaw(0, g_originalNationality);
+    Log("  state: colours restored to %d (%s) [%s]", g_originalNationality,
+        game::NationName(g_originalNationality), reason);
+    g_nationalityOverridden = false;
+    g_originalNationality   = -1;
+    return true;
+}
+
+// A career change must never inherit a disguise. Called from the same place
+// triggers are reset.
+inline void ForgetNationalityOverride()
+{
+    g_nationalityOverridden = false;
+    g_originalNationality   = -1;
+}
+
 // Snapshot for logging an event's net effect.
 struct Snapshot { int crew, plunder, morale, months; };
 

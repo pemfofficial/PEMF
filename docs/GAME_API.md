@@ -882,6 +882,93 @@ far more reliable choice than the literal minimum.
 
 ---
 
+## Flags, emblems, and the overworld ship array
+
+> **Confidence: verified in game**, except where marked. Full write-up in
+> [`re/experiments/flags/`](../re/experiments/flags/README.md).
+
+### Custom flags and sails are already unlimited
+
+The game enumerates them rather than loading fixed names, so **adding flags
+needs no mod at all**. `FUN_004B00E0(filter, container)` splits its filter on
+`;` (`flag_*.dds;flag_*.tga`), scans the game's `custom\` **and**
+`My Documents\My Games\Sid Meier's Pirates!\Custom\` with `FindFirstFileA`,
+de-duplicates, and appends into an array it resizes as needed.
+
+| Global | Holds |
+|---|---|
+| `0x008C9560` | number of custom **flags** found |
+| `0x008C9564` | number of custom **sails** found |
+
+Both read `0` until **Options → Change Sails and Flags** is first opened — the
+scan is lazy. Measured: 11 flag files gave 11, 8 emblem files gave 8.
+
+The picker (`FUN_004B7C70`, Options case `0x212`) shows three thumbnails and
+indexes them `1 % count`, wrapping around the whole list — a carousel, not a
+cap. The choice persists **by name** as `CustomFlag` / `CustomSail` in
+`Config.ini`, so adding files never invalidates a saved selection.
+
+### The player's flag is one texture pointer
+
+`FUN_004AF760` re-applies four textures to matching scene nodes every time
+round, comparing before applying:
+
+| Global | Applied to nodes named |
+|---|---|
+| `0x008E8FB0` | `ship_playercolor*` |
+| `0x008E8FB4` | `flag*` — **the player's flag** |
+| `0x008E8FB8` | `ship_sail_emblem_lrg*` |
+| `0x008E8FBC` | `ship_sail_emblem_sml*` |
+
+Write `0x008E8FB4` and the flag on the mast changes; the engine keeps it there
+with no further calls. Verified in game across repeated swaps and a restore.
+
+⚠️ **These are refcounted objects — see the layer rule in
+[`DEVELOPER.md`](DEVELOPER.md#layer-rules).** Capturing one without taking a
+reference crashes the game, because the picker releases a texture the moment it
+scrolls away from it.
+
+### Nation flags are five fixed meshes
+
+`FUN_0046BAA0` loads five flag meshes and clones them into live scene nodes:
+
+| Prototype | Live node | Nation |
+|---|---|---|
+| `0x00860B40` | `0x00860B54` | Spanish (0) |
+| `0x00860B44` | `0x00860B58` | English (1) |
+| `0x00860B48` | `0x00860B5C` | French (2) |
+| `0x00860B4C` | `0x00860B60` | Dutch (3) |
+| `0x00860B50` | `0x00860B64` | Pirate (4) |
+
+Custom nation *art* is possible by retexturing a live node at runtime — additive
+and reversible, unlike replacing `custom\flag_spa.dds`. A **sixth nation is
+not**: five hardcoded slots, the same shape as the cargo array.
+
+### The overworld ship array
+
+Found because `PlayerX`/`PlayerY` are fields of its first record:
+
+```
+base 0x008142F8, stride 0x45C, player = entry 0
+  +0x04   nationality  (0x008142FC)   read by "She's flying @NATIONALITY colors."
+  +0x0C   X            (0x00814304)
+  +0x10   Y            (0x00814308)
+  +0x58   flags        (0x00814350)
+```
+
+⛔ **`+0x04` is NOT the player's flag**, and two measurements say so: cycling it
+through all five nations changed nothing on the mast, and it reads `0` (Spanish)
+on a career started under the **English** flag, so it does not track the nation
+the player sails for either. Recorded because it is a real find about AI
+vessels — it is simply not the flag.
+
+**Consequence for false colours:** the flag and the nationality the game reasons
+about are unrelated systems that never touch, so the engine has no concept of
+flying false colours. That makes the mechanic entirely PEMF's to define rather
+than something to keep in step with engine behaviour.
+
+---
+
 ## Ship-battle instance (naval combat)
 
 > **Confidence: decompiled, not yet run.** Field offsets are read from the code

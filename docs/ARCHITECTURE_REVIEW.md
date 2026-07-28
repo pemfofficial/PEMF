@@ -455,4 +455,6 @@ of bug that is expensive to diagnose.
 | **Drawing is gated on a learned screen signature, never on ship movement.** | Menus freeze the ship, so motion cannot separate a menu from a becalmed ship at sea. Motion learns the signature; it is never the test. |
 | **Measured screen signatures are evidence, never constants.** | Comparing against them means one unvisited HUD state stops all drawing, silently. |
 | **A notice's clock stops while it is off screen.** | Otherwise it expires unseen behind a menu and the player loses it for having glanced at the map. |
+| **A retained pointer to an engine object must be referenced.** | Gamebryo refcounts at `+4` and destroys at zero. Capturing flag textures without a reference crashed the game on first use. |
+| **Confirm a limit exists before building around it.** | "Flags must be replaced" was accepted for years; the game had enumerated them since 2004. One call site settled it. |
 | **Redirect a call site rather than detour a prologue, where possible.** | No trampoline, nothing relocated, one reversible write. |
