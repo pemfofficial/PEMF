@@ -1022,6 +1022,73 @@ constexpr int kShipRole     = 0x2A;   // 0x00814322
 constexpr int kShipDestCity = 0x3E;   // 0x00814336
 constexpr int kShipHomeCity = 0x40;   // 0x00814338
 
+// WHAT THIS SHIP IS. The field that actually classifies a vessel, and not the
+// one at +0x2A this project spent three test rounds calling "role".
+//
+// Proved by the label code at 0x00462098, which is the text you get when you
+// hover a ship on the overworld:
+//
+//     movsx eax, word [edi + 0x8142FA]      ; <- +0x02
+//     dec   eax
+//     cmp   eax, 3
+//     ja    no_label
+//     jmp   dword [eax*4 + 0x00463CB4]      ; a four-entry jump table
+//
+// and the table resolves, in order, to the four strings at 0x00707A60..AA4:
+//
+//     1  "@NATIONALITY pirate-hunter"
+//     2  "@NATIONALITY privateer"
+//     3  "@NATIONALITY raider"
+//     4  "@NATIONALITY smuggler"
+//
+// 0 is an ordinary merchant, which gets the plain "@NATIONALITY @SHIPTYPE
+// '@SHIPNAME'" label instead. Values 5 and 6 are written by the game but have
+// no label; 6 comes out of two builders, so it is probably "escort" or similar.
+//
+// This is why a spawned ship showed NO hover text: the builders leave it at a
+// value the label code does not name.
+constexpr int kShipPurpose = 0x02;    // 0x008142FA
+
+enum ShipPurpose {
+    kPurposeMerchant     = 0,
+    kPurposePirateHunter = 1,
+    kPurposePrivateer    = 2,
+    kPurposeRaider       = 3,
+    kPurposeSmuggler     = 4
+};
+
+inline const char* PurposeName(int p)
+{
+    switch (p) {
+    case kPurposeMerchant:     return "merchant";
+    case kPurposePirateHunter: return "PIRATE-HUNTER";
+    case kPurposePrivateer:    return "privateer";
+    case kPurposeRaider:       return "raider";
+    case kPurposeSmuggler:     return "smuggler";
+    case 5:                    return "5 (unlabelled)";
+    case 6:                    return "6 (unlabelled)";
+    default:                   return "?";
+    }
+}
+
+inline int ShipPurposeOf(int index)
+{
+    __try {
+        return *(const short*)(addr::ShipArray +
+                               (uintptr_t)index * addr::kShipStride + kShipPurpose);
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER) { return -1; }
+}
+
+inline void SetShipPurposeRaw(int index, int purpose)
+{
+    __try {
+        *(short*)(addr::ShipArray + (uintptr_t)index * addr::kShipStride
+                  + kShipPurpose) = (short)purpose;
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER) {}
+}
+
 inline int ShipRole(int index)
 {
     __try {

@@ -1154,6 +1154,39 @@ All three are verified callable in a running game — signature check passes, a
 slot is consumed, flags come out distinct per builder. `FUN_00415290`'s mixed
 convention needs a naked shim; no compiler emits it.
 
+### ✅ `+0x02` is what a ship IS — and 1 is *pirate-hunter*
+
+The overworld hover label gives this away completely. At `0x00462098`:
+
+```
+movsx eax, word [edi + 0x8142FA]      ; +0x02
+dec   eax
+cmp   eax, 3
+ja    no_label
+jmp   dword [eax*4 + 0x00463CB4]      ; four-entry jump table
+```
+
+and the table resolves, in order, to the four strings at `0x00707A60`–`AA4`:
+
+| `+0x02` | Hover label |
+|---|---|
+| 0 | *(none — gets the plain `@NATIONALITY @SHIPTYPE '@SHIPNAME'`)* |
+| **1** | **`@NATIONALITY pirate-hunter`** |
+| 2 | `@NATIONALITY privateer` |
+| 3 | `@NATIONALITY raider` |
+| 4 | `@NATIONALITY smuggler` |
+| 5, 6 | written by the game, no label — `6` comes out of two builders |
+
+**This is the classification the game actually uses**, and it is *not* the field
+at `+0x2A` that three test rounds here called "role". A spawned ship showing no
+hover text is the symptom: the builders leave `+0x02` at a value the label code
+does not name.
+
+Values are written at: `0x0040DACA` (3, governor's dispatch), `0x00413FD0` (4),
+`0x0041412A` (2), `0x00414093` (3 — the raider branch, gated on the game-progress
+value at `0x0085A150` exceeding `0xBB8`), `0x0041535D` (2), `0x00414B3C` and
+`0x004155B6` (6).
+
 ### ✅ The lever is the DESTINATION, not the role
 
 Both builders hand back a ship whose **destination city equals the port it was
@@ -1220,7 +1253,8 @@ there is a reason not to.
 | `+0x04` | `0x008142FC` | nationality, word — the colours she is seen to fly |
 | `+0x0C` | `0x00814304` | X, milli-units |
 | `+0x10` | `0x00814308` | Y |
-| `+0x2A` | `0x00814322` | **role / mission**, word, values 1–4 |
+| `+0x02` | `0x008142FA` | **purpose** — what the ship *is*. See below. |
+| `+0x2A` | `0x00814322` | a second classifier, values 1–4, meaning unknown |
 | `+0x3E` | `0x00814336` | a city index (destination) |
 | `+0x40` | `0x00814338` | a city index (origin) |
 | `+0x58` | `0x00814350` | flags |

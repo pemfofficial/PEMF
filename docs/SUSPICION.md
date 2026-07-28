@@ -151,9 +151,14 @@ Every input the design needs is confirmed working in a running game.
    why the first attempts appeared to do nothing. Full account in
    [`GAME_API.md`](GAME_API.md#-the-lever-is-the-destination-not-the-role).
 
-   Still open underneath it: a hunter currently sails to a *place*, not at a
-   *ship*. Pointing it past the player is close enough to read as pursuit, and
-   whether true target-chasing exists has not been established.
+   And a hunter is not something we have to write: **`+0x02` on a ship record
+   classifies it, and `1` means pirate-hunter** — the value behind the game's
+   own `"@NATIONALITY pirate-hunter"` hover label. Whether stamping it produces
+   hunting *behaviour* is the outstanding test.
+
+   Still open underneath that: a spawned ship sails to a *place*, not at a
+   *ship*. If the purpose field does not bring behaviour with it, pointing a
+   hunter past the player is the fallback.
 2. **Infamy is not located.** The game tracks an "@ORDINAL most notorious pirate"
    ranking, so a value exists, but the HUD only draws the *word* "Fame" and the
    two references to that string push no value. Wanted for the "a famous captain

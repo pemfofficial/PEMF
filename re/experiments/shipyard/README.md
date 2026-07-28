@@ -173,6 +173,61 @@ parameters are the ones to distrust.
 
 ---
 
+---
+
+## The field that mattered was a different one
+
+`+0x2A` was called "role" here for three test rounds. The classification the
+game actually uses is **`+0x02`**, and the hover label gives it away completely
+(`0x00462098`, jump table at `0x00463CB4`):
+
+| `+0x02` | Label |
+|---|---|
+| 0 | ordinary merchant |
+| **1** | **pirate-hunter** |
+| 2 | privateer |
+| 3 | raider |
+| 4 | smuggler |
+| 5, 6 | written, unlabelled |
+
+**A pirate hunter is a value in a field.** Not a behaviour to be written, not a
+hostility flag to be found — a `1` at `+0x02`.
+
+### The symptom that should have caught this a round earlier
+
+A spawned ship showed **no hover text at all**. That was reported and passed
+over. It is exactly what a ship with an unnamed `+0x02` looks like, and chasing
+it straight away would have led here without the intervening rounds.
+
+**Unexplained readings are data.** "Nothing appeared when I hovered it" is a
+measurement of the classification field, and it was treated as an absence.
+
+---
+
+## Reputation is the hostility model
+
+Recorded here because it was found in the same sweep and it changes what a
+spawned hunter is *for*.
+
+**Negative reputation with a nation is that nation being hostile to you** — the
+game's own model, per-nation rather than per-ship, which is why a search for a
+per-ship flag came up empty.
+
+| Reputation `0x00869A78 + nation*2` | Effect |
+|---|---|
+| `> 0` | welcome |
+| `< 0` | that nation's settlements are **skipped** by the port search (`0x00406265`, and five sibling sites) |
+| `< -1` | *"the @NATIONALITY have put a price on your head"*, and an amnesty is offered (`0x0040B5DC`) |
+
+Related machinery already in the game: `"Pirate hunter sails from @CITYNAME."`,
+`"there's a price on your head in @CITYNAME"`, `"@NATION offers Pirate
+Amnesty."`, and a Jesuit priest who travels to a named port to arrange one.
+
+Writers: `0x00405010`, `0x00405029`, `0x00405050`, `0x00405085`, `0x004051DC`,
+`0x00405AA6`, `0x0040D5AF`, `0x0040D86E`. Reputation is **player state**, inside
+the 216-byte saved player record — a far smaller thing to write than the nation
+relations matrix, which is world state.
+
 ## Open
 
 * **True pursuit.** Whether a vessel can be pointed at a *ship* rather than a

@@ -841,7 +841,12 @@ static void ReportColours(const char* when)
 // After the first live test: which builder was called decides what the ship
 // DOES, so all three are exposed and the experiment is now "which of these
 // behaves like a hunter" rather than "does the call work" (it does).
-enum ShipyardKind { kYardRole0 = 0, kYardRole4 = 1, kYardRole3 = 2 };
+enum ShipyardKind {
+    kYardRole0 = 0,     // FUN_00414FC0, left exactly as built -- the control
+    kYardRole4 = 1,     // FUN_00415290, then given a role AND a destination
+    kYardRole3 = 2,     // FUN_004154F0, refused unless its global is sane
+    kYardRoleOnly = 3   // FUN_00415290, then given a role and NOTHING ELSE
+};
 
 // The role to stamp on a newly built ship, cycled by its own key.
 //
@@ -856,6 +861,11 @@ enum ShipyardKind { kYardRole0 = 0, kYardRole4 = 1, kYardRole3 = 2 };
 // only inside the encounter spawner and the governor's dispatch, both far too
 // entangled to call. So the only way to see what they DO is to stamp them.
 static int g_testRole = 1;
+
+// ...and the PURPOSE to stamp, which is the field that actually classifies a
+// ship. 1 is pirate-hunter, straight out of the hover-label jump table. This is
+// the value the whole false-colours consequence has been looking for.
+static int g_testPurpose = game::kPurposePirateHunter;
 
 // Somewhere for a ship to actually go. A destination equal to the origin is the
 // whole reason nothing moved, so the experiment needs a port that is elsewhere.
@@ -886,14 +896,15 @@ static void RunShipyardExperiment(ShipyardKind which)
         Log("shipyard: refused -- not in a career");
         return;
     }
-    static const char* const kYardName[3] = {
+    static const char* const kYardName[4] = {
         "role0 (FUN_00414FC0 -- ordinary traffic)",
-        "role4 (FUN_00415290)",
-        "role3 (FUN_004154F0 -- picks its own port)"
+        "role4 (FUN_00415290, then role + destination)",
+        "role3 (FUN_004154F0 -- picks its own port)",
+        "ROLE ONLY (FUN_00415290, role stamped, destination untouched)"
     };
     const bool callable = which == kYardRole0 ? game::SpawnShipCallable()
-                        : which == kYardRole4 ? game::SpawnRole4Callable()
-                                              : game::SpawnRole3Callable();
+                        : which == kYardRole3 ? game::SpawnRole3Callable()
+                                              : game::SpawnRole4Callable();
     if (!callable) {
         Log("shipyard: REFUSED -- %s does not match its expected bytes. "
             "Nothing was called.", kYardName[which]);
@@ -925,8 +936,8 @@ static void RunShipyardExperiment(ShipyardKind which)
         // actually SEEN the game use, rather than a number that seemed
         // reasonable.
         const int slot = which == kYardRole0 ? game::SpawnShipAtCity(city, 0x0B)
-                       : which == kYardRole4 ? game::SpawnRole4Ship(city, 0x0B)
-                                             : game::SpawnRole3Ship(0x0B);
+                       : which == kYardRole3 ? game::SpawnRole3Ship(0x0B)
+                                             : game::SpawnRole4Ship(city, 0x0B);
 
         const int freeAfter = game::CountFreeShipSlots();
         Log("shipyard: factory returned %d, %d free slot(s) after (delta %d)",
@@ -956,11 +967,42 @@ static void RunShipyardExperiment(ShipyardKind which)
 
         const uintptr_t rec = game::ShipRecord(slot);
         Log("shipyard: slot %d AS BUILT -- type %d, nationality %d (%s), "
-            "ROLE %d, flags 0x%08X, dest city %d, home city %d",
+            "PURPOSE %d (%s), role %d, flags 0x%08X, dest city %d, home %d",
             slot, game::ShipType(slot), game::ShipNationality(slot),
             game::NationName(game::ShipNationality(slot)),
+            game::ShipPurposeOf(slot),
+            game::PurposeName(game::ShipPurposeOf(slot)),
             game::ShipRole(slot), game::ShipFlagBits(slot),
             game::ShipDestCity(slot), game::ShipHomeCity(slot));
+
+        // ROLE, AND NOTHING ELSE.
+        //
+        // The earlier role test was confounded and the conclusion drawn from it
+        // ("role does not gate movement") is not one that test could support:
+        // every stamped ship was ALSO handed a fresh destination, so of course
+        // it sailed. Role was never asked the question on its own.
+        //
+        // Here it is. The ship keeps the destination it was built with -- its
+        // own home port, which it is already sitting in -- so it has nothing to
+        // do unless the role itself gives it something. If a role means "hunt",
+        // this is the only arrangement in which that can show.
+        if (which == kYardRoleOnly) {
+            game::SetShipPurposeRaw(slot, g_testPurpose);
+            game::SetShipRoleRaw(slot, g_testRole);
+            Log("shipyard: slot %d PURPOSE %d (%s), role %d, destination left "
+                "at city %d -- where she already is. Anything she does now is "
+                "hers, not an errand. Hover her: the label should read '%s %s'.",
+                slot, game::ShipPurposeOf(slot),
+                game::PurposeName(game::ShipPurposeOf(slot)),
+                game::ShipRole(slot), game::ShipDestCity(slot),
+                game::NationName(game::ShipNationality(slot)),
+                game::PurposeName(game::ShipPurposeOf(slot)));
+            char m2[160];
+            _snprintf_s(m2, sizeof(m2), _TRUNCATE, "%s, no orders. Watch her.",
+                        game::PurposeName(g_testPurpose));
+            content::PostDebugNotice(m2, 8);
+            return;
+        }
 
         // Give it somewhere to be and something to be doing. Only on the
         // role-4 builder, so H stays a clean control: if H and J now behave
@@ -1217,8 +1259,9 @@ static DWORD WINAPI Hook_timeGetTime(void)
     bool kJ = mods && (GetAsyncKeyState('J') & 0x8000);
     bool kK = mods && (GetAsyncKeyState('K') & 0x8000);
     bool kL = mods && (GetAsyncKeyState('L') & 0x8000);
+    bool kO = mods && (GetAsyncKeyState('O') & 0x8000);
     bool down = k1 || k2 || k3 || k4 || k5 || k6 || k7 || k8 || k9 || k0 ||
-                kN || kH || kJ || kK || kL;
+                kN || kH || kJ || kK || kL || kO;
 
     bool rising = down && !g_prevKeyDown;
     g_prevKeyDown = down;
@@ -1281,18 +1324,21 @@ static DWORD WINAPI Hook_timeGetTime(void)
     // Ctrl+Shift+H/J/K each ask a DIFFERENT one of the engine's ship builders
     // for a vessel. Behind their own marker file, because they create state
     // that a second keypress cannot take back.
-    if (kH || kJ || kK) {
-        RunShipyardExperiment(kH ? kYardRole0 : kJ ? kYardRole4 : kYardRole3);
+    if (kH || kJ || kK || kO) {
+        RunShipyardExperiment(kH ? kYardRole0 : kJ ? kYardRole4
+                            : kK ? kYardRole3 : kYardRoleOnly);
         return r;
     }
     // Ctrl+Shift+L picks which role the next J-built ship is given. Roles 1 and
     // 2 exist only inside code we cannot call, so stamping is the only way to
     // find out what they mean.
     if (kL) {
-        g_testRole = (g_testRole % 4) + 1;          // 1,2,3,4, round again
-        Log("shipyard: next ordered ship will be given ROLE %d", g_testRole);
-        char msg[80];
-        _snprintf_s(msg, sizeof(msg), _TRUNCATE, "Next role: %d", g_testRole);
+        g_testPurpose = (g_testPurpose % 6) + 1;    // 1..6, round again
+        Log("shipyard: next ship will be stamped PURPOSE %d (%s)",
+            g_testPurpose, game::PurposeName(g_testPurpose));
+        char msg[100];
+        _snprintf_s(msg, sizeof(msg), _TRUNCATE, "Next: %s",
+                    game::PurposeName(g_testPurpose));
         content::PostDebugNotice(msg, 5);
         return r;
     }
@@ -1613,6 +1659,8 @@ static DWORD WINAPI Init(LPVOID)
             Log("shipyard:   K = role 3 (0x%08X) %s",
                 (unsigned)game::SpawnShipRole3Fn,
                 game::SpawnRole3Callable() ? "MATCHES" : "MISMATCH");
+            Log("shipyard:   O = role stamped, NO destination -- the isolated "
+                "role test; L cycles which role");
         }
     }
 
