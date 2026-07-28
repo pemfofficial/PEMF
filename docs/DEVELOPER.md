@@ -99,6 +99,16 @@ boundary comes from the safe point, **not** `Present` — this game never calls
 - **Never** hand the engine a token argument count, or an `@ITEM` index, that has
   not been read out of the disassembly. It does not bounds check; `@ITEM` past
   the end of its list access-violates.
+- **Never** infer "the overworld is on screen" from ship movement. Menus freeze
+  the ship, so motion cannot tell a menu from a becalmed ship at sea — that
+  mistake put a lookout's call across the Load/Save screen. Drawing is gated on
+  `triggers::WorldOnScreen()`, which matches a screen signature it *learned*
+  from ticks where the ship demonstrably moved. Motion learns the answer; it is
+  never the answer.
+- **Never** hardcode a measured screen signature. They are recorded in
+  [`GAME_API.md`](GAME_API.md#drawing-belongs-to-the-sailing-view) as evidence
+  only. Comparing against them would mean one unvisited HUD state stops all
+  drawing, silently.
 - `session::Ready()` gates content on an active, loaded career.
 
 ### Why a `version.dll` proxy
@@ -323,6 +333,7 @@ whether that trigger was a keypress or a port entry is the caller's business.
 | 1b — trigger layer (`elapsedSailing`, `nearPort`, `stateCrosses`) | **Verified in-game**; `stateCrosses` built |
 | 1c — render phase + `notice` events | **Verified in-game**, on GOG and Steam |
 | 1c+ — notices anchored to the ship, `{placeholder}` authoring | **Verified in-game** |
+| 1c++ — notices confined to the sailing view, clock held behind menus | **Verified in-game** |
 | 1d — event cards from inside the frame (stage 3) | **Next** — see below |
 | 1e — officers | After 1d |
 | 2 — crew simulation, mutiny outcomes | Planned |

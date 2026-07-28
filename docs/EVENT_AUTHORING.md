@@ -106,6 +106,14 @@ A few practical notes:
 
 - An anchored notice only draws while a career is loaded and the world exists.
   Posted anywhere else it waits harmlessly and is dropped when it expires.
+- **Notices only appear in the sailing view.** Not in a town, not in a menu, not
+  in battle — a notice is drawn against the world, so anywhere else it would be
+  painted over whatever is on screen. This applies to both `"screen"` and
+  `"ship"` notices.
+- **`seconds` counts only while the notice is actually visible.** Its clock is
+  held whenever the overworld is off screen, so a player who opens the map with
+  a notice up comes back to it with the time it had left, rather than to nothing.
+  You can write a 4-second notice and trust it will be seen for 4 seconds.
 - Anchored lines do not stack — several at once will overlap on the ship. If you
   expect more than one at a time, put some on `"screen"`.
 - Keep anchored text short. It is drawn at world scale over open water, and a

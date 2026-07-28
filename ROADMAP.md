@@ -58,6 +58,14 @@ These are the load-bearing pieces everything else stands on. They work.
 - ✅ **Two presentation styles** — the interrupting modal card, and the
   non-interrupting on-screen "notice" (a lookout's call while sailing). Both
   are drawn in-game.
+- ✅ **Notices stay where they belong** — a notice appears only in the sailing
+  view, never over a town, a menu or the Load/Save screen, and its time is
+  **paused while it is out of sight**, so opening the map with one up means
+  coming back to it rather than finding it gone. This replaced a motion-based
+  guess that could not tell a menu from a becalmed ship; the framework now
+  learns the overworld's screen signature at runtime instead. Method and
+  measurements in
+  [`re/experiments/screen_state/`](re/experiments/screen_state/README.md).
 - ✅ **Notices anchored to your ship** — a notice can hang over the player's
   vessel and **follow it as you sail**, turning and moving with the ship, then
   easing out at the end. It is drawn by the same routine the game uses for its

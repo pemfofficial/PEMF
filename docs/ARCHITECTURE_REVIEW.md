@@ -370,6 +370,56 @@ officer roster overlay uses the same anchor.
 
 ---
 
+## Sixth pass (2026-07-28) — found by playtesting, not by audit
+
+### 15. A heuristic standing in for a fact — FIXED
+
+Drawing was gated on `triggers::WorldOnScreen()`, which asked whether the ship
+had moved in the last 350 ms. **That is not a screen test.** Menus freeze the
+ship, so a notice went on painting over one until the window lapsed — a player
+sent a screenshot of a lookout's call printed across the Load/Save screen.
+
+The window was a compromise the code was honest about in a comment, and it could
+not be tuned out: a becalmed ship at sea is indistinguishable from a menu under
+any motion test, so a shorter window only trades a menu leak for notices
+vanishing at sea.
+
+Two things made this worth recording as a review finding rather than a bug fix.
+
+**The blocker was a dead-end note, not the engine.** The screen-state globals had
+been investigated and written off with *do not re-investigate*. What that work
+actually proved was that the values are **not an enum** — true, they read as a
+bitfield. But "not an enum" is a far weaker claim than "cannot tell screens
+apart", and the stronger reading is what kept this unsolved for a session or
+two. Taken as a pair, id and depth separate every screen cleanly. **Re-read
+dead-end notes for what they proved, not for their headline.**
+
+**The fix uses the heuristic where it is trustworthy.** Ship movement is
+unreliable as *"the overworld is on screen"* but completely reliable as *"the
+overworld is on screen right now"*. So the gate learns the overworld's signature
+on ticks where the position demonstrably changed, and afterwards matches the
+live signature against what it learned. Motion learns the answer and is never
+the answer — which turns a permanent approximation into a one-time calibration,
+with no constants to maintain.
+
+It fails closed: an unrecognised screen draws nothing until the ship moves and
+teaches us its signature, and more than four overworld signatures logs a warning
+rather than going quiet.
+
+Full method, the two candidate signals that failed, and the measured table are in
+[`re/experiments/screen_state/`](../re/experiments/screen_state/README.md).
+
+### 16. Notices expired behind menus — FIXED
+
+A notice's life was wall-clock, so it kept counting down while nobody could see
+it: open the map with one up and it had gone by the time you came back. Its
+clock is now held whenever the overworld is off screen — both timestamps shift
+by exactly the elapsed time, leaving the remaining time untouched — so a notice
+resumes with what it had left. `seconds` now means seconds *seen*, which is what
+an author writing it meant.
+
+---
+
 ## Remaining, in priority order
 
 1. **Address single source of truth.** `re/out/offsets.json` and `src/core/game.h`
@@ -402,4 +452,7 @@ of bug that is expensive to diagnose.
 | **Decide at the top of the frame; show after the render.** | Presenting before the world is drawn gives a stale, half-drawn background. |
 | **Never present two dialogs in one frame.** | Same stale-buffer problem — use `events::PostFollowUp()`. |
 | **HUD text must be re-drawn every frame.** | The engine has no timed-message call; expiry is ours to track. |
+| **Drawing is gated on a learned screen signature, never on ship movement.** | Menus freeze the ship, so motion cannot separate a menu from a becalmed ship at sea. Motion learns the signature; it is never the test. |
+| **Measured screen signatures are evidence, never constants.** | Comparing against them means one unvisited HUD state stops all drawing, silently. |
+| **A notice's clock stops while it is off screen.** | Otherwise it expires unseen behind a menu and the player loses it for having glanced at the map. |
 | **Redirect a call site rather than detour a prologue, where possible.** | No trampoline, nothing relocated, one reversible write. |

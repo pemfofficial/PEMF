@@ -106,6 +106,12 @@ A notice can also **hang over your ship and follow it** as you sail, the way the
 game labels other vessels, and it can name the port you are approaching:
 *"Land ho! Nevis off the bow!"*
 
+Notices stay where they belong. They appear only in the sailing view — never
+over a town, a menu or the Load/Save screen — and if you open one of those with
+a notice up, **it waits for you**: its time is paused while it is out of sight,
+so you come back to it rather than finding it gone. Coming to a stop at sea does
+not cut one short either.
+
 ### Your saves are respected
 
 The mod keeps its own state — which events have fired, and in time your officers
