@@ -68,7 +68,9 @@ Full detail, including what we've already ruled out:
 
 PEMF has no network code, no persistence, no autostart, and touches nothing
 outside your game folder. It's MIT-licensed and every line is in this repo — read
-it, or build it yourself with `.\build.ps1 -Package` and compare hashes.
+it, or build it yourself with `.\build.ps1 -Package` and run the result instead
+of ours. (A rebuild won't match our hash byte-for-byte: MSVC stamps the build
+time into the DLL. Same code, different bytes.)
 
 ## What's here
 

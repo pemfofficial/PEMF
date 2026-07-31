@@ -58,7 +58,13 @@ network access of any kind, no autostart or persistence, no injection into
 processes other than the game you launched, no privilege escalation, no packing
 or obfuscation, no anti-analysis. It reads and writes only inside your game
 folder. The source is all here — read it, or build it yourself with
-`.\build.ps1 -Package` and compare.
+`.\build.ps1 -Package` and run your own build instead of ours.
+
+⚠️ A rebuild will **not** produce our hash. MSVC stamps the build time into the
+PE header, so the same source compiled twice gives two different files. Building
+from source proves the source is honest; it can't prove our binary came from it.
+The hashes above exist to confirm you got *our* published file intact, nothing
+more.
 
 A false-positive report has been filed with Microsoft. These usually clear in a
 few days, and the detection should stop on its own.
