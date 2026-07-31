@@ -470,7 +470,15 @@ the whole toolkit with an empty file, which is what makes their report useful.
 
 ### Signing
 
-The archive is **unsigned**, so Windows Smart App Control refuses to load it —
-`Bad Image ... 0xC0E90002`. See [`SIGNING.md`](SIGNING.md). Until that is
-resolved it belongs in the release notes and the FAQ, because it is the one
-failure a player cannot diagnose from the log.
+The archive is **unsigned and stays unsigned** — the SignPath Foundation
+rejected our application and paid certificates are out of scope. Two
+consequences, and both belong in every release's notes and FAQ, because neither
+is diagnosable from the log:
+
+- Smart App Control refuses to load the DLLs: `Bad Image ... 0xC0E90002`.
+- Defender may block the **download** as `Trojan:Win32/Wacatac.B!ml`, a cloud
+  ML false positive.
+
+See [`WINDOWS_SECURITY.md`](WINDOWS_SECURITY.md). **Publish the SHA256 of every
+artifact you ship** — with no signature, the hash is the only way a player can
+tell our build from someone else's.

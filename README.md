@@ -12,6 +12,64 @@ through the game's **own** text and dialog routines, so they look native.
 > **Not affiliated with Firaxis Games, 2K, or Atari.** PEMF ships **no game
 > files** and modifies none on disk. You must own a legitimate copy of the game.
 
+## ⬇️ Download
+
+### **[Get the latest release →](https://github.com/pemfofficial/PEMF/releases/latest)**
+
+Grab **`PEMF-0.2.0.zip`** from that page — it's the file under **Assets**.
+Unzip it into your game folder, the one with `Pirates!.exe` in it, and launch the
+game. That's the whole install; nothing else is needed and the game executable is
+never modified.
+
+**Don't use the green "Code" button** at the top of this page. That downloads the
+*source code*, which has no `version.dll` or `pemf_core.dll` in it — those are
+built, not stored here. If you ended up with a folder of `.cpp` files and no DLLs,
+that's what happened. Use the releases link above.
+
+**GOG and Steam both work.** To uninstall, delete `version.dll`, `pemf_core.dll`
+and the `PEMF` folder.
+
+### Check what you downloaded
+
+```powershell
+Get-FileHash .\PEMF-0.2.0.zip -Algorithm SHA256
+```
+
+| File | SHA256 |
+|---|---|
+| `PEMF-0.2.0.zip` | `AF66FB5F0581AF8321725C13DC1311C78FBB9756EE69C29E5C78F2E2080AF690` |
+| `pemf_core.dll` | `4997313EA02A4496285A94F82AC17216031CCF7BA7559ED9F97A0625059AE8FE` |
+| `version.dll` | `4A97CF1D1812CF1CEC5C639AB83FB62F2E3AFAF76FD7F284834BAB8208DD8175` |
+
+PEMF is unsigned, so this hash is your integrity check. If it doesn't match,
+you didn't get the file from us.
+
+## ⚠️ Windows may block it
+
+PEMF is **unsigned** — we applied to the SignPath Foundation's free
+open-source signing programme and were rejected, and paid certificates are out
+of scope for this project. Windows reacts to that in two ways:
+
+**Defender may refuse the download** as `Trojan:Win32/Wacatac.B!ml`. This is a
+**false positive**. The `!ml` suffix marks it as a machine-learning guess made in
+Microsoft's cloud rather than a match against known malware, and the published
+bytes scan clean against Defender's full signature set. A brand-new unsigned file
+that hooks into a game process is simply the shape a classifier distrusts —
+that's the same technique every PC mod loader has used for twenty years. Check
+the hash, then allow it in *Windows Security → Protection history*.
+
+**Smart App Control may block the game from starting**, with `Bad Image ...
+0xC0E90002`. Most people never see this — it only turns itself on for clean
+Windows 11 installs. The only fix is turning Smart App Control off, and that
+can't be undone without reinstalling Windows, so it's a fair reason to walk away.
+
+Full detail, including what we've already ruled out:
+**[`docs/WINDOWS_SECURITY.md`](docs/WINDOWS_SECURITY.md)**.
+
+PEMF has no network code, no persistence, no autostart, and touches nothing
+outside your game folder. It's MIT-licensed and every line is in this repo — read
+it, or build it yourself with `.\build.ps1 -Package` and compare hashes.
+
 ## What's here
 
 | Path | What |
@@ -39,15 +97,12 @@ the Windows SDK.
 .\build.ps1 -Package        # build + produce a ready-to-extract zip
 ```
 
+`-Package` writes `dist\PEMF-<version>.zip` — the same archive published on the
+releases page. `dist\` is not tracked in git, which is why the source tree
+contains no DLLs.
+
 See [`INSTALL.txt`](INSTALL.txt) for player install steps and
 [`docs/EVENT_AUTHORING.md`](docs/EVENT_AUTHORING.md) to write your own events.
-
-## Known issue: Windows Smart App Control
-
-On some Windows 11 machines, PEMF's DLLs are blocked at startup with
-`Bad Image ... 0xC0E90002`. This is Windows' **Smart App Control** refusing
-unsigned code — not a bug in the mod. See [`docs/SIGNING.md`](docs/SIGNING.md)
-for the full explanation and the fix (code signing).
 
 ## License
 

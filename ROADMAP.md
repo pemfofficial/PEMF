@@ -304,12 +304,21 @@ refuses any build it does not recognise rather than risk your game. Broadening
 that set means a version-detection step — fingerprint the game, load the right
 map — which is now ordinary work rather than research.
 
-### 🟡 Windows Smart App Control
+### 🔴 Windows blocks unsigned code — and PEMF will stay unsigned
 
-On some Windows 11 machines the mod's files are blocked at startup with a
-"Bad Image" / `0xC0E90002` error. That's Windows refusing to load unsigned code,
-not a bug in the mod. The fix is code signing, which is in progress. See
-[`docs/SIGNING.md`](docs/SIGNING.md) for the full story.
+Two separate symptoms, one root cause. Defender may refuse the **download** as
+`Trojan:Win32/Wacatac.B!ml` — a cloud machine-learning guess, not a signature
+match, and a false positive. On some Windows 11 machines Smart App Control
+blocks the game at **startup** with "Bad Image" / `0xC0E90002`.
+
+Code signing would answer both. We applied to the SignPath Foundation's free
+OSS programme and **were rejected**; paid certificates are out of scope for this
+project. So the workarounds are the answer: allow the file by hash, and turn
+Smart App Control off if it's on. Reputation should erode the antivirus half
+over time, and a false-positive report is filed with Microsoft.
+
+See [`docs/WINDOWS_SECURITY.md`](docs/WINDOWS_SECURITY.md) for the full story,
+the published hashes, and the approaches already ruled out.
 
 ---
 

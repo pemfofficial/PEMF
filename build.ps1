@@ -7,13 +7,19 @@
         .\build.ps1 -Package      # build, then produce a ready-to-extract zip
         .\build.ps1 -Deploy -Package
 
-    Code signing (see docs/SIGNING.md):
+    Code signing (see docs/WINDOWS_SECURITY.md):
         .\build.ps1 -Sign -CertThumbprint <sha1>      # cert in the user store
         .\build.ps1 -Sign -PfxPath key.pfx -PfxPassword <pw>
 
-    Windows Smart App Control blocks UNSIGNED DLLs from loading with
-    "Bad Image ... 0xC0E90002".  Signing is the only real fix; the version
-    resources below are hygiene, not a cure.
+    NOTE: there is no certificate.  The SignPath Foundation rejected us and paid
+    signing is out of scope, so releases ship UNSIGNED.  The switches above are
+    kept in case that ever changes.
+
+    Unsigned means Smart App Control blocks the DLLs from loading with
+    "Bad Image ... 0xC0E90002", and Defender may flag the download as
+    Trojan:Win32/Wacatac.B!ml (a cloud ML false positive).  The version
+    resources below are hygiene, not a cure.  Publish the SHA256 of what you
+    ship - it is the only integrity check players have.
 #>
 [CmdletBinding()]
 param(
@@ -25,7 +31,10 @@ param(
     [string]$PfxPassword,
     [string]$TimestampUrl = "http://timestamp.digicert.com",
     [string]$GameDir = "C:\GOG Games\Sid Meier's Pirates",
-    [string]$Version = "0.1.0"
+    # Bump this with each release. It is stamped into the DLL resources AND
+    # logged on the first line of pemf.log, so a stale default is not cosmetic:
+    # it makes a bug report name a version that was never shipped.
+    [string]$Version = "0.2.0"
 )
 
 $ErrorActionPreference = 'Stop'
@@ -83,7 +92,7 @@ echo === proxy ===
 cl $common /LD "$root\src\proxy\proxy.cpp" /Fe:version.dll /link kernel32.lib user32.lib "$build\proxy.res" /DEF:"$root\src\proxy\proxy.def" /OUT:version.dll
 if errorlevel 1 exit /b 1
 echo === core ===
-cl $common /LD "$root\src\core\core.cpp" /I"$root\src\core" /Fe:pemf_core.dll /link kernel32.lib user32.lib winmm.lib "$build\core.res" /OUT:pemf_core.dll
+cl $common /LD "$root\src\core\core.cpp" /I"$root\src\core" /I"$build" /Fe:pemf_core.dll /link kernel32.lib user32.lib winmm.lib "$build\core.res" /OUT:pemf_core.dll
 if errorlevel 1 exit /b 1
 exit /b 0
 "@
