@@ -233,5 +233,78 @@
     "overworld_combat": {
       "note": "Overworld vessels never open fire on the player. Combat begins on player contact. Hostility is real via negative reputation (ports close, hails fire) but no AI ship initiates."
     }
+  },
+  "weather": {
+    "_comment": "Storms and clouds on the sailing map. Drawn by the overworld tick FUN_004612B0, positioned via FUN_004BBC80, prefabs registered by FUN_00429610.",
+    "prefab_storm": {
+      "va": "0x008CCB58",
+      "asset": "stormcloud_sound.kfm (0x006FDD90)",
+      "note": "THE DARK STORM."
+    },
+    "prefab_cloud": {
+      "va": "0x008CC498",
+      "asset": "cloud00.nif (0x006FDD84)",
+      "note": "The ORDINARY WHITE cloud. Registered one line away from the storm; scaling this one by mistake enlarges fair weather and leaves storms untouched."
+    },
+    "storm_scale_site": {
+      "va": "0x0046374A",
+      "original": "8D 14 9B C1 E2 04",
+      "meaning": "lea edx,[ebx+ebx*4] ; shl edx,4  ->  EBX*80",
+      "note": "Six bytes = the length of `imul edx, ebx, imm32` (69 D3 imm32), so both instructions can be replaced by one with a tunable operand."
+    },
+    "storm_height_site": {
+      "va": "0x0046376E",
+      "original": "68 2C 01 00 00",
+      "meaning": "push 0x12C (z = 300)"
+    },
+    "cloud_scale_site": {
+      "va": "0x0046393A",
+      "original": "69 DB FA 00 00 00",
+      "meaning": "imul ebx,ebx,250"
+    },
+    "cloud_height_site": {
+      "va": "0x0046395D",
+      "original": "68 F4 01 00 00",
+      "meaning": "push 0x1F4 (z = 500)"
+    },
+    "slot_count_site": {
+      "va": "0x00463973",
+      "original": "83 F8 03",
+      "meaning": "cmp eax,3",
+      "note": "⛔ 3 IS A HARD CEILING. Positions live in two parallel arrays 0x008B98E4 (x) and 0x008B98F0 (y) that are 12 bytes apart -- exactly three dwords. A 4th slot writes the x array into the y array."
+    },
+    "loop_head": {
+      "va": "0x0046354A",
+      "note": "Weather slot loop. Index in [ESP+0x1c]; slot 0 special-cased at 0x00463563 and is the one the storm uses."
+    },
+    "pos_x_array": {
+      "va": "0x008B98E4",
+      "type": "int32[3]"
+    },
+    "pos_y_array": {
+      "va": "0x008B98F0",
+      "type": "int32[3]"
+    },
+    "draw_call": {
+      "va": "0x004BBC80",
+      "sig": "__thiscall (prefab, x, y, z, rotMatrix, scale, p7, p8)",
+      "note": "Drawn size = scale * 0.01, written to *(node+0x1c)+0x68. FUN_004BBC10 wraps it and builds the rotation matrix from three binary angles (x 2pi/2^32)."
+    },
+    "shared_world_scale": {
+      "va": "0x00725678",
+      "note": "⛔ DO NOT scale weather through this. It also feeds the ship AI's engagement distances (FUN_00467F90: *1000 and *0x960)."
+    },
+    "sounds": {
+      "cues": [
+        "NAV_THUNDER_LOW",
+        "NAV_THUNDER_MEDIUM",
+        "NAV_THUNDER_HIGH"
+      ],
+      "va": "0x0070B814",
+      "files": "Assets/Sounds/sailing/Storm.wav, StormBoom.wav, StormYell1/2/Neg-NNN.wav -- all LOOSE on disk, overridable"
+    },
+    "measured": {
+      "note": "Vanilla storm scale 80. Verified in game to 700 (8.75x) with height 1100, still a defined storm. Scale and height fight: scale 1000 at height 320 washed the whole screen to haze with no visible cloud. Purely visual -- storm gameplay effects not located."
+    }
   }
 }

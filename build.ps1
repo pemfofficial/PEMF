@@ -160,10 +160,12 @@ function Copy-Payload([string]$dest) {
     # is already there -- a rebuild must not discard someone's balance pass.
     $kmSrc = Join-Path $root 'content\PEMF\KeyMap_WASD.ini'
     if (Test-Path $kmSrc) { Copy-Item $kmSrc (Join-Path $dest 'PEMF') -Force }
-    $susSrc = Join-Path $root 'content\PEMF\suspicion.ini'
-    $susDst = Join-Path $dest 'PEMF\suspicion.ini'
-    if ((Test-Path $susSrc) -and -not (Test-Path $susDst)) {
-        Copy-Item $susSrc $susDst -Force
+    foreach ($ini in @('suspicion.ini', 'storms.ini')) {
+        $iniSrc = Join-Path $root "content\PEMF\$ini"
+        $iniDst = Join-Path $dest "PEMF\$ini"
+        if ((Test-Path $iniSrc) -and -not (Test-Path $iniDst)) {
+            Copy-Item $iniSrc $iniDst -Force
+        }
     }
     $docs = Join-Path $dest 'PEMF\docs'
     New-Item -ItemType Directory -Force $docs | Out-Null

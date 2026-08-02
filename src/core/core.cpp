@@ -42,6 +42,7 @@
 #include "content.h"
 #include "triggers.h"
 #include "render.h"
+#include "storms.h"
 #include "d3d9hook.h"
 
 #pragma intrinsic(_ReturnAddress)
@@ -2174,6 +2175,7 @@ static DWORD WINAPI Init(LPVOID)
     strncpy_s(g_gameDir, sizeof(g_gameDir), dir, _TRUNCATE);
     ScanFlags();
     suspicion::LoadTuning(dir);
+    storms::LoadTuning(dir);
     InstallWasdKeymap(dir);
 
     Log("false colours: Ctrl+Shift+8 changes your flag, 9 runs your own back "
@@ -2249,6 +2251,10 @@ static DWORD WINAPI Init(LPVOID)
         // so this is the only verification that build ever gets.
         game::ReportFeatureProbes();
 
+        // Weather is a byte patch on three immediates, so it waits for the
+        // target check like every other write into the game's code.
+        storms::Apply();
+
         // Install the hooks. On the packed build a slot may be filled slightly
         // after .text unpacks, so retry until all four take (or time out). Each
         // hook is installed at most once -- never re-patch an already-hooked slot
@@ -2304,6 +2310,7 @@ BOOL APIENTRY DllMain(HMODULE mod, DWORD reason, LPVOID reserved)
     else if (reason == DLL_PROCESS_DETACH && reserved == nullptr) {
         render::Uninstall();
         d3d9hook::Uninstall();
+        storms::Restore();
         // Restore the slots only on an explicit FreeLibrary. On process teardown
         // the address space is going away and touching locks risks a hang.
         // By-address restore works whether the hook was installed by name or by

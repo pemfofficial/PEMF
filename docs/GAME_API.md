@@ -1103,6 +1103,99 @@ map of what game state *is*. Sizes worth having:
 walks (`0x45C00 / 0x45C`). Twenty-four has been a serviceable window on the
 water near the player, never a correct bound.
 
+## Weather — storms and clouds on the sailing map
+
+Both are prefab instances drawn by the overworld tick `FUN_004612B0`, positioned
+every frame through `FUN_004BBC80`. Registered once at startup by
+`FUN_00429610`, which is also where the asset names live.
+
+### ⚠️ There are TWO cloud prefabs and they are not the same thing
+
+| Prefab | Asset | What it is |
+|---|---|---|
+| `0x008CC498` | `cloud00.nif` (`0x006FDD84`) | the **ordinary white fair-weather cloud** |
+| `0x008CCB58` | `stormcloud_sound.kfm` (`0x006FDD90`) | the **dark storm** |
+
+They are registered on adjacent lines, which is exactly why the first attempt at
+this scaled the wrong one: the sky filled with enormous white puffs while the
+storms stayed the size they always were. The symptom is unmistakable once you
+know it — *"the normal clouds look larger for sure"* with no change to the
+weather you actually wanted.
+
+### The draw call
+
+```c
+// __thiscall, ecx = prefab
+FUN_004BBC80(prefab, x, y, z, rotMatrix, scale, param_7, param_8);
+```
+
+and inside it the sixth argument lands on the scene node:
+
+```c
+*(float*)(*(int*)(node + 0x1c) + 0x68) = ABS((float)scale * 0.01);
+```
+
+so **drawn size is `scale * 0.01`**, and the caller's arithmetic is ours to
+change. `FUN_004BBC10` is a thin wrapper that converts three binary angles
+(x `2*pi/2^32`) into the rotation matrix first.
+
+### The three sites worth patching
+
+| What | Address | Original |
+|---|---|---|
+| **Storm size** | `0x0046374A` | `lea edx,[ebx+ebx*4]` + `shl edx,4` → `EBX * 80` |
+| **Storm height** | `0x0046376E` | `push 0x12C` (z = 300) |
+| **Fair cloud size** | `0x0046393A` | `imul ebx,ebx,0xFA` (x250) |
+| **Fair cloud height** | `0x0046395D` | `push 0x1F4` (z = 500) |
+| **Weather slots** | `0x00463973` | `cmp eax,3` |
+
+The storm pair is **six bytes**, exactly the length of `imul edx, ebx, imm32`
+(`69 D3 imm32`), so PEMF replaces both instructions with one that computes the
+same value from an operand it controls — same registers, same result, no code
+displacement. See [`src/core/storms.h`](../src/core/storms.h).
+
+### ⛔ THREE WEATHER SLOTS IS A HARD CEILING
+
+The loop at `0x0046354A` indexes two parallel arrays:
+
+```
+0x008B98E4   x positions
+0x008B98F0   y positions
+```
+
+**They are 12 bytes apart — exactly three dwords.** A count of 4 reads and
+writes the x array into the y array. `cmp eax,3` looks like a "how much weather"
+dial and is really "how far past the end of an array shall we go". Storms and
+clouds share these slots; slot 0 is special-cased (`test esi,esi` at
+`0x00463563`) and is the one the storm uses.
+
+More storms therefore cannot come from the count. The route, unproven, is to
+call `FUN_004BBC80` ourselves with the storm prefab at jittered offsets — the
+engine plainly supports several instances per frame, since that is how three
+slots become three separate clouds.
+
+### ⛔ Do not scale weather through `0x00725678`
+
+It feeds the fair-cloud scale **and** the ship AI's engagement distances
+(`FUN_00467F90` reads `DAT_00725678 * 1000` and `* 0x960`). Scaling weather
+through it would quietly change how ships fight.
+
+### Measured limits
+
+Vanilla storm scale is 80. Verified in game up to **700 (8.75x)** with height
+raised to 1100, still reading as a defined storm with a visible edge. Size and
+height fight each other: a large cloud left at a low altitude swallows the
+camera and reads as fog rather than weather — at scale 1000 with height 320 the
+whole screen washed to a pale haze with no visible cloud at all. **Raise the
+height whenever you raise the scale.**
+
+Sound is already loose on disk and named by intensity: `Storm.wav`,
+`StormBoom.wav`, `StormYell1/2/Neg-NNN.wav`, and the cues `NAV_THUNDER_LOW` /
+`_MEDIUM` / `_HIGH` (`0x0070B814`).
+
+**Purely visual.** Whether a storm does more to your ship — damage, crew, speed
+— lives somewhere else and has not been located.
+
 ## Making ships — the factory
 
 The engine has no way to make an existing vessel hostile: **nothing anywhere
