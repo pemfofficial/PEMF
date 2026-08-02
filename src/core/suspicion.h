@@ -41,6 +41,7 @@
 #include "game.h"
 #include "state.h"
 #include "nations.h"
+#include "standing.h"
 
 namespace suspicion {
 
@@ -116,6 +117,10 @@ struct Hunt {
     DWORD startedAt = 0;
     DWORD lastAimAt = 0;
     int   aimCity  = -1;
+    // Where she was at the previous re-aim, so the log can say whether the
+    // re-issued order actually kept her under way or she is sitting in harbour.
+    int   lastX = 0, lastY = 0;
+    bool  havePos = false;
 };
 
 // Several per nation, because a crown that truly wants you does not send one
@@ -197,6 +202,11 @@ inline void LoadTuning(const char* gameDir)
             { "hunterGiveUpMs", &g_tune.hunterGiveUpMs },
             { "hunterEscapeDist", &g_tune.hunterEscapeDist },
             { "maxPerNation",   &g_tune.maxPerNation },
+            // The standing ledger lives in its own header but tunes from the
+            // same file -- one place a player edits, not two.
+            { "debtForgetMonths",  &standing::kDebtForgetMonths },
+            { "actNotorietyShare", &standing::kActNotorietyShare },
+            { "actSpillPercent",   &standing::kActSpillPercent },
         };
         for (const Entry& e : table) {
             if (_stricmp(key, e.name) == 0) { *e.slot = value; ++applied; break; }
@@ -227,7 +237,14 @@ struct Look {
     int port  = -1;     // their settlement within portRange, or -1
     int portDist = 0;
     int nearest  = 0;   // closest vessel of theirs, for the panel
+    int nearestSlot = -1;  // which slot she was in -- tells us whether the old
+                           // 24-slot window was ever going to see her
 };
+
+// The most recent Observe(), kept so the panel can say what is actually driving
+// the meter. "Something is watching you" with nothing visible on screen reads as
+// a bug; "their harbour" or "2 sail" reads as a situation.
+inline Look g_lastLook;
 
 inline Look Observe(int nation)
 {
@@ -237,7 +254,13 @@ inline Look Observe(int nation)
     const int px = game::PlayerX() / 1000;
     const int py = game::PlayerY() / 1000;
 
-    for (int i = 1; i < 24; ++i) {
+    // THE WHOLE SEA, not the first 24 slots. The ship array is 256 slots (the
+    // save serializer writes 0x45C00 bytes over a 0x45C stride), and scanning
+    // only 24 of them is why a disguise could be tested by a PORT but almost
+    // never by a SHIP: the city walk below has always covered all 128 cities,
+    // so ports worked and vessels quietly did not. Observed in a playtest as
+    // sailing right alongside a Dutch West Indiaman while the meter sat at zero.
+    for (int i = 1; i < game::addr::kMaxShips; ++i) {
         const int type = game::ShipType(i);
         if (type == -1) continue;
         const int x = *(const int*)(game::ShipRecord(i) + 0x0C) / 1000;
@@ -249,7 +272,7 @@ inline Look Observe(int nation)
 
         if (game::ShipNationality(i) == nation) {
             if (d <= g_tune.shipRange) ++look.ships;
-            if (d < look.nearest) look.nearest = d;
+            if (d < look.nearest) { look.nearest = d; look.nearestSlot = i; }
         }
     }
     if (look.nearest == 0x7FFFFFFF) look.nearest = -1;
@@ -370,7 +393,18 @@ inline void ReaimHunter(Hunt& h)
         if (d < 0 || d >= bestDist) continue;
         bestDist = d; best = c;
     }
-    if (best < 0 || best == h.aimCity) return;
+    if (best < 0) return;
+
+    // RE-ISSUE EVERY TIME, even when the destination has not changed. Skipping
+    // the write when `best == h.aimCity` looks like an obvious saving and is the
+    // reason a hunt died halfway: she reaches the port we aimed her at, and a
+    // ship that has ARRIVED stops. Because our idea of where she should go had
+    // not changed, we never ordered her anywhere again, so she stayed in harbour
+    // while the player -- still hostile to her nation, still shot at on sight --
+    // watched her sit there. Reported from a playtest in exactly those words.
+    //
+    // The order is what keeps her under way; the destination merely says which
+    // way. Re-issuing costs one write every hunterReaimMs.
     game::SetShipDestCityRaw(h.slot, best);
     h.aimCity = best;
 }
@@ -407,7 +441,18 @@ inline void TickHunts()
 
         if ((int)(now - h.lastAimAt) >= g_tune.hunterReaimMs) {
             h.lastAimAt = now;
+            const int moved = h.havePos
+                            ? Octagonal(hx - h.lastX, hy - h.lastY) : -1;
+            const int wasAim = h.aimCity;
             ReaimHunter(h);
+            // Whether she is actually SAILING is the open question behind the
+            // re-issue fix -- `moved 0` here across several ticks means the
+            // order is not enough by itself and she needs somewhere new to go.
+            Log("suspicion: %s hunter slot %d -- dist %d, moved %d, aim %d%s",
+                game::NationName(h.nation), h.slot,
+                Octagonal(hx - px, hy - py), moved, h.aimCity,
+                h.aimCity == wasAim ? " (re-issued)" : " (new)");
+            h.lastX = hx; h.lastY = hy; h.havePos = true;
         }
     }
 }
@@ -445,13 +490,18 @@ inline void Unmask(int nation)
     int penalty = g_tune.repPenalty;
     if (look.nearest > g_tune.closeRange && look.port < 0) penalty = (penalty + 1) / 2;
 
+    // Through the ledger, NOT straight into the engine's word. Being seen
+    // through is a fright, and a fright lapses if the captain never makes good
+    // on it -- standing.h decides whether this one does. The reputation the
+    // world reacts to is written by its Tick, not here.
     const int before = nations::Reputation(nation);
-    const int after  = before - penalty;
-    game::SetReputationRaw(nation, after);
+    standing::NoteUnmasked(nation, penalty);
+    const int after = standing::Effective(nation);
 
     Log("suspicion: UNMASKED by the %s -- reputation %d -> %d (penalty %d, "
-        "nearest of theirs %d) -- %s", game::NationName(nation), before, after,
-        penalty, look.nearest,
+        "nearest of theirs %d in slot %d) -- %s",
+        game::NationName(nation), before, after,
+        penalty, look.nearest, look.nearestSlot,
         after < 0 ? "their ports are now closed to us"
                   : "still tolerated, but barely");
 
@@ -502,6 +552,7 @@ inline void Tick(DWORD dtMs)
     NationSuspicion& s = g_sus[nation];
 
     const Look look = Observe(nation);
+    g_lastLook = look;      // the panel says WHO is looking, not just that someone is
     const int  rate = RateFor(nation, look);
     s.lastRate = rate;
 
@@ -594,6 +645,25 @@ inline void RefreshPanel()
     // nobody is looking, an eye-ish glyph when they are.
     _snprintf_s(g_panel[g_panelLines++], 96, _TRUNCATE, "%s %s",
                 bar, s.lastRate > 0 ? "<" : " ");
+
+    // WHAT is looking. Without this the meter climbs with nothing of theirs
+    // visible anywhere on screen, which reads as the system misfiring rather
+    // than as a harbour over the horizon taking an interest. A port is the
+    // usual culprit and the one you cannot see coming.
+    if (s.lastRate > 0) {
+        const Look& L = g_lastLook;
+        if (L.port >= 0 && L.ships > 0) {
+            _snprintf_s(g_panel[g_panelLines++], 96, _TRUNCATE,
+                        "their harbour, %d sail", L.ships);
+        } else if (L.port >= 0) {
+            _snprintf_s(g_panel[g_panelLines++], 96, _TRUNCATE, "their harbour");
+        } else if (L.ships > 0) {
+            _snprintf_s(g_panel[g_panelLines++], 96, _TRUNCATE,
+                        "%d sail watching", L.ships);
+        } else if (L.close > 0) {
+            _snprintf_s(g_panel[g_panelLines++], 96, _TRUNCATE, "seen at close range");
+        }
+    }
 
     if (hunters > 0) {
         _snprintf_s(g_panel[g_panelLines++], 96, _TRUNCATE,

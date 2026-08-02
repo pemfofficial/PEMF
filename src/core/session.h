@@ -46,6 +46,7 @@
 #include <string.h>
 #include "log.h"
 #include "state.h"
+#include "standing.h"
 
 namespace session {
 
@@ -226,6 +227,9 @@ inline bool Save(const char* savePath)
     fprintf(f, "fpMonths=%d\n", state::Months());
     fprintf(f, "fpGold=%d\n",   state::Plunder());
     fprintf(f, "fpCrew=%d\n",   state::Crew());
+    // What we forgave and what we remember. The save itself is the authority on
+    // plain standing, so only the parts the game cannot know are written here.
+    standing::Save(f);
     fclose(f);
     Log("session: wrote sidecar (eventsFired=%d) -> %s",
         g_state.eventsFired, path);
@@ -249,6 +253,11 @@ inline void ReadName(const char* src, char* out, size_t outsz)
     out[n] = 0;
 }
 
+// The ledger read from a sidecar but NOT yet applied, on the same terms as the
+// rest of the staged state: nothing lands until the career proves it is the one
+// the file belongs to.
+inline standing::Ledger g_stagedStanding[standing::kNations];
+
 inline bool LoadInto(const char* savePath, ModState& out)
 {
     char path[MAX_PATH];
@@ -262,9 +271,11 @@ inline bool LoadInto(const char* savePath, ModState& out)
     }
 
     ModState loaded;
+    standing::Ledger led[standing::kNations];
     char line[256];
     while (fgets(line, sizeof(line), f)) {
         int v = 0;
+        if (standing::LoadLine(line, led))                    continue;
         if (sscanf_s(line, "version=%d", &v) == 1)            loaded.version = v;
         else if (sscanf_s(line, "eventsFired=%d", &v) == 1)   loaded.eventsFired = v;
         else if (sscanf_s(line, "lastEventTick=%d", &v) == 1) loaded.lastEventTick = v;
@@ -287,6 +298,7 @@ inline bool LoadInto(const char* savePath, ModState& out)
 
     loaded.valid = true;
     out = loaded;
+    for (int n = 0; n < standing::kNations; ++n) g_stagedStanding[n] = led[n];
     Log("session: sidecar read (eventsFired=%d, flag='%s') <- %s",
         out.eventsFired, out.flagName[0] ? out.flagName : "-", path);
     return true;
@@ -479,6 +491,8 @@ inline bool Tick()      // returns true if the career context just changed
             Log("session: state applied from the loaded save (eventsFired=%d, "
                 "flag='%s')", g_state.eventsFired,
                 g_state.flagName[0] ? g_state.flagName : "-");
+            // The ledger lands on the same proof as everything else.
+            standing::ApplyStaged(g_stagedStanding);
         } else if (GetTickCount() - g_stagedAt > kStagedTimeoutMs) {
             Log("session: the staged save does not match this career "
                 "(months %d vs %d, gold %d vs %d, crew %d vs %d) -- discarded",

@@ -1466,6 +1466,144 @@ fallback.
 None of these need the render hook; they are ordinary reverse engineering of the
 combat setup, and player-vs-AI needs no networking.
 
+## The notice strip — the game's own notification line
+
+> **Confidence: verified in-game.** PEMF posts to this strip in the shipping
+> build; the screenshots show our text on the game's own parchment.
+
+The torn-paper strip along the bottom of the sailing screen — where the game
+says *"Pirate attack on the city of Nevis defeated by local militia."* — is
+**two plain globals and no function call at all**. It is the cheapest thing in
+this document to use and the safest: no hook, no stack, no re-entrancy.
+
+### The two globals
+
+| Address | Type | What it is |
+|---|---|---|
+| `0x00876BF8` | `char[256]` | the strip's text buffer |
+| `0x008CA9E8` | `uint8` | visibility counter — drawn while non-zero |
+
+`0x008CA9E8` is a **countdown, not a timestamp**. The game's own post sets it to
+**100** and `FUN_004612B0` decrements it once per update tick:
+
+```asm
+004633B3  MOV  AL, [0x008CA9E8]
+004633B8  TEST AL, AL
+004633BA  JZ   done
+004633BC  DEC  AL
+004633BE  MOV  [0x008CA9E8], AL
+```
+
+### Capacity is 256 bytes — measured, not assumed
+
+The next address any code references above the buffer is `0x00876CF8`, exactly
+`+0x100`, with nine referents of its own. Scan for it with:
+
+```bash
+# 4-byte LE operands in .text falling just above the buffer
+python re/scripts/xref_scan.py   # same technique as callers_of.py
+```
+
+**The game does not respect this bound.** `FUN_004600A0` `strcpy`s in from the
+4096-byte compose buffer with no length check — a latent overflow in the
+original. PEMF caps at 200 and refuses rather than truncating into a global.
+
+### Who draws it
+
+`FUN_004741B0` is the **overworld sailing HUD** — it also draws Fame, `@NUM
+knots`, `@NUM crew` and the date. Per-frame and non-blocking:
+
+```c
+if (DAT_008CA9E8 != 0) {
+    tex = FUN_004CDDF0("tornPaper.dds", 0, 0, &w, &h);
+    FUN_004AF080(tex, 0, 0, w, h, x, y, ...);
+    FUN_004B06C0(&DAT_00876BF8, x, y, 0x32, 0xFF1A3E1A, 1, 200, 0);
+}
+```
+
+`0xFF1A3E1A` is the dark green the strip's text is drawn in.
+
+### The game's own post — `FUN_004600A0`
+
+```c
+void FUN_004600A0(void)
+{
+    FUN_004879F0(0x20, 0);        // WrapText to 32 columns
+    strcpy(0x00876BF8, 0x00869B48);
+    DAT_008CA9E8 = 100;
+}
+```
+
+Called at `0x0044E91B`, right after the news composer finishes. **The `0x20` is
+the wrap width** — 32 columns is the strip's own break point, so text wrapped to
+anything else will not line up with the game's.
+
+### There is no queue — this is the important part
+
+The strip is **one slot, last-write-wins**. Posting overwrites whatever is on it
+mid-display, with no way to recover it. Write blind and you will eat the game's
+own news: a player would simply never learn their city had been raided.
+
+Anything sharing the strip must therefore **gate on `0x008CA9E8 == 0`** and hold
+its own queue. PEMF does this in `content::PumpNoticeStrip()`, pumped from the
+safe point so the "is it free" question is asked once per frame.
+
+### Doing it without calling the game
+
+Because the API is two globals, the whole thing is:
+
+```c
+// text first, counter LAST -- the HUD reads both every frame, and setting the
+// counter first exposes one frame of whatever the buffer still held.
+memcpy((void*)0x00876BF8, text, len + 1);
+*(unsigned char*)0x008CA9E8 = ticks;
+```
+
+`FUN_004600A0` itself is **not** worth calling: it would re-wrap whatever is
+currently in `0x00869B48` and clobber our text.
+
+---
+
+## `FUN_004888E0` is AUDIO — a trap that has caught us twice
+
+> **Confidence: proven by the function's own error string.**
+
+`FUN_004888E0` sits immediately after the news composer's text work and looks
+exactly like a presenter. It is not. Its own diagnostic string at `0x00709E20`
+is:
+
+> `"The audio manager has not been properly initialized yet"`
+
+logged when the vtable predicate `[[0x008ECD78]+0x18]` (audio-manager-ready)
+returns 0. On the call shape:
+
+```asm
+PUSH -1.0f ; PUSH -1 ; PUSH -1 ; PUSH <n>
+OR ESI,-1  ; XOR EAX,EAX ; OR ECX,-1
+CALL 0x004888E0            ; then ADD ESP,0x10
+```
+
+`<n>` is a **sound id**, not a presentation style — `0x2A` is the news sting,
+`0x39` the card's. The single `float` is volume/pan; the `-1`s are channel and
+priority defaults. The `CALL 0x00412810; CMP EAX,0x1C; JGE skip` guard around
+the news call is *positional* audio: no sting for a city across the map.
+
+`FUN_00488A80` next door is likewise audio (the spoken-callout entry point).
+
+**Rule for the `0x4888xx`–`0x4889xx` range: read the function's own format and
+error strings before naming it.** Two byte-identical call sites differing in one
+integer prove nothing about what that integer means.
+
+### Related text-layout helpers
+
+| Address | What it actually is |
+|---|---|
+| `0x00509500` | **Text measurement.** `(font, str, stopAtNewline)` — walks glyph widths off the font object at `+0x44`, handles `\n` and `<` markup, returns max line width as `float10`. Presents nothing. |
+| `0x005F0DDC` | CRT `float`→`int64` **round** helper (consumes ST0). Not a timer. |
+| `0x00487E90` | **Fit-to-width.** Measures the buffer, then while the result is narrower than the available width *and* runs to more than 3 lines, widens the `WrapText` column by 2 and retries. Finds the narrowest wrap that fits in three lines. |
+
+---
+
 ## Audio / Sound System
 
 > **Confidence: decompiled, not yet run.** Recovered by byte analysis
@@ -1624,6 +1762,11 @@ marked otherwise. Nothing here is inferred from disassembly alone unless said so
 | `AddTextOption` renders selectable options on a modal card | **Disproven** — it is the town-menu system |
 | `ShowMessage` with `eax = 10` as a one-shot modal | **Disproven** — non-blocking, returns `-2` |
 | In-game event triggers | Not started |
+| Notice strip (`0x00876BF8` + `0x008CA9E8`) drives the game's own bottom-of-screen line | **Verified in-game** — PEMF's notices appear on it |
+| Notice-strip buffer is 256 bytes | **Verified statically** — next referenced global is `0x00876CF8`, exactly `+0x100` |
+| Notice strip has **no queue**; posting overwrites | **Verified statically** — single buffer, single counter, no backing store |
+| `FUN_004888E0` is audio, not presentation | **Proven** — its own error string names the audio manager |
+| `FUN_00509500` measures text; `FUN_00487E90` fits it to width | **Decompiled** |
 | Audio engine = Miles (`Mss32.dll`), 71-import IAT map | **Verified statically** — byte analysis of the import table |
 | Sound module + loader/player function roles | **Decompiled** — read from the actual code |
 | High-level play is **by numeric id** from a registered table (`0x008ED4A0`) | **Decompiled** — not yet exercised |

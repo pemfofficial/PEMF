@@ -181,6 +181,32 @@ namespace addr {
     constexpr uintptr_t ShipNationality = 0x008142FC;   // int16, +0x04
     constexpr uintptr_t ShipFlags       = 0x00814350;   // dword, +0x58
 
+    // ------------------------------------------- the game's own notice strip
+    // The torn-paper strip along the bottom of the sailing screen -- the one the
+    // game posts its own news to ("Pirate attack on the city of @CITYNAME
+    // defeated by local militia."). Drawn by the overworld HUD, FUN_004741B0:
+    //
+    //   if (NoticeTtl != 0) { tex = load("tornPaper.dds"); blit(tex, ...);
+    //                         DrawText(NoticeText, x, y, 0x32, 0xFF1A3E1A, ...) }
+    //
+    // Two plain globals, so posting to it needs NO engine call at all -- write
+    // the text, set the counter. That is the whole API, and it is the safest
+    // thing in this file: no hook, no stack, no re-entrancy.
+    //
+    // NoticeTtl is a BYTE counter, not a timestamp. The game's own post sets it
+    // to 100 and FUN_004612B0 decrements it once per update tick
+    // (`TEST AL,AL; JZ; DEC AL`), so the strip shows while it is non-zero.
+    //
+    // CAPACITY IS 256 BYTES AND THAT IS MEASURED, NOT ASSUMED: the next global
+    // any code references is 0x00876CF8, exactly +0x100, with 9 referents of its
+    // own. Note the GAME does not respect it -- FUN_004600A0 strcpy's into here
+    // from the 4096-byte compose buffer unbounded, which is a latent overflow in
+    // the original. Ours is bounded.
+    constexpr uintptr_t NoticeText   = 0x00876BF8;
+    constexpr size_t    kNoticeMax   = 0x100;      // to 0x00876CF8, exclusive
+    constexpr uintptr_t NoticeTtl    = 0x008CA9E8; // uint8, counts down per tick
+    constexpr int       kNoticeTicks = 100;        // what the game's own post uses
+
     // Nation indices, fixed by the flag-mesh table that FUN_0046baa0 builds:
     //   prototypes 0x00860B40 + nation*4   (Flag_Sp/En/Fr/Du/Pi .nif)
     //   live nodes 0x00860B54 + nation*4   (clones via FUN_004bb500)
@@ -1010,6 +1036,47 @@ inline int ShipType(int index)
         return *(const short*)(addr::ShipArray + (uintptr_t)index * addr::kShipStride);
     }
     __except (EXCEPTION_EXECUTE_HANDLER) { return -1; }
+}
+
+// ------------------------------------------------ the game's own notice strip
+// Is the strip currently showing something? Non-zero means the game (or we) put
+// a line there and it has not run out yet.
+//
+// THIS IS THE WHOLE REASON A CALLER MUST ASK. The strip is ONE SLOT and the
+// game keeps no queue of its own: posting overwrites whatever is on it, mid
+// display, with no way to get it back. Writing blind would eat the game's own
+// news -- a player would simply never learn that their city had been raided.
+inline int NoticeStripTicksLeft()
+{
+    __try {
+        return *(const unsigned char*)addr::NoticeTtl;
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER) { return -1; }
+}
+
+inline bool NoticeStripBusy() { return NoticeStripTicksLeft() != 0; }
+
+// Put a line on the strip. Text first, counter LAST: the HUD draw reads both
+// every frame, and setting the counter first would expose it to one frame of
+// whatever the buffer still held.
+//
+// Bounded to kNoticeMax even though the game's own post is not -- see the note
+// on the address. Returns false rather than truncating silently into a global.
+inline bool PostNoticeStrip(const char* text, int ticks = addr::kNoticeTicks)
+{
+    if (!text || !*text) return false;
+    if (ticks <= 0)   ticks = addr::kNoticeTicks;
+    if (ticks > 0xFF) ticks = 0xFF;              // it is a byte
+
+    const size_t n = strlen(text);
+    if (n + 1 > addr::kNoticeMax) return false;   // caller's problem, not a wrap
+
+    __try {
+        memcpy((void*)addr::NoticeText, text, n + 1);
+        *(unsigned char*)addr::NoticeTtl = (unsigned char)ticks;
+        return true;
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
 }
 
 // Field offsets are derived from the absolute addresses the disassembly uses,

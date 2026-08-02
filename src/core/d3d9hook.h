@@ -138,7 +138,20 @@ HRESULT WINAPI PemfPresentHook(void* device, const RECT* src, const RECT* dst,
 HRESULT WINAPI PemfEndSceneHook(void* device)
 {
     InterlockedIncrement(&g_pemfEndSceneCalls);
-    PemfOnEndScene(device);
+
+    // ONE PASS ONLY, exactly as BeginScene already does. A displayed frame runs
+    // 2-3 Begin/EndScene pairs, and this hook used to fire on every one of them
+    // -- so the screen notices were laid down two or three times per frame, each
+    // run starting again at y=8 under a slightly different projection. On screen
+    // that is one line of text with a second copy printed a few pixels off it,
+    // which reads as a duplicated notice and was reported as exactly that.
+    //
+    // The counter is incremented by the BeginScene hook, so the first pair has
+    // it at 1 by the time we get here. Reset comes from the safe point (see the
+    // note on g_pemfPassThisFrame -- NOT from Present, which this game never
+    // calls on the device).
+    if (g_pemfPassThisFrame == 1) PemfOnEndScene(device);
+
     return ((PemfEndScene_t)g_pemfOrigEndScene)(device);
 }
 

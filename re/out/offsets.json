@@ -16,12 +16,14 @@
     "AddText_mode0": {
       "va": "0x004F6090",
       "sig": "void (const char* fmt, ...)  // esi = msgbuf, internal flag 0",
-      "xref_count": 114
+      "call_sites": 740,
+      "distinct_callers": 96
     },
     "AddText_mode1": {
       "va": "0x004F60B0",
       "sig": "void (const char* fmt, ...)  // esi = msgbuf, internal flag 1",
-      "xref_count": 42
+      "call_sites": 416,
+      "distinct_callers": 47
     },
     "Formatter_core": {
       "va": "0x004F60D0",
@@ -33,7 +35,7 @@
   "crew": {
     "_comment": "Discovered via the mutiny and 'Your crew of @NUM is @HAPPY' call sites.",
     "crew_count":        { "va": "0x00869AB0", "type": "int32" },
-    "unknown_869AB4":    { "va": "0x00869AB4", "type": "int32", "note": "read in morale calc, +0x1F4 applied; gold or food?" },
+    "gold_869AB4":       { "va": "0x00869AB4", "type": "int32", "note": "GOLD (plunder). Read immediately after the divide-plunder text call at 0x0041032A (`mov eax,[0x869AB4]`), and it is slot 0 of the 7-entry contiguous cargo-hold array. Was 'gold or food?'; the divide-plunder read settles it." },
     "months_at_sea":     { "va": "0x00869B1A", "type": "int16", "note": "used by mutiny message" },
     "morale_byte_869B27":{ "va": "0x00869B27", "type": "int8",  "note": "shl 2 then subtracted in morale calc" },
     "flags_869B34":      { "va": "0x00869B34", "type": "int32", "note": "bit 0x80 tested in morale calc" },
@@ -47,14 +49,47 @@
       "sig": "const char* ()",
       "note": "Returns the @HAPPY substitution string. Internally computes a score clamped to [1, 999] (0x3E7)."
     },
-    "ShowMessageCard": {
+    "WrapText": {
       "va": "0x004879F0",
-      "sig": "(int id, int flag)  // CANDIDATE - not yet confirmed",
-      "note": "Called right after AddText at both the mutiny (id=0x2C) and crew-status (id=0x64) sites. Likely commits the composed buffer to a presented card."
+      "sig": "cdecl (int width, int mode) -> int lineCount",
+      "note": "CONFIRMED 2026-08-02, and NOT a card presenter -- an earlier note guessed '(int id, int flag) ShowMessageCard'. param_1 is a COLUMN WIDTH: it pulls the message text via FUN_00412F10, wraps it with FUN_004F22C0(&s, width), strcpy's the result into the shared buffer 0x869B48 and returns the line count."
+    },
+    "MeasureText": {
+      "va": "0x00509500",
+      "sig": "(void* font, const char* s, char stopAtNewline) -> float10 maxLineWidth",
+      "note": "Text MEASUREMENT, presents nothing. Walks glyph widths off the font object at +0x44; handles '\\n' and '<' markup."
+    },
+    "FitTextToWidth": {
+      "va": "0x00487E90",
+      "sig": "__fastcall (int width)",
+      "note": "Measures the buffer, then while it is narrower than the space available AND runs past 3 lines, widens the WrapText column by 2 and retries. Finds the narrowest wrap that fits in three lines."
+    },
+    "PlaySoundCue": {
+      "va": "0x004888E0",
+      "sig": "(ecx, eax, esi, int soundId, int, int, float) // cdecl stack args",
+      "note": "AUDIO, NOT PRESENTATION -- proven by its own error string at 0x00709E20, 'The audio manager has not been properly initialized yet'. The int arg is a SOUND ID (0x2A news sting, 0x39 card). This function has been mistaken for a text presenter twice; FUN_00488A80 next door is the spoken-callout entry point. Read the strings in 0x4888xx-0x4889xx before naming anything there."
+    },
+    "PostNoticeStrip": {
+      "va": "0x004600A0",
+      "sig": "void ()",
+      "note": "The game's own post to the bottom-of-screen notice strip: WrapText(0x20=32 cols), strcpy 0x869B48 -> 0x876BF8, then set the 0x8CA9E8 counter to 100. Called at 0x0044E91B after the news composer."
+    },
+    "OverworldHudDraw": {
+      "va": "0x004741B0",
+      "sig": "void ()",
+      "note": "The sailing-screen HUD: Fame, '@NUM knots', '@NUM crew', the date, and the notice strip (gated on 0x8CA9E8, art 'tornPaper.dds', text drawn with FUN_004B06C0 in 0xFF1A3E1A)."
     }
   },
 
+  "notice_strip": {
+    "_comment": "The game's own notification line along the bottom of the sailing screen. TWO PLAIN GLOBALS -- posting needs no engine call at all. ONE SLOT, NO QUEUE: a post overwrites whatever is showing, so anything sharing it must gate on the counter being 0 or it will eat the game's own news.",
+    "text":  { "va": "0x00876BF8", "type": "char[256]", "note": "Capacity MEASURED: the next referenced global is 0x00876CF8, exactly +0x100, with 9 referents. The GAME does not respect it -- FUN_004600A0 strcpy's in from the 4096-byte compose buffer unbounded." },
+    "ttl":   { "va": "0x008CA9E8", "type": "uint8", "note": "Visibility COUNTDOWN, not a timestamp. Set to 100 by the game's own post; decremented once per update tick by FUN_004612B0 at 0x004633B3. Drawn while non-zero." },
+    "wrap_columns": 32
+  },
+
   "call_sites": {
+    "_comment": "These VAs point at the START OF THE ARGUMENT SETUP, not at the CALL instruction itself -- e.g. divide_plunder 0x00410321 sets up, and the actual `call 0x004F6090` is at 0x0041032A. Verified against Ghidra 2026-08-02.",
     "mutiny_message":  "0x004125A0",
     "crew_status":     "0x00443DC0",
     "divide_plunder":  "0x00410321",
@@ -63,7 +98,8 @@
   },
 
   "code_cave": {
-    "_comment": "Present only in the cp-base/Challenge-Pack exe, NOT in gog-original. Empty (all zero) in cp-base.",
+    "_comment": "OUT OF SCOPE -- PEMF targets GOG + Steam ONLY. The Challenge Pack (cp-base) is NOT a supported target. Kept for reference only; do not build features on this. Present only in the cp-base/Challenge-Pack exe, NOT in gog-original. Empty (all zero) in cp-base.",
+    "_status": "not-a-target",
     "modCode": { "va": "0x004F3000", "size": 4096, "prot": "RWX" },
     "modData": { "va": "0x004F4000", "size": 4096, "prot": "RW" }
   }

@@ -785,6 +785,104 @@ inline void ClearNotices()
     g_noticeCount = 0;
 }
 
+// ----------------------------------------------- the game's own notice strip
+// The torn-paper line along the bottom of the sailing screen. Using it instead
+// of drawing our own text means our notices look like the game's, because they
+// ARE the game's -- same strip, same font, same parchment.
+//
+// THE GAME KEEPS NO QUEUE. The strip is a single buffer plus a countdown, and a
+// post overwrites whatever is showing. So the queue is ours, and the rule it
+// exists to enforce is: NEVER WRITE WHILE THE STRIP IS BUSY. A busy strip may
+// be showing the game's own news -- a raided city, a promotion -- and clobbering
+// that would delete something the player never got to read.
+//
+// Ours therefore WAIT. Nothing is dropped for being unlucky with timing, which
+// is the whole point of having a queue rather than posting where we please.
+// Off sends screen notices back to our own top-of-screen draw, which is worth
+// keeping reachable: the strip is one line, so a long line or a burst of them
+// reads better stacked. Anchored notices ignore this entirely -- they follow the
+// ship and the strip cannot.
+inline bool g_useNativeStrip = true;
+
+constexpr int kMaxStripQueue = 4;
+constexpr int kStripLineMax  = 200;   // well inside the measured 256-byte buffer
+
+inline std::string g_stripQueue[kMaxStripQueue];
+inline int         g_stripCount = 0;
+inline std::string g_stripLast;       // what we put up most recently
+
+// The strip is a fixed-size piece of art and the text is NOT wrapped to it for
+// us: a line longer than the parchment simply runs off both ends of it, which
+// is what "She's coming about. They don't believe you." did. The game's own
+// news reads as several short lines because that is how it arrives, so ours
+// has to arrive the same way.
+//
+// Broken on SPACES only -- a word is never split, and a single word longer than
+// the budget is left alone to overhang rather than turned into nonsense.
+//
+// 32 IS THE GAME'S OWN NUMBER, not a guess: its post to this strip is
+// FUN_004600A0, whose first act is `WrapText(0x20, 0)` -- wrap to 32 columns --
+// before it copies the buffer across. Matching it means our lines break where
+// the game's own news breaks.
+constexpr int kStripWrapCols = 32;
+
+inline void WrapForStrip(const char* in, char* out, size_t outsz)
+{
+    size_t o = 0, col = 0;
+    for (size_t i = 0; in[i] && o + 2 < outsz; ++i) {
+        if (in[i] == '\n') { out[o++] = '\n'; col = 0; continue; }
+
+        // At the budget and standing on a space: that space becomes the break.
+        if (in[i] == ' ' && col >= (size_t)kStripWrapCols) {
+            out[o++] = '\n'; col = 0; continue;
+        }
+        out[o++] = in[i];
+        ++col;
+    }
+    out[o] = 0;
+}
+
+inline void QueueStripNotice(const char* rawText)
+{
+    if (!rawText || !*rawText) return;
+
+    char wrapped[kStripLineMax];
+    WrapForStrip(rawText, wrapped, sizeof(wrapped));
+    const char* text = wrapped;
+
+    if (!*text) return;
+    if ((int)strlen(text) >= kStripLineMax) return;   // bounded, never truncated
+
+    // Same reasoning as SlotForText: identical words are not two pieces of news.
+    if (g_stripLast == text) return;
+    for (int i = 0; i < g_stripCount; ++i)
+        if (g_stripQueue[i] == text) return;
+
+    if (g_stripCount >= kMaxStripQueue) {
+        // Drop the OLDEST. A line that has been waiting through several of the
+        // game's own notices has usually been overtaken by events.
+        for (int i = 1; i < g_stripCount; ++i) g_stripQueue[i - 1] = g_stripQueue[i];
+        --g_stripCount;
+    }
+    g_stripQueue[g_stripCount++] = text;
+}
+
+// Drain one line onto the strip, and ONLY when it is free. Called from the safe
+// point: these are plain memory writes so they would be safe anywhere, but the
+// decision "is the strip free" is only meaningful once per frame.
+inline void PumpNoticeStrip()
+{
+    if (g_stripCount <= 0) return;
+    if (game::NoticeStripBusy()) return;      // the game is using it -- wait
+
+    if (game::PostNoticeStrip(g_stripQueue[0].c_str())) {
+        g_stripLast = g_stripQueue[0];
+        Log("  strip: '%s' (%d waiting)", g_stripQueue[0].c_str(), g_stripCount - 1);
+    }
+    for (int i = 1; i < g_stripCount; ++i) g_stripQueue[i - 1] = g_stripQueue[i];
+    --g_stripCount;
+}
+
 // Find a slot for a notice on this channel. A status notice reuses the slot its
 // predecessor held, so the newest simply overwrites the old one and nothing
 // accumulates; a narrative notice takes a fresh slot, dropping the oldest when
@@ -1129,6 +1227,15 @@ inline void ReportDrawFromSafePoint()
 inline void PostDebugNotice(const char* text, int seconds, bool anchor = false,
                             NoticeChannel channel = kChannelStatus)
 {
+    // Screen lines go on the game's own strip; anchored ones cannot, because the
+    // strip has one fixed place at the bottom and the whole point of an anchored
+    // notice is that it follows the ship. See g_useNativeStrip.
+    if (!anchor && g_useNativeStrip) {
+        QueueStripNotice(text);
+        Log("debug: notice posted -- '%s' (game's notice strip)", text);
+        return;
+    }
+
     ActiveNotice& n = *SlotForText(channel, text);
     n.resolved = text;
     n.anchor   = anchor;
@@ -1154,6 +1261,13 @@ inline void PostNotice(const Event& ev)
     int  argc = ResolveArgs(ev.bodyArgs, args, kMaxArgs);
     char buf[512];
     game::ComposeText(ev.body.c_str(), args, argc, buf, sizeof(buf));
+
+    // Screen notices ride the game's own strip; anchored ones stay ours.
+    if (!ev.anchorShip && g_useNativeStrip) {
+        QueueStripNotice(buf);
+        Log("  notice '%s' -> the game's notice strip", ev.id.c_str());
+        return;
+    }
 
     // Authored notices are narrative: several can be true at once, so they
     // stack and the oldest is dropped when full.

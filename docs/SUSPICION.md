@@ -251,10 +251,107 @@ count are diagnostics and belong in the log.
 
 ---
 
+## The standing ledger — `src/core/standing.h`
+
+> Added after the first playtests. Suspicion decides *when* a lie comes apart;
+> this decides *what it costs*, and for how long.
+
+### The one idea
+
+**The engine's reputation word stops being where anything is stored.** It
+becomes an output we project onto, so the world keeps reacting the way it always
+has — ports close, hunters sail — while the reason lives with us.
+
+It has to work that way because the two disagree about time. Vanilla reputation
+is a single number with no memory of how it got there, so a false flag that
+frightened a harbourmaster and a career spent burning that nation's shipping are
+indistinguishable once written. They should not be: one ought to lift if you
+never follow through, the other ought not.
+
+So a nation's standing is three numbers, and what the engine sees is their sum:
+
+| Field | Meaning | Lifetime |
+|---|---|---|
+| `baseline` | standing genuinely theirs to give | the game's business |
+| `debt` | a fright — being seen through | lapses after `debtForgetMonths` |
+| `notoriety` | what you actually did | **permanent** |
+
+```
+engine reputation  =  baseline - notoriety - debt
+```
+
+### `applied` is the field that makes it safe
+
+The game writes reputation too — promotions, missions, and every hostile act.
+Projecting our target blindly each tick would erase all of it, and the bug would
+present as *"reputation sometimes doesn't change"*, which is close to
+undiagnosable months later.
+
+So we remember the last value **we** wrote. When the live word differs, the
+difference is the game's doing and is folded into `baseline`. Their change is
+real standing and it survives.
+
+### The same check detects piracy, for free
+
+A **downward** write we did not make **is** the hostile act. The engine already
+knows what counts as attacking or plundering — we read its verdict instead of
+keeping our own list, so there is no combat hook to write and nothing to keep in
+step with the game's own rules.
+
+That event routes through `NoteHostileAct(target, severity)`, which:
+
+- adds `severity` to the target's `notoriety`,
+- adds `actSpillPercent` of it to **every other crown** — everybody hates a
+  pirate, nobody hates one as much as the nation he robbed,
+- **hardens any outstanding `debt`** into notoriety. The suspicion was earned.
+
+### The rules
+
+| Situation | Result |
+|---|---|
+| Unmasked, clean record | `debt` — lapses after `debtForgetMonths` of doing nothing |
+| Unmasked while `baseline - notoriety < 0` | hardens immediately — they already had your measure |
+| Any hostile act | `notoriety`, permanently, plus the spill |
+| `Amnesty(nation)` | the **only** thing that clears notoriety |
+
+Notoriety never decays. A pardon, a bribe, or a service done for that crown is
+the intended route back, and is a content hook rather than a timer.
+
+### Persistence
+
+Written to the `.pemf` sidecar as
+`standing<N>=baseline,debt,notoriety,debtSetAt`, staged and applied on the same
+career-fingerprint proof as the rest of the save state.
+
+The restore arithmetic is worth stating because it is easy to get backwards: at
+save time the engine word **already contains our projection**, so `ApplyStaged`
+re-primes `baseline` from the engine and then adds `notoriety + debt` back on to
+recover standing *without* us. Verified as an exact round trip.
+
+Backward compatible — no `kStateVersion` bump. An older sidecar simply carries
+no ledger and the career is primed fresh from the engine.
+
+### Tuning
+
+All of it lives in `PEMF\suspicion.ini`, read once at startup:
+
+| Key | Default | Effect |
+|---|---|---|
+| `debtForgetMonths` | 12 | game months of honest sailing before a fright lapses |
+| `actNotorietyShare` | 1 | notoriety remembered per point the engine itself took |
+| `actSpillPercent` | 25 | what the other crowns take from an act against one of them |
+
+> **Note:** `build.ps1` never overwrites an existing tuning file, so a rebuild
+> cannot discard a balance pass. Editing the deployed copy is the way to retune.
+
+---
+
 ## Principles
 
 - **Suspicion is PEMF's. The world stays the engine's.** We read game state
   freely and write almost none of it.
+- **Reputation is an output, never storage.** The ledger owns the truth; the
+  engine's word is where we publish it.
 - **Nothing evaluates in the render hook.** The safe point decides; the frame
   draws.
 - **Every threshold has a visible consequence.** A hidden number that only
