@@ -48,6 +48,7 @@
 #include "log.h"
 #include "game.h"
 #include "render.h"   // RedirectCall
+#include "stormaudio.h"
 
 namespace storms {
 
@@ -84,6 +85,34 @@ struct Tuning {
     // The engine's weather-curve numerator. VANILLA IS 128000. Higher = heavier
     // rain further out -- and stronger wind with it. See WeatherPowerSite.
     int weatherPower = 128000;
+
+    // The cull-bound fix. Scaling a cloud grows the visual but not its culling
+    // sphere, so at high scale the engine drops the whole cloud while most of
+    // it is still on screen -- reported from play as the storm vanishing once
+    // it is 20-30% off the edge.
+    //
+    //   0 = off
+    //   1 = REPORT ONLY. Dump the candidate bound fields once so the offsets
+    //       can be checked against real numbers before anything is written.
+    //   2 = report and fix.
+    //
+    // Defaults to report-only on purpose. The offsets are derived from the
+    // Gamebryo member order rather than read out of this binary, and this file
+    // has already spent one round on a layout that looked right and was not.
+    int boundFix = 1;
+    int boundScalePct = 100;   // MULTIPLIER on the radius the engine computed
+
+    // PEMF owns where and when storms happen. The engine drops one at eight
+    // coarse cells EAST of the player and leaves it there, which is why vanilla
+    // weather always turns up in the same corner of the screen. Ours are far
+    // bigger and more intense, so there should be fewer of them and they should
+    // come from any quarter.
+    int schedule       = 0;       // 1 = PEMF places storms
+    int quietMs        = 240000;  // fair weather between storms
+    int stormMs        = 120000;  // how long one lasts before it clears
+    int spawnAtStart   = 1;       // one storm on the first voyage, to teach them
+    int placeDistance  = 11000;   // how far off it appears, in map units
+    int parkDistance   = 400000;  // where a storm goes to be "not there"
     int cargoLossEveryMs  = 20000; // at most one loss this often
     int cargoLossMax      = 3;     // units of ONE good, picked at random
 
@@ -201,6 +230,8 @@ inline bool g_applied = false;
 constexpr uintptr_t kStormCallSite = 0x0046377A;
 constexpr int kMaxCluster = 12;
 
+extern "C" void __cdecl PemfFixStormBounds(void* prefab, int drawnScale);
+
 extern "C" {
     inline void* g_stormOrig  = nullptr;   // the real FUN_004BBC80
     inline int   g_clusterN   = 0;
@@ -256,6 +287,13 @@ __declspec(naked) void StormDrawShim()
         mov  ecx, ebx
         call dword ptr [g_stormOrig]
 
+        // Every instance now exists and has been positioned, so this is the
+        // moment its cull sphere is meaningful. cdecl, we clean.
+        push dword ptr [ebp+0x18]      // the scale the game itself asked for
+        push ebx                       // the prefab
+        call PemfFixStormBounds
+        add  esp, 8
+
         pop  edi
         pop  esi
         pop  ebx
@@ -263,6 +301,106 @@ __declspec(naked) void StormDrawShim()
         pop  ebp
         ret  0x1C
     }
+}
+
+// ------------------------------------------------------------- the cull bound
+// A prefab keeps its instances on a list at +0x10, and each instance's scene
+// node is at +0x1C. Inside the node, the Gamebryo member order is
+//
+//     NiBound m_kWorldBound;   // NiPoint3 centre + float radius = 16 bytes
+//     NiTransform m_kLocal;    // rotation 36 + translation 12 + scale 4
+//     NiTransform m_kWorld;
+//
+// and we KNOW m_kLocal starts at +0x38, because +0x68 is the scale this file
+// patches and FUN_004C0740 confirms it independently (it writes param_1[0x1A],
+// which is byte offset 0x68). So the bound sits immediately before it:
+//
+//     centre  node + 0x28
+//     radius  node + 0x34
+//
+// ⚠️ DERIVED, NOT READ OUT OF THIS BINARY. Report-only mode exists so the
+// numbers can be checked before anything is written -- a radius should be a
+// positive, finite float of roughly model size, and if +0x34 comes back as
+// zero, enormous, or NaN then the layout is wrong and nothing should be
+// written on the strength of it.
+constexpr int kNodeAt        = 0x1C;
+constexpr int kInstNextAt    = 0x10;
+constexpr int kBoundRadiusAt = 0x34;
+constexpr int kBoundCentreAt = 0x28;
+constexpr int kLocalScaleAt  = 0x68;
+
+inline bool g_boundReported = false;
+
+inline bool LooksLikeRadius(float f)
+{
+    return f > 0.0f && f < 1.0e9f && f == f;      // positive, sane, not NaN
+}
+
+// Walk the prefab's instance list and hand every node a cull sphere that
+// matches how big it is actually drawn.
+inline void FixBounds(void* prefab, int drawnScale)
+{
+    if (!prefab || g_tune.boundFix == 0) return;
+
+    // MULTIPLY the radius the engine worked out; do not replace it. Measured
+    // in game: a storm drawn at scale 3.99 reports radius 1464.28, and
+    // 1464.28 / 3.99 = 367.0 exactly -- so Gamebryo IS scaling the bound
+    // properly and the bound is not "broken".
+    //
+    // It is too small for a different reason: the storm is a PARTICLE SYSTEM
+    // (FUN_004C0740 rescales its emitter parameters), so the bound covers the
+    // EMITTER at ~367 units while the particles it throws spread across tens of
+    // thousands. The cull sphere is correct for the node and useless for the
+    // picture, which is why the cloud vanishes with most of itself on screen.
+    const float mult = (float)g_tune.boundScalePct * 0.01f;
+    int touched = 0;
+
+    __try {
+        int inst = (int)prefab;
+        for (int guard = 0; inst != 0 && guard < 64; ++guard) {
+            const int node = *(const int*)(inst + kNodeAt);
+            if (node) {
+                const float radius = *(const float*)(node + kBoundRadiusAt);
+                const float scale  = *(const float*)(node + kLocalScaleAt);
+
+                if (!g_boundReported) {
+                    g_boundReported = true;
+                    Log("storms: bound probe -- node 0x%08X, radius(+0x34) %.3f, "
+                        "scale(+0x68) %.3f, centre(+0x28) %.1f/%.1f/%.1f",
+                        (unsigned)node, radius, scale,
+                        *(const float*)(node + kBoundCentreAt),
+                        *(const float*)(node + kBoundCentreAt + 4),
+                        *(const float*)(node + kBoundCentreAt + 8));
+                    if (!LooksLikeRadius(radius)) {
+                        Log("storms: bound probe -- +0x34 does NOT look like a "
+                            "radius. Layout is wrong; NOT writing it.");
+                    }
+                }
+
+                // Only ever GROW it, and only when the existing value reads as
+                // a sane radius. Shrinking a bound hides things that should be
+                // drawn, which is a worse bug than the one we are fixing.
+                if (g_tune.boundFix == 2 && LooksLikeRadius(radius) &&
+                    mult > 1.0f) {
+                    const float want = radius * mult;
+                    if (LooksLikeRadius(want) && want > radius) {
+                        *(float*)(node + kBoundRadiusAt) = want;
+                        ++touched;
+                    }
+                }
+            }
+            inst = *(const int*)(inst + kInstNextAt);
+        }
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER) { return; }
+    (void)touched;
+}
+
+// The naked shim calls this; keeping the SEH and the walking in normal C++
+// means the assembly stays small enough to read.
+extern "C" void __cdecl PemfFixStormBounds(void* prefab, int drawnScale)
+{
+    FixBounds(prefab, drawnScale);
 }
 
 // Offsets are computed ONCE and never move. Jittering them per frame would make
@@ -303,6 +441,24 @@ inline void LoadTuning(const char* gameDir)
     char line[256];
     int applied = 0;
     while (fgets(line, sizeof(line), f)) {
+        // The one setting that is not a number, so it has to be taken before
+        // the integer scanner below gets a look at the line.
+        {
+            char nameBuf[128] = {0};
+            if (sscanf_s(line, " stormMusicFile = %127[^\r\n]", nameBuf,
+                         (unsigned)sizeof(nameBuf)) == 1) {
+                char* end = nameBuf + strlen(nameBuf);
+                while (end > nameBuf && (end[-1] == ' ' || end[-1] == '\t')) --end;
+                *end = 0;
+                if (nameBuf[0]) {
+                    strncpy_s(stormaudio::g_tune.file,
+                              sizeof(stormaudio::g_tune.file), nameBuf, _TRUNCATE);
+                    ++applied;
+                }
+                continue;
+            }
+        }
+
         char key[64] = {0};
         int  value = 0;
         if (sscanf_s(line, " %63[A-Za-z_] = %d", key, (unsigned)sizeof(key),
@@ -322,6 +478,18 @@ inline void LoadTuning(const char* gameDir)
         else if (_stricmp(key, "cargoLossIntensity")== 0) { g_tune.cargoLossIntensity = value; ++applied; }
         else if (_stricmp(key, "cargoLossProtect")  == 0) { g_tune.cargoLossProtect   = value; ++applied; }
         else if (_stricmp(key, "weatherPower")      == 0) { g_tune.weatherPower       = value; ++applied; }
+        else if (_stricmp(key, "boundFix")          == 0) { g_tune.boundFix           = value; ++applied; }
+        else if (_stricmp(key, "boundScalePct")     == 0) { g_tune.boundScalePct      = value; ++applied; }
+        else if (_stricmp(key, "stormSchedule")     == 0) { g_tune.schedule       = value; ++applied; }
+        else if (_stricmp(key, "stormQuietMs")      == 0) { g_tune.quietMs        = value; ++applied; }
+        else if (_stricmp(key, "stormLastsMs")      == 0) { g_tune.stormMs        = value; ++applied; }
+        else if (_stricmp(key, "stormAtStart")      == 0) { g_tune.spawnAtStart   = value; ++applied; }
+        else if (_stricmp(key, "stormDistance")     == 0) { g_tune.placeDistance  = value; ++applied; }
+        else if (_stricmp(key, "stormMusic")        == 0) { stormaudio::g_tune.enabled = value; ++applied; }
+        else if (_stricmp(key, "stormMusicVolume")  == 0) { stormaudio::g_tune.volume  = value; ++applied; }
+        else if (_stricmp(key, "stormMusicStartAt") == 0) { stormaudio::g_tune.startAt = value; ++applied; }
+        else if (_stricmp(key, "stormMusicStopAt")  == 0) { stormaudio::g_tune.stopAt  = value; ++applied; }
+        else if (_stricmp(key, "stormMusicFadeMs")  == 0) { stormaudio::g_tune.fadeMs  = value; ++applied; }
         else if (_stricmp(key, "cargoLossEveryMs")== 0) { g_tune.cargoLossEveryMs = value; ++applied; }
         else if (_stricmp(key, "cargoLossMax")    == 0) { g_tune.cargoLossMax     = value; ++applied; }
         else if (_stricmp(key, "enabled")     == 0) { g_tune.enabled = (value != 0); ++applied; }
@@ -342,6 +510,13 @@ inline void LoadTuning(const char* gameDir)
     g_tune.cargoLossIntensity = Clamp(g_tune.cargoLossIntensity, 1, 32);
     g_tune.cargoLossProtect |= 1;              // gold is never on the table
     g_tune.weatherPower = Clamp(g_tune.weatherPower, 32000, 2000000);
+    g_tune.boundFix      = Clamp(g_tune.boundFix, 0, 2);
+    g_tune.boundScalePct = Clamp(g_tune.boundScalePct, 10, 4000);
+    g_tune.quietMs       = Clamp(g_tune.quietMs, 10000, 3600000);
+    g_tune.stormMs       = Clamp(g_tune.stormMs, 10000, 3600000);
+    g_tune.placeDistance = Clamp(g_tune.placeDistance, 2000, 80000);
+
+    stormaudio::Configure(gameDir);
 
     Log("storms: loaded %d setting(s) from %s -- STORM scale %d height %d | "
         "fair clouds scale %d count %d height %d%s",
@@ -543,6 +718,99 @@ inline int StormDistanceToPlayer()
 // Called from the safe point while sailing. Deliberately does nothing at all
 // unless the player asked for it -- losing cargo is a real consequence and it
 // should never arrive as a surprise from a visual mod.
+// Called from the safe point while sailing. Reads the engine's weather value
+// once and hands it to everything that cares.
+// ------------------------------------------------------------- the scheduler
+// Vanilla weather is one storm parked eight cells east of you, forever. That is
+// why it always arrives from the same corner and why it is always THERE. With
+// storms this size, "always there" is exhausting and "always east" is a tell.
+//
+// So PEMF writes the position itself: park the storm over the horizon while the
+// weather is fair, and when one is due, drop it near the player on a bearing
+// that changes every time. The engine's own curve does the rest -- rain, wind,
+// sound and our cargo loss all read the position we just wrote.
+inline bool  g_schedInit   = false;
+inline bool  g_stormActive = false;
+inline DWORD g_phaseUntil  = 0;
+inline int   g_bearing     = 0;
+inline int   g_stormX = 0, g_stormY = 0;   // where WE decided it is
+
+inline void WriteStormPos(int x, int y)
+{
+    __try {
+        *(int*)addr::StormX = x;
+        *(int*)addr::StormY = y;
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER) {}
+}
+
+inline void ParkStorm()
+{
+    const int px = game::PlayerX() / 1000;
+    const int py = game::PlayerY() / 1000;
+    WriteStormPos(px + g_tune.parkDistance, py + g_tune.parkDistance);
+}
+
+inline void PlaceStorm()
+{
+    // Eight bearings, stepped by a prime so successive storms do not walk
+    // around the compass in an obvious order.
+    static const int kCos[8] = { 100,  71,   0, -71, -100, -71,   0,  71 };
+    static const int kSin[8] = {   0,  71, 100,  71,    0, -71, -100, -71 };
+    g_bearing = (g_bearing + 3) & 7;
+
+    const int px = game::PlayerX() / 1000;
+    const int py = game::PlayerY() / 1000;
+    const int d  = g_tune.placeDistance;
+    g_stormX = px + kCos[g_bearing] * d / 100;
+    g_stormY = py + kSin[g_bearing] * d / 100;
+    WriteStormPos(g_stormX, g_stormY);
+    Log("storms: a storm makes up on bearing %d, %d away", g_bearing, d);
+}
+
+inline void TickSchedule(bool sailing)
+{
+    if (!g_tune.enabled || !g_tune.schedule || !sailing) return;
+
+    const DWORD now = GetTickCount();
+
+    if (!g_schedInit) {
+        g_schedInit = true;
+        g_stormActive = (g_tune.spawnAtStart != 0);
+        g_phaseUntil = now + (DWORD)(g_stormActive ? g_tune.stormMs
+                                                   : g_tune.quietMs);
+        if (g_stormActive) PlaceStorm(); else ParkStorm();
+        return;
+    }
+
+    if ((int)(now - g_phaseUntil) >= 0) {
+        g_stormActive = !g_stormActive;
+        g_phaseUntil = now + (DWORD)(g_stormActive ? g_tune.stormMs
+                                                   : g_tune.quietMs);
+        if (g_stormActive) { PlaceStorm(); }
+        else { ParkStorm(); Log("storms: the weather clears"); }
+        return;
+    }
+
+    // HOLD IT WHERE WE PUT IT, every tick, in BOTH phases.
+    //
+    // Placing it once is not enough: the engine re-seeds the position whenever
+    // its own flag fires, and its seed is always "eight coarse cells east of
+    // the player". So a storm we dropped to the south-west would silently jump
+    // back to the top-right corner a moment later -- which is exactly what the
+    // first version of this scheduler did, and it looked identical to the
+    // vanilla behaviour it was meant to replace.
+    if (g_stormActive) WriteStormPos(g_stormX, g_stormY);
+    else               ParkStorm();
+}
+
+inline void TickWeather(bool sailing)
+{
+    TickSchedule(sailing);
+    const int intensity = sailing ? StormIntensityHere() : -1;
+    stormaudio::Tick(intensity < 0 ? 0 : intensity, sailing);
+}
+
 inline void TickCargoLoss()
 {
     if (!g_tune.enabled || !g_tune.cargoLossEnabled) return;

@@ -160,6 +160,14 @@ function Copy-Payload([string]$dest) {
     # is already there -- a rebuild must not discard someone's balance pass.
     $kmSrc = Join-Path $root 'content\PEMF\KeyMap_WASD.ini'
     if (Test-Path $kmSrc) { Copy-Item $kmSrc (Join-Path $dest 'PEMF') -Force }
+    # Audio ships as loose files -- overwrite these, they are ours not the
+    # player's, unlike the tuning files below.
+    $audioSrc = Join-Path $root ('content' + [char]92 + 'PEMF' + [char]92 + 'audio')
+    if (Test-Path $audioSrc) {
+        $audioDst = Join-Path $dest ('PEMF' + [char]92 + 'audio')
+        New-Item -ItemType Directory -Force $audioDst | Out-Null
+        Copy-Item (Join-Path $audioSrc '*') $audioDst -Force
+    }
     foreach ($ini in @('suspicion.ini', 'storms.ini')) {
         $iniSrc = Join-Path $root "content\PEMF\$ini"
         $iniDst = Join-Path $dest "PEMF\$ini"

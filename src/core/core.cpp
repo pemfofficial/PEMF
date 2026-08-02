@@ -406,6 +406,9 @@ static void RunSafePoint()
             }
         }
 
+        // Gated on the overworld being on screen, not merely in game --
+        // otherwise the storm track plays over the main menu.
+        storms::TickWeather(content::g_worldLive);
         storms::TickCargoLoss();
         if (storms::g_pendingNotice) {
             content::PostDebugNotice(storms::g_pendingNotice, 7, false,
