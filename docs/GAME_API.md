@@ -1180,6 +1180,105 @@ It feeds the fair-cloud scale **and** the ship AI's engagement distances
 (`FUN_00467F90` reads `DAT_00725678 * 1000` and `* 0x960`). Scaling weather
 through it would quietly change how ships fight.
 
+### The weather curve — `FUN_0045FA70`
+
+The game's own weather-proximity function, and the thing to read instead of
+inventing a radius:
+
+```c
+int __cdecl StormIntensity(int x, int y, int playSound);   // 0x0045FA70
+```
+
+It walks the three weather slots, takes the octagonal distance to the nearest
+(with a +2000 penalty on slots 1 and 2, so slot 0 — the storm — dominates) and
+returns
+
+```
+0x1F400 / (distance + 4000)          // 128000 / (d + 4000)
+```
+
+≈32 on top of the storm, 14 at 5,000 map units, 10 at 9,000, 4 far out. **There
+is no hard edge to a storm; weather is a gradient.** The result is stored in
+`0x0085A0F8` and read by six sites.
+
+✅ **Safe to call with `playSound = 0`** — the trailing write to `0x0085A0F8`
+stores back the value it already read, so there is no side effect.
+
+⚠️ **It reads the POSITION arrays, never the cloud's drawn scale.** Making a
+storm bigger on screen does not make it hit harder or blow you along faster.
+
+### ⚠️ `0x1F400` is a DROP-SIZE dial, not a drop-count dial
+
+The numerator is an immediate at `0x0045FAF6` (`B8 00 F4 01 00`). Raising it
+does **not** give heavier rain — it gives *bigger* rain, and more wind with it,
+because the same value feeds the sailing update. Measured:
+
+| Value | Result |
+|---|---|
+| `300000` | fat white bars that visibly bend with perspective; **27-knot winds** |
+| `128000` | vanilla — still large and in your face at the heart of a storm |
+| `70000` | smaller, calmer drops, gentler push |
+| `45000` | noticeably restrained |
+
+The bend *is* the wind. Genuinely **denser** rain needs the particle count,
+which lives elsewhere in `FUN_0047A040` and has not been isolated.
+
+### Storms are seeded once, relative to the player, and never move
+
+```
+00463550  MOV  AL, [0x008B996C]      ; a "reseed me" flag
+00463561  JZ   skip                  ; ...only when set
+00463567  MOV  EAX, [0x008B96B4]     ; player X / 1,000,000
+0046356C  ADD  EAX, 0x8              ; eight coarse cells east of you
+0046356F  IMUL EAX, EAX, 0x3E8
+00463575  MOV  [0x008B98F0], EAX     ; storm X
+00463582  MOV  [0x008B98E4], EAX     ; storm Y
+00463587  MOV  byte [0x008B996C], 0  ; and clear the flag
+```
+
+A storm is **dropped at a fixed world position** and stays there — it does not
+drift and does not follow. Sail out of one and you have left it behind.
+`0x008B996C` is only ever written **to zero** (here and at `0x00471F3A`);
+whatever sets it is a bulk write to a surrounding struct and has not been found.
+
+Drifting or persistent weather would hook in here.
+
+### ⚠️ KNOWN LIMITATION — the cull bound is not scaled
+
+Scaling a cloud grows the visual and **not** its culling sphere, so at high
+scale the engine drops the whole cloud while most of it is still on screen.
+Reported from play as "it disappears once the storm is 20–30% off screen", and
+it reads as the storm teleporting or respawning.
+
+From the Gamebryo 2.6 headers, `NiAVObject` orders its members
+`m_kWorldBound` → `m_kLocal` → `m_kWorld`, and `NiBound` is `NiPoint3` centre
+plus `float` radius. We know `m_kLocal` sits at **node+0x38** (rotation `+0x38`,
+translation `+0x5C`, scale `+0x68` — the field the storm patch writes), so:
+
+| Field | Offset |
+|---|---|
+| world bound centre | `node + 0x28` |
+| **world bound radius** | **`node + 0x34`** |
+
+with `node` being `*(int*)(instance + 0x1C)`.
+
+Not yet fixed. Note that Gamebryo recomputes world bounds during its update
+traversal, so writing the radius after the draw may simply be overwritten — the
+durable fix is likely scaling the **model** bound once, rather than the world
+bound per frame.
+
+### Clusters — the prefab keeps an instance pool
+
+`FUN_004BB4B0` walks a list at `+0x10` and allocates another instance whenever
+the current one is already marked used this frame (`+0x24`, set by
+`FUN_004BBC80`). That is how three weather slots become three separate clouds,
+and it is why **calling the draw again yields another cloud rather than moving
+the first**. PEMF builds a squall line by redirecting the `call` at `0x0046377A`
+through a shim that issues extra draws at fixed ring offsets before the game's
+own — same phase, same ordering, no guessing about render stages.
+
+⚠️ Offsets must be **fixed**. Jittering them per frame makes the front strobe.
+
 ### Measured limits
 
 Vanilla storm scale is 80. Verified in game up to **700 (8.75x)** with height

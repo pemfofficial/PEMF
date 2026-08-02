@@ -131,7 +131,11 @@ levels are used throughout the docs:
 | Making an *existing* vessel hostile | **Ruled out** — the engine's pursuit-target field ignores slot 0; measured three runs |
 | An AI ship opening fire on the overworld | **Ruled out** — no such behaviour exists; contact starts combat |
 | Suspicion tuning via `PEMF\suspicion.ini` | **Verified** |
-| Larger, heavier storms on the sailing map | **Verified** — 8.75x vanilla scale, tunable in `PEMF\storms.ini` |
+| Larger, heavier storms on the sailing map | **Verified** — tunable in `PEMF\storms.ini` |
+| Storm clusters — a squall line from one engine storm | **Verified** — the prefab pools instances, so extra draws give extra clouds |
+| Cargo lost to weather, using the engine's own storm curve | **Verified** — gold and cannon protected |
+| Denser rain | **Not found** — the available dial changes drop SIZE and wind, not count |
+| Storms that drift or persist | **Not started** — weather is seeded once relative to the player and never moves |
 | More than 3 weather slots | **Ruled out** — the position arrays hold exactly 3; a 4th writes off the end |
 | Playing a named game sound with an event | **Verified** |
 | Officer simulation | Not started |

@@ -47,6 +47,7 @@
 
 #include "log.h"
 #include "game.h"
+#include "render.h"   // RedirectCall
 
 namespace storms {
 
@@ -59,6 +60,33 @@ struct Tuning {
     int cloudScale  = 250;   // FAIR-weather cloud size
     int cloudCount  = 3;     // weather SLOTS -- storms and clouds share these
     int cloudHeight = 500;   // fair-weather cloud altitude
+
+    // A storm is ONE cloud in vanilla, and the slot count cannot be raised (see
+    // kCountMax). So a squall line is built by drawing the storm prefab extra
+    // times ourselves, around the real one.
+    int clusterCount  = 0;    // extra clouds around the storm; 0 = vanilla
+    int clusterSpread = 7000; // how far out they sit, in map units
+    int clusterScale  = 70;   // their size as a PERCENT of the main storm
+
+    // Weather that costs you something. Storms already hurt the hull; this adds
+    // a little cargo going over the side.
+    int cargoLossEnabled  = 0;
+    int cargoLossRadius   = 9000;  // kept for the log only; the engine decides
+    int cargoLossIntensity = 12;   // engine weather value that counts as "in it"
+
+    // Bitmask of hold slots the sea will NOT take. Bit 0 = gold, bit 6 =
+    // cannon: 0x41. Losing plunder reads as theft, and losing CANNON is not
+    // cargo attrition -- it is disarming the ship, which a playtest found out
+    // the hard way ("The sea takes 2 Cannon over the side" was real, and it
+    // really did remove them).
+    int cargoLossProtect  = 0x41;
+
+    // The engine's weather-curve numerator. VANILLA IS 128000. Higher = heavier
+    // rain further out -- and stronger wind with it. See WeatherPowerSite.
+    int weatherPower = 128000;
+    int cargoLossEveryMs  = 20000; // at most one loss this often
+    int cargoLossMax      = 3;     // units of ONE good, picked at random
+
     bool enabled    = false;
 };
 
@@ -68,7 +96,7 @@ inline Tuning g_tune;
 // through `ABS()` at the other end, so neither is a useful thing to allow. The
 // upper bounds are generous but finite -- an immediate that overflows the
 // multiply would produce a garbage scale rather than a big cloud.
-constexpr int kScaleMin = 20,   kScaleMax = 4000;
+constexpr int kScaleMin = 20,   kScaleMax = 2032;   // 127 * 16, the imm8 ceiling
 // ⛔ THREE IS A HARD CEILING, NOT A TASTE JUDGEMENT. The loop at 0x0046354A
 // walks weather slots and indexes two parallel arrays:
 //
@@ -84,13 +112,29 @@ constexpr int kHeightMin = 50,  kHeightMax = 8000;
 
 // ------------------------------------------------------------------ the sites
 namespace addr {
-    // THE STORM. `8D 14 9B  C1 E2 04` = lea edx,[ebx+ebx*4] ; shl edx,4.
-    // Six bytes, which is exactly the length of `imul edx, ebx, imm32`
-    // (`69 D3 imm32`) -- so the pair is replaced wholesale with one instruction
-    // that computes the same thing with an operand we control. Same registers,
-    // same result, no displacement anywhere else in the function.
+    // THE STORM SIZE.
+    //
+    //   0046374A  lea edx,[ebx+ebx*4]   8D 14 9B      <-- we patch THIS
+    //   0046374D  push esi              56
+    //   0046374E  lea eax,[esp+0x60]    8D 44 24 60
+    //   00463752  shl edx,0x4           C1 E2 04      <-- left alone
+    //
+    // ⚠️ THE `lea` AND THE `shl` ARE NOT ADJACENT. Two unrelated instructions
+    // sit between them. An earlier version of this file treated them as one
+    // six-byte run and tried to replace both with `imul edx, ebx, imm32`; the
+    // signature never matched, the site check refused every single time, and
+    // the storm patch silently did nothing for several rounds of "looks
+    // bigger". Had the check not been there it would have written over
+    // `push esi`.
+    //
+    // `lea edx,[ebx+ebx*4]` is 3 bytes and `imul edx, ebx, imm8` (`6B D3 imm8`)
+    // is also 3 bytes, so the multiply-by-five becomes a multiply-by-ours and
+    // the existing `shl edx,4` still multiplies by 16 afterwards:
+    //
+    //     drawn scale = imm8 * 16          (vanilla imm8 = 5 -> 80)
     constexpr uintptr_t StormScaleSite  = 0x0046374A;
-    constexpr int       kStormScaleImmAt = 2;      // into the rewritten imul
+    constexpr int       kStormScaleImmAt = 2;
+    constexpr int       kStormScaleStep  = 16;    // the surviving shl
 
     // `68 2C 01 00 00`     push 0x12C            -- imm32 at +1
     constexpr uintptr_t StormHeightSite = 0x0046376E;
@@ -107,6 +151,23 @@ namespace addr {
     // `68 F4 01 00 00`     push 0x1F4            -- imm32 at +1
     constexpr uintptr_t HeightSite  = 0x0046395D;
     constexpr int       kHeightImmAt = 1;
+
+    // HOW HEAVY THE WEATHER IS. `B8 00 F4 01 00` = mov eax, 0x1F400, the
+    // numerator of the engine's own weather curve inside FUN_0045FA70:
+    //
+    //     intensity = 0x1F400 / (distance + 4000)
+    //
+    // That value drives the RAIN density (0x0047BC3C multiplies by it), and it
+    // is the same number PEMF's cargo loss reads. Raising it makes weather bite
+    // harder at every distance rather than only close in.
+    //
+    // ⚠️ IT IS NOT RAIN-ONLY. Five other sites read 0x0085A0F8, including the
+    // overworld tick and the sailing update, which is almost certainly where a
+    // storm's push on your ship comes from. Turning this up makes storms wetter
+    // AND windier. That is arguably the right bargain for weather, but it is a
+    // gameplay change and should not arrive by surprise.
+    constexpr uintptr_t WeatherPowerSite = 0x0045FAF6;
+    constexpr int       kWeatherPowerImmAt = 1;
 }
 
 // Opcode prefixes only -- the immediates are what we are about to change, so
@@ -116,15 +177,112 @@ namespace addr {
 constexpr unsigned char kScaleOp[]  = { 0x69, 0xDB };
 constexpr unsigned char kCountOp[]  = { 0x83, 0xF8 };
 constexpr unsigned char kHeightOp[] = { 0x68 };
+constexpr unsigned char kWeatherPowerOp[] = { 0xB8 };
 constexpr unsigned char kStormHeightOp[] = { 0x68 };
 
 // The storm scale site is the one place we replace whole instructions, so it is
 // checked against BOTH forms: the original lea+shl, or our own imul if this is
 // a re-apply. Anything else and we leave it alone.
-constexpr unsigned char kStormScaleOrig[]  = { 0x8D, 0x14, 0x9B, 0xC1, 0xE2, 0x04 };
-constexpr unsigned char kStormScalePatched[] = { 0x69, 0xD3 };
+constexpr unsigned char kStormScaleOrig[]    = { 0x8D, 0x14, 0x9B };   // lea
+constexpr unsigned char kStormScalePatched[] = { 0x6B, 0xD3 };         // our imul
 
 inline bool g_applied = false;
+
+// ------------------------------------------------------------------ cluster
+// The storm draw is `call FUN_004BBC80` at 0x0046377A. Redirecting it puts our
+// extra instances in exactly the right place in the frame -- same phase, same
+// ordering -- which is worth far more than picking a hook point ourselves.
+//
+// It works at all because the prefab keeps a POOL: FUN_004BB4B0 walks a list at
+// +0x10 and allocates another instance when the current one is already marked
+// used this frame (+0x24). That is how three weather slots become three
+// separate clouds, and it is why calling the draw again yields another cloud
+// rather than moving the first one.
+constexpr uintptr_t kStormCallSite = 0x0046377A;
+constexpr int kMaxCluster = 12;
+
+extern "C" {
+    inline void* g_stormOrig  = nullptr;   // the real FUN_004BBC80
+    inline int   g_clusterN   = 0;
+    inline int   g_clusterSc  = 0;
+    inline int   g_offX[kMaxCluster] = {0};
+    inline int   g_offY[kMaxCluster] = {0};
+}
+
+// __thiscall: ecx = prefab, seven stack args, CALLEE cleans (0x1C). Verified at
+// both call sites -- neither follows the call with an `add esp`.
+__declspec(naked) void StormDrawShim()
+{
+    __asm {
+        push ebp
+        mov  ebp, esp
+        push ebx
+        push esi
+        push edi
+
+        mov  ebx, ecx                       // the prefab; ecx is clobbered by
+                                            // each call, so keep it somewhere
+        xor  esi, esi
+    next_extra:
+        cmp  esi, dword ptr [g_clusterN]
+        jge  main_draw
+
+        push dword ptr [ebp+0x20]           // p8
+        push dword ptr [ebp+0x1C]           // p7
+        push dword ptr [g_clusterSc]        // scale (satellites are smaller)
+        push dword ptr [ebp+0x14]           // rotation matrix
+        push dword ptr [ebp+0x10]           // z
+        mov  eax, dword ptr [ebp+0x0C]      // y + offset
+        add  eax, dword ptr g_offY[esi*4]
+        push eax
+        mov  eax, dword ptr [ebp+0x08]      // x + offset
+        add  eax, dword ptr g_offX[esi*4]
+        push eax
+        mov  ecx, ebx
+        call dword ptr [g_stormOrig]
+
+        inc  esi
+        jmp  next_extra
+
+    main_draw:
+        // The game's own storm, arguments untouched.
+        push dword ptr [ebp+0x20]
+        push dword ptr [ebp+0x1C]
+        push dword ptr [ebp+0x18]
+        push dword ptr [ebp+0x14]
+        push dword ptr [ebp+0x10]
+        push dword ptr [ebp+0x0C]
+        push dword ptr [ebp+0x08]
+        mov  ecx, ebx
+        call dword ptr [g_stormOrig]
+
+        pop  edi
+        pop  esi
+        pop  ebx
+        mov  esp, ebp
+        pop  ebp
+        ret  0x1C
+    }
+}
+
+// Offsets are computed ONCE and never move. Jittering them per frame would make
+// the squall line strobe, which is the opposite of weather.
+inline void BuildClusterOffsets(int count, int spread)
+{
+    if (count > kMaxCluster) count = kMaxCluster;
+    // A ring, with every other cloud pulled inwards so it does not read as a
+    // circle of identical blobs.
+    static const int kCos[12] = { 100,  87,  50,   0, -50, -87,
+                                 -100, -87, -50,   0,  50,  87 };
+    static const int kSin[12] = {   0,  50,  87, 100,  87,  50,
+                                    0, -50, -87,-100, -87, -50 };
+    for (int i = 0; i < count; ++i) {
+        const int r = (i & 1) ? (spread * 60 / 100) : spread;
+        g_offX[i] = kCos[i % 12] * r / 100;
+        g_offY[i] = kSin[i % 12] * r / 100;
+    }
+    g_clusterN = count;
+}
 
 // --------------------------------------------------------------------- io
 inline int Clamp(int v, int lo, int hi)
@@ -156,6 +314,16 @@ inline void LoadTuning(const char* gameDir)
         else if (_stricmp(key, "cloudScale")  == 0) { g_tune.cloudScale  = value; ++applied; }
         else if (_stricmp(key, "cloudCount")  == 0) { g_tune.cloudCount  = value; ++applied; }
         else if (_stricmp(key, "cloudHeight") == 0) { g_tune.cloudHeight = value; ++applied; }
+        else if (_stricmp(key, "clusterCount")  == 0) { g_tune.clusterCount  = value; ++applied; }
+        else if (_stricmp(key, "clusterSpread") == 0) { g_tune.clusterSpread = value; ++applied; }
+        else if (_stricmp(key, "clusterScale")  == 0) { g_tune.clusterScale  = value; ++applied; }
+        else if (_stricmp(key, "cargoLoss")       == 0) { g_tune.cargoLossEnabled = value; ++applied; }
+        else if (_stricmp(key, "cargoLossRadius") == 0) { g_tune.cargoLossRadius  = value; ++applied; }
+        else if (_stricmp(key, "cargoLossIntensity")== 0) { g_tune.cargoLossIntensity = value; ++applied; }
+        else if (_stricmp(key, "cargoLossProtect")  == 0) { g_tune.cargoLossProtect   = value; ++applied; }
+        else if (_stricmp(key, "weatherPower")      == 0) { g_tune.weatherPower       = value; ++applied; }
+        else if (_stricmp(key, "cargoLossEveryMs")== 0) { g_tune.cargoLossEveryMs = value; ++applied; }
+        else if (_stricmp(key, "cargoLossMax")    == 0) { g_tune.cargoLossMax     = value; ++applied; }
         else if (_stricmp(key, "enabled")     == 0) { g_tune.enabled = (value != 0); ++applied; }
     }
     fclose(f);
@@ -165,6 +333,15 @@ inline void LoadTuning(const char* gameDir)
     g_tune.cloudScale  = Clamp(g_tune.cloudScale,  kScaleMin,  kScaleMax);
     g_tune.cloudCount  = Clamp(g_tune.cloudCount,  kCountMin,  kCountMax);
     g_tune.cloudHeight = Clamp(g_tune.cloudHeight, kHeightMin, kHeightMax);
+    g_tune.clusterCount  = Clamp(g_tune.clusterCount, 0, kMaxCluster);
+    g_tune.clusterSpread = Clamp(g_tune.clusterSpread, 500, 60000);
+    g_tune.clusterScale  = Clamp(g_tune.clusterScale, 10, 200);
+    g_tune.cargoLossRadius  = Clamp(g_tune.cargoLossRadius, 1000, 60000);
+    g_tune.cargoLossEveryMs = Clamp(g_tune.cargoLossEveryMs, 2000, 600000);
+    g_tune.cargoLossMax     = Clamp(g_tune.cargoLossMax, 1, 20);
+    g_tune.cargoLossIntensity = Clamp(g_tune.cargoLossIntensity, 1, 32);
+    g_tune.cargoLossProtect |= 1;              // gold is never on the table
+    g_tune.weatherPower = Clamp(g_tune.weatherPower, 32000, 2000000);
 
     Log("storms: loaded %d setting(s) from %s -- STORM scale %d height %d | "
         "fair clouds scale %d count %d height %d%s",
@@ -200,10 +377,13 @@ inline bool WriteImm8(uintptr_t site, int offset, int value)
 // length (6 bytes), identical registers, identical meaning -- only the constant
 // changes. Written as one blob so the instruction is never half-formed if the
 // process is interrupted mid-write.
-inline bool WriteStormScale(int value)
+inline bool WriteStormScale(int scale)
 {
-    unsigned char blob[6] = { 0x69, 0xD3, 0, 0, 0, 0 };
-    *(int*)(blob + 2) = value;
+    int mult = scale / addr::kStormScaleStep;            // imm8 for `imul edx,ebx,imm8`
+    if (mult < 1)   mult = 1;
+    if (mult > 127) mult = 127;                    // signed imm8
+
+    unsigned char blob[3] = { 0x6B, 0xD3, (unsigned char)mult };
 
     DWORD old = 0;
     void* at = (void*)addr::StormScaleSite;
@@ -228,12 +408,14 @@ inline void Apply()
     const bool okScale  = game::BytesMatch(addr::ScaleSite,  kScaleOp,  sizeof(kScaleOp));
     const bool okCount  = game::BytesMatch(addr::CountSite,  kCountOp,  sizeof(kCountOp));
     const bool okHeight = game::BytesMatch(addr::HeightSite, kHeightOp, sizeof(kHeightOp));
+    const bool okPower  = game::BytesMatch(addr::WeatherPowerSite, kWeatherPowerOp, sizeof(kWeatherPowerOp));
 
-    if (!okStormScale || !okStormHeight || !okScale || !okCount || !okHeight) {
+    if (!okStormScale || !okStormHeight || !okScale || !okCount || !okHeight ||
+        !okPower) {
         Log("storms: NOT patching -- site check failed (stormScale %d, "
-            "stormHeight %d, scale %d, count %d, height %d). Weather stays as "
-            "the game ships it.",
-            okStormScale, okStormHeight, okScale, okCount, okHeight);
+            "stormHeight %d, scale %d, count %d, height %d, power %d). Weather "
+            "stays as the game ships it.",
+            okStormScale, okStormHeight, okScale, okCount, okHeight, okPower);
         return;
     }
 
@@ -243,17 +425,171 @@ inline void Apply()
         WriteImm32(addr::ScaleSite,  addr::kScaleImmAt,  g_tune.cloudScale);
         WriteImm8 (addr::CountSite,  addr::kCountImmAt,  g_tune.cloudCount);
         WriteImm32(addr::HeightSite, addr::kHeightImmAt, g_tune.cloudHeight);
+        WriteImm32(addr::WeatherPowerSite, addr::kWeatherPowerImmAt, g_tune.weatherPower);
     }
     __except (EXCEPTION_EXECUTE_HANDLER) {
         Log("storms: faulted while patching -- weather may be half-applied");
         return;
     }
 
+    // The cluster is a call redirect, not an immediate, so it installs
+    // separately and is allowed to fail without taking the rest with it.
+    if (g_tune.clusterCount > 0) {
+        g_clusterSc = g_tune.stormScale * g_tune.clusterScale / 100;
+        if (g_clusterSc < kScaleMin) g_clusterSc = kScaleMin;
+        BuildClusterOffsets(g_tune.clusterCount, g_tune.clusterSpread);
+        if (render::RedirectCall(kStormCallSite, (void*)&StormDrawShim, &g_stormOrig)) {
+            Log("storms: cluster on -- %d extra cloud(s) at spread %d, scale %d "
+                "(%d%% of the storm)", g_clusterN, g_tune.clusterSpread,
+                g_clusterSc, g_tune.clusterScale);
+        } else {
+            g_clusterN = 0;
+            Log("storms: cluster NOT installed -- 0x%08X is not a call rel32",
+                (unsigned)kStormCallSite);
+        }
+    }
+
     g_applied = true;
     Log("storms: applied -- STORM scale %d (was 80, x%.2f) height %d (was 300) | "
-        "fair clouds scale %d (was 250) count %d (was 3) height %d (was 500)",
+        "fair clouds scale %d (was 250) count %d (was 3) height %d (was 500) | "
+        "weather power %d (was 128000, x%.2f)",
         g_tune.stormScale, (double)g_tune.stormScale / 80.0, g_tune.stormHeight,
-        g_tune.cloudScale, g_tune.cloudCount, g_tune.cloudHeight);
+        g_tune.cloudScale, g_tune.cloudCount, g_tune.cloudHeight,
+        g_tune.weatherPower, (double)g_tune.weatherPower / 128000.0);
+}
+
+// ------------------------------------------------------------- weather bites
+// Storms already cost you hull, through the game's own lightning. This adds the
+// other thing a captain would expect: a little cargo going over the side.
+//
+// The storm's position is the same pair the draw call reads --
+//   x = 0x008B98F0, y = 0x008B98E4
+// -- in MAP UNITS, the same scale as `PlayerX() / 1000` and city coordinates.
+// (The game builds them from 0x008B96B4 / 0x008B96B0, which are the player's
+// own position divided by a million, so a storm is placed on a coarse grid
+// relative to us.)
+//
+// GOLD IS NEVER TAKEN. Slot 0 of the hold is plunder, and having a squall empty
+// the strongbox would feel like theft rather than weather. Only trade goods go.
+namespace addr {
+    constexpr uintptr_t StormX = 0x008B98F0;
+    constexpr uintptr_t StormY = 0x008B98E4;
+
+    // The game's OWN weather-proximity function, and the reason this file no
+    // longer guesses a radius. Used by the ship AI at 0x0045FAB0.
+    //
+    //   int __cdecl StormIntensity(int x, int y, int playSound)
+    //
+    // walks the three weather slots, takes the octagonal distance to the
+    // nearest (with a +2000 penalty on slots 1 and 2, so slot 0 -- the storm --
+    // dominates) and returns
+    //
+    //     128000 / (distance + 4000)
+    //
+    // so it rises smoothly as you close: ~32 on top of the storm, ~14 at 5,000,
+    // ~10 at 9,000, ~4 out at 28,000. There is NO hard edge; weather is a
+    // gradient, which is why "am I in the storm" was always a judgement call.
+    //
+    // ✅ SAFE TO CALL WITH playSound = 0: the write to 0x0085A0F8 at the end
+    // stores back the value it already read, so the call has no side effect.
+    //
+    // ⚠️ AND IT SETTLES A QUESTION: this reads the POSITION ARRAYS, never the
+    // cloud's drawn scale. So making a storm bigger on screen does not make it
+    // hit harder or blow you along faster -- the gameplay footprint is fixed.
+    // A larger cloud simply means you spend longer inside the same gradient.
+    constexpr uintptr_t StormIntensityFn = 0x0045FA70;
+}
+
+constexpr unsigned char kStormIntensitySig[] = {
+    0xB8, 0xD3, 0x4D, 0x62, 0x10, 0xF7, 0x6C, 0x24, 0x08
+};
+
+typedef int (__cdecl *StormIntensity_t)(int x, int y, int playSound);
+
+inline int StormIntensityHere()
+{
+    if (!game::BytesMatch(addr::StormIntensityFn, kStormIntensitySig,
+                          sizeof(kStormIntensitySig))) return -1;
+    __try {
+        return ((StormIntensity_t)addr::StormIntensityFn)(
+                    game::PlayerX(), game::PlayerY(), 0);
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER) { return -1; }
+}
+
+constexpr int kHoldSlots = 7;    // slot 0 = gold/plunder, 1..6 = trade goods
+
+inline DWORD g_lastLossAt = 0;
+inline const char* g_pendingNotice = nullptr;
+inline char g_noticeBuf[160];
+
+inline int StormDistanceToPlayer()
+{
+    __try {
+        const int sx = *(const int*)addr::StormX;
+        const int sy = *(const int*)addr::StormY;
+        const int px = game::PlayerX() / 1000;
+        const int py = game::PlayerY() / 1000;
+        int dx = sx - px, dy = sy - py;
+        if (dx < 0) dx = -dx;
+        if (dy < 0) dy = -dy;
+        const int lo = dx < dy ? dx : dy;
+        const int hi = dx < dy ? dy : dx;
+        return (lo + hi * 2) / 2;          // the engine's own octagonal approx
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER) { return -1; }
+}
+
+// Called from the safe point while sailing. Deliberately does nothing at all
+// unless the player asked for it -- losing cargo is a real consequence and it
+// should never arrive as a surprise from a visual mod.
+inline void TickCargoLoss()
+{
+    if (!g_tune.enabled || !g_tune.cargoLossEnabled) return;
+
+    const DWORD now = GetTickCount();
+    if ((int)(now - g_lastLossAt) < g_tune.cargoLossEveryMs) return;
+
+    // Ask the ENGINE how bad the weather is here rather than measuring it
+    // ourselves against a radius we invented.
+    const int intensity = StormIntensityHere();
+    const int d = StormDistanceToPlayer();
+    if (intensity < 0) return;                      // could not ask; do nothing
+    if (intensity < g_tune.cargoLossIntensity) return;
+    g_lastLossAt = now;
+
+    // Pick a good we actually carry. Walking from a random start means a full
+    // hold does not always lose the same barrel.
+    const int start = 1 + (int)(now % (kHoldSlots - 1));
+    int slot = -1, have = 0;
+    for (int n = 0; n < kHoldSlots - 1; ++n) {
+        const int i = 1 + ((start - 1 + n) % (kHoldSlots - 1));
+        int v = 0;
+        __try { v = *(const int*)(game::addr::UndividedPlunder + (uintptr_t)i * 4); }
+        __except (EXCEPTION_EXECUTE_HANDLER) { v = 0; }
+        if (v > 0 && ((g_tune.cargoLossProtect >> i) & 1) == 0) {
+            slot = i; have = v; break;
+        }
+    }
+    if (slot < 0) return;                  // nothing loose to lose
+
+    int lost = 1 + (int)(now % (DWORD)g_tune.cargoLossMax);
+    if (lost > have) lost = have;
+
+    __try {
+        *(int*)(game::addr::UndividedPlunder + (uintptr_t)slot * 4) = have - lost;
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER) { return; }
+
+    char item[64] = {0};
+    if (!game::ItemName(slot, item, sizeof(item)) || !item[0])
+        strncpy_s(item, sizeof(item), "cargo", _TRUNCATE);
+
+    _snprintf_s(g_noticeBuf, sizeof(g_noticeBuf), _TRUNCATE,
+                "The sea takes %d %s over the side.", lost, item);
+    g_pendingNotice = g_noticeBuf;
+    Log("storms: cargo loss -- slot %d (%s) %d -> %d, storm %d away, "
+        "intensity %d", slot, item, have, have - lost, d, intensity);
 }
 
 // Put the game back exactly as we found it, including the two instructions we
@@ -262,6 +598,10 @@ inline void Apply()
 // crashed" into "the game crashed".
 inline void Restore()
 {
+    if (g_clusterN > 0 && g_stormOrig) {
+        render::RedirectCall(kStormCallSite, g_stormOrig, nullptr);
+        g_clusterN = 0;
+    }
     if (!g_applied) return;
     DWORD old = 0;
     void* at = (void*)addr::StormScaleSite;
@@ -274,6 +614,7 @@ inline void Restore()
     WriteImm32(addr::ScaleSite,  addr::kScaleImmAt,  250);
     WriteImm8 (addr::CountSite,  addr::kCountImmAt,  3);
     WriteImm32(addr::HeightSite, addr::kHeightImmAt, 500);
+    WriteImm32(addr::WeatherPowerSite, addr::kWeatherPowerImmAt, 128000);
     g_applied = false;
     Log("storms: restored vanilla weather");
 }

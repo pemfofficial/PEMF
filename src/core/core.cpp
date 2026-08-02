@@ -406,6 +406,13 @@ static void RunSafePoint()
             }
         }
 
+        storms::TickCargoLoss();
+        if (storms::g_pendingNotice) {
+            content::PostDebugNotice(storms::g_pendingNotice, 7, false,
+                                     content::kChannelNarrative);
+            storms::g_pendingNotice = nullptr;
+        }
+
         if (suspicion::g_pendingNotice) {
             content::PostDebugNotice(suspicion::g_pendingNotice, 7, false,
                                      suspicion::g_pendingIsBeat

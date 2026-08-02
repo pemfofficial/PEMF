@@ -305,6 +305,32 @@
     },
     "measured": {
       "note": "Vanilla storm scale 80. Verified in game to 700 (8.75x) with height 1100, still a defined storm. Scale and height fight: scale 1000 at height 320 washed the whole screen to haze with no visible cloud. Purely visual -- storm gameplay effects not located."
+    },
+    "weather_curve": {
+      "va": "0x0045FA70",
+      "sig": "int __cdecl (int x, int y, int playSound)",
+      "note": "128000/(dist+4000) over the 3 weather slots, +2000 penalty on slots 1-2. Result cached in 0x0085A0F8, read by 6 sites. Safe to call with playSound=0. Reads POSITIONS, never the drawn scale -- a bigger cloud does not hit harder."
+    },
+    "weather_power_site": {
+      "va": "0x0045FAF6",
+      "original": "B8 00 F4 01 00",
+      "meaning": "mov eax, 0x1F400",
+      "note": "DROP-SIZE dial, NOT drop-count. Measured: 300000 = fat bending bars + 27kt winds; 128000 vanilla; 70000 calmer; 45000 restrained. Also feeds the sailing update, so it changes wind. Denser rain needs the particle COUNT in FUN_0047A040 -- not isolated."
+    },
+    "storm_seed": {
+      "flag": "0x008B996C",
+      "site": "0x00463567",
+      "note": "Storms are seeded ONCE at (playerX/1e6 + 8, playerY/1e6) * 1000 and never move. The flag is only ever written to ZERO (0x00463587, 0x00471F3A); whatever sets it is a bulk write not yet found. Drifting weather would hook here."
+    },
+    "cull_bound_limitation": {
+      "node_from": "*(int*)(instance + 0x1C)",
+      "world_bound_centre": "node + 0x28",
+      "world_bound_radius": "node + 0x34",
+      "note": "⚠️ NOT FIXED. Scaling a cloud grows the visual but not the cull sphere, so at high scale the engine drops it while most is still on screen ('disappears once 20-30% off screen'). Offsets derived from Gamebryo 2.6 NiAVObject member order (m_kWorldBound, m_kLocal, m_kWorld) anchored on the known m_kLocal at +0x38. Gamebryo recomputes world bounds during update, so the durable fix is probably the MODEL bound, not the world bound per frame."
+    },
+    "instance_pool": {
+      "va": "0x004BB4B0",
+      "note": "Prefab keeps a list at +0x10 and allocates another instance when the current is already used this frame (+0x24, set by FUN_004BBC80). Calling the draw again yields ANOTHER cloud, not a moved one -- this is what makes clusters possible. PEMF redirects the call at 0x0046377A. Cluster offsets must be FIXED; per-frame jitter strobes."
     }
   }
 }
