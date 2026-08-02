@@ -30,7 +30,7 @@
 //
 // The one thing we build ourselves is the hunter, because a ship needs steering
 // and the game has no "chase that vessel" behaviour to borrow. Its strength
-// comes from the engine's own formula (2 - reputation/10, clamped 2..4), so a
+// comes from the engine's own formula (2 - reputation/5, clamped 2..4), so a
 // crown that loathes you sends something worse.
 #pragma once
 #include <windows.h>
@@ -80,7 +80,9 @@ struct Tuning {
     int  hunterReaimMs   = 5000;    // how often she re-aims at you
     int  hunterGiveUpMs  = 240000;  // ...before losing interest
     int  hunterEscapeDist = 70000;  // or you simply get clear
+    int  hunterMaxSpawnDist = 9000; // past this she is culled before arriving
     bool hunterEnabled   = true;
+
 
     int  maxPerNation = 1;          // hunters at sea per crown
 };
@@ -121,6 +123,7 @@ struct Hunt {
     // re-issued order actually kept her under way or she is sitting in harbour.
     int   lastX = 0, lastY = 0;
     bool  havePos = false;
+    int   lastDist = -1;   // so the log can say whether she is CLOSING
 };
 
 // Several per nation, because a crown that truly wants you does not send one
@@ -201,6 +204,7 @@ inline void LoadTuning(const char* gameDir)
             { "hunterReaimMs",  &g_tune.hunterReaimMs },
             { "hunterGiveUpMs", &g_tune.hunterGiveUpMs },
             { "hunterEscapeDist", &g_tune.hunterEscapeDist },
+            { "hunterMaxSpawnDist", &g_tune.hunterMaxSpawnDist },
             { "maxPerNation",   &g_tune.maxPerNation },
             // The standing ledger lives in its own header but tunes from the
             // same file -- one place a player edits, not two.
@@ -320,6 +324,22 @@ inline int RateFor(int nation, const Look& look)
 // The game has no "chase that ship" behaviour to borrow -- a vessel sails to a
 // PLACE. So a hunt is a ship rebuilt toward the player every few seconds, and
 // from the deck that is a warship that will not let go.
+// Distance from an arbitrary point to a city, in the same units CityDistance
+// uses. The stock helper measures from the PLAYER, which is exactly the thing
+// the probe must not assume.
+inline int CityDistanceFrom(int cityIndex, int x, int y)
+{
+    if (cityIndex < 0) return -1;
+    const int* pos = (const int*)(game::addr::CityPositions + (size_t)cityIndex * 16);
+    int dx = pos[0] - x, dy = pos[1] - y;
+    if (dx < 0) dx = -dx;
+    if (dy < 0) dy = -dy;
+    return ((dy < dx) ? (dy + dx * 2) : (dx + dy * 2)) / 2;
+}
+
+inline void ReaimHunter(Hunt& h, int fallbackCity = -1);   // defined below
+inline void Say(const char* text, bool beat);              // ...and the ladder's
+
 inline bool DispatchOneHunter(int nation, Hunt& h)
 {
     if (!game::SpawnShipCallable()) {
@@ -341,6 +361,21 @@ inline bool DispatchOneHunter(int nation, Hunt& h)
         return false;
     }
 
+    // A ship built too far away is DEAD ON ARRIVAL. Measured during the chase
+    // probe: every pursuer spawned within ~7,000 of the player lived for as long
+    // as we watched her, and every one spawned beyond ~11,000 was culled inside
+    // two seconds. The overworld does not keep vessels that far out.
+    //
+    // "Nearest port of that crown" can still be a long way off, so without this
+    // a hunt silently produces nothing and the player just never sees anyone --
+    // which is a much worse bug than declining to send one.
+    if (bestDist > g_tune.hunterMaxSpawnDist) {
+        Log("suspicion: %s wants to send someone but their nearest port (city "
+            "%d) is %d away -- past %d she would be culled before reaching us",
+            game::NationName(nation), from, bestDist, g_tune.hunterMaxSpawnDist);
+        return false;
+    }
+
     const int slot = game::SpawnShipAtCity(from, 0x0B);
     if (slot < 8 || slot >= game::addr::kMaxShips) {
         Log("suspicion: the yard could not build a hunter (returned %d)", slot);
@@ -349,18 +384,30 @@ inline bool DispatchOneHunter(int nation, Hunt& h)
 
     // The engine's own recipe: strength scales with how badly they think of us.
     const int strength = game::HunterStrengthFor(nation);
-    game::SetShipPurposeRaw(slot, game::kPurposePirateHunter);
     game::SetShipRoleRaw(slot, strength);
     game::MarkCitySentHunter(from, slot);
 
+    // Bookkeeping FIRST. This block used to sit below the setup and reset
+    // h.aimCity to -1 after the chase branch had just computed it, so the far
+    // destination was written once at spawn and never re-issued -- and the log
+    // reported "ordered-to city -1", which read as "we never aimed her".
     h.active = true; h.slot = slot; h.nation = nation;
     h.strength = strength;
     h.startedAt = h.lastAimAt = GetTickCount();
-    h.aimCity = -1;
+    h.aimCity = -1; h.lastDist = -1;
 
-    Log("suspicion: %s dispatches a pirate-hunter from city %d -- slot %d, "
-        "strength %d (reputation %d)", game::NationName(nation), from, slot,
-        strength, nations::Reputation(nation));
+    game::SetShipPurposeRaw(slot, game::kPurposePirateHunter);
+
+    // Give her somewhere to be IMMEDIATELY. A ship leaves the factory with its
+    // destination set to the port it was built at -- already arrived -- and an
+    // arrived ship docks and is culled within about two seconds. Waiting for the
+    // first re-aim is waiting too long.
+    ReaimHunter(h, from);
+
+    Log("suspicion: %s dispatches a pirate-hunter from city %d (dist %d) -- "
+        "slot %d, strength %d, aimed past us at city %d (reputation %d)",
+        game::NationName(nation), from, bestDist, slot, strength, h.aimCity,
+        nations::Reputation(nation));
     return true;
 }
 
@@ -382,17 +429,68 @@ inline void DispatchHunters(int nation)
         game::NationName(nation), have, want, nations::Reputation(nation));
 }
 
-// Point her at us. Her destination is a PORT, so we pick whichever of theirs is
-// nearest the player -- she then sails into our water rather than at a fixed
-// spot, and re-aiming keeps her honest as we run.
-inline void ReaimHunter(Hunt& h)
+// Point her THROUGH us.
+//
+// The old version aimed her at whichever port lay nearest the player, and that
+// is why hunts kept dying in harbour: a port near us is still a PLACE, she
+// reaches it, and a ship that has arrived stops. Re-issuing the same order --
+// the previous fix -- kept her under way but did not stop her going somewhere
+// that was not us.
+//
+// The chase probe settled the underlying question: the engine has a per-ship
+// pursuit target at +0x08, it is the only field that overrides the war-relations
+// check, and it does NOTHING when pointed at slot 0. Measured over three runs --
+// a ship given target 0 and a ship given no target at all behaved identically,
+// both sailing to their ordered port and leaving the player behind. The player
+// cannot be the object of the engine's chase behaviour.
+//
+// So we steer, and the trick is to aim BEYOND. We pick the port nearest a point
+// on the far side of the player, which makes the player stand between her and
+// where she is going. She sails at us the whole way and does not stop when she
+// gets here, because here was never the destination.
+//
+// The probe demonstrated this by accident before it was designed: a privateer
+// ordered clear across the map passed straight through the player's water at
+// speed and read, from the deck, exactly like a pursuit.
+inline void ReaimHunter(Hunt& h, int fallbackCity)
 {
+    const int px = game::PlayerX() / 1000;
+    const int py = game::PlayerY() / 1000;
+
+    int hx = px, hy = py;
+    __try {
+        hx = *(const int*)(game::ShipRecord(h.slot) + 0x0C) / 1000;
+        hy = *(const int*)(game::ShipRecord(h.slot) + 0x10) / 1000;
+    } __except (EXCEPTION_EXECUTE_HANDLER) {}
+
+    // Reflect her position through the player: as far past us as she is short.
+    const int ax = px + (px - hx);
+    const int ay = py + (py - hy);
+
+    // The destination must lie genuinely BEYOND us -- farther from her than we
+    // are. Without this the nearest port to the reflected point can be the very
+    // one she is sitting in (seen in the log as "aimed past us at city 24" from
+    // a hunter built at city 24), and a ship ordered to the harbour she is
+    // already in has arrived. That is the parking bug wearing a new hat.
+    const int toPlayer = Octagonal(hx - px, hy - py);
+
     int best = -1, bestDist = 0x7FFFFFFF;
     for (int c = 0; c < game::addr::kMaxCities; ++c) {
-        const int d = game::CityDistance(c);
+        const int d = CityDistanceFrom(c, ax, ay);
         if (d < 0 || d >= bestDist) continue;
+        if (CityDistanceFrom(c, hx, hy) <= toPlayer) continue;   // not past us
         bestDist = d; best = c;
     }
+    // Relaxing the rule beats leaving her with no orders at all: a ship with
+    // nowhere to be docks and is culled.
+    if (best < 0) {
+        for (int c = 0; c < game::addr::kMaxCities; ++c) {
+            const int d = CityDistanceFrom(c, ax, ay);
+            if (d < 0 || d >= bestDist) continue;
+            bestDist = d; best = c;
+        }
+    }
+    if (best < 0) best = fallbackCity;
     if (best < 0) return;
 
     // RE-ISSUE EVERY TIME, even when the destination has not changed. Skipping
@@ -409,27 +507,76 @@ inline void ReaimHunter(Hunt& h)
     h.aimCity = best;
 }
 
-inline void EndHunt(Hunt& h, const char* why)
+inline void EndHunt(Hunt& h, const char* why, bool tellPlayer = true)
 {
     if (!h.active) return;
     Log("suspicion: the %s hunter breaks off -- %s",
         game::NationName(h.nation), why);
-    h.active = false; h.slot = -1; h.aimCity = -1;
+
+    // TELL THE PLAYER. A hunt that ends in silence is indistinguishable from a
+    // hunt that is still coming, and the whole point of an escape is knowing you
+    // made it. Only worth saying for the endings the player earned -- a ship
+    // that sank or despawned announces itself.
+    if (tellPlayer) {
+        char line[160];
+        _snprintf_s(line, sizeof(line), _TRUNCATE,
+                    "The %s hunter breaks off -- %s.",
+                    game::NationName(h.nation), why);
+        Say(line, true);
+    }
+    h.active = false; h.slot = -1; h.aimCity = -1; h.lastDist = -1;
+}
+
+// A crown that wants you keeps wanting you. Dispatch used to be attempted once,
+// at the moment of unmasking, so being caught in open water meant nobody was
+// ever sent -- and sailing back into their waters an hour later changed nothing.
+// Now the attempt repeats while you are hostile to them, which also means the
+// spawn-distance guard costs you nothing: it defers the hunt until you are
+// somewhere they can actually reach you from.
+inline DWORD g_lastRetryAt = 0;
+constexpr int kDispatchRetryMs = 15000;
+
+inline void RetryDispatches()
+{
+    const DWORD now = GetTickCount();
+    if ((int)(now - g_lastRetryAt) < kDispatchRetryMs) return;
+    g_lastRetryAt = now;
+
+    for (int n = 0; n < game::addr::kNationsWithRank; ++n) {
+        if (nations::Reputation(n) >= 0) continue;      // no quarrel, no hunt
+        int have = 0;
+        for (int k = 0; k < kMaxHuntsPerNation; ++k)
+            if (g_hunts[n][k].active) ++have;
+        if (have >= HunterCountFor(n)) continue;
+        DispatchHunters(n);
+    }
 }
 
 inline void TickHunts()
 {
     const DWORD now = GetTickCount();
+    RetryDispatches();
     for (int n = 0; n < game::addr::kNationsWithRank; ++n)
     for (int k = 0; k < kMaxHuntsPerNation; ++k) {
         Hunt& h = g_hunts[n][k];
         if (!h.active) continue;
 
         // She may have been sunk, despawned, or had her slot reused.
-        if (game::ShipType(h.slot) == -1) { EndHunt(h, "her ship is gone"); continue; }
+        if (game::ShipType(h.slot) == -1) { EndHunt(h, "her ship is gone", false); continue; }
 
         if ((int)(now - h.startedAt) > g_tune.hunterGiveUpMs) {
             EndHunt(h, "she has searched long enough"); continue;
+        }
+
+        // THE WAY BACK. A hunt exists because a crown thinks you are a pirate,
+        // so it has to end when they stop thinking so -- otherwise the standing
+        // ledger can forgive a fright, their ports can reopen, and a warship is
+        // still out there hunting a captain nobody wants any more.
+        //
+        // Reputation is the same number that opened the ports again, so the two
+        // can never disagree.
+        if (nations::Reputation(h.nation) >= 0) {
+            EndHunt(h, "their quarrel with us is settled"); continue;
         }
 
         const int px = game::PlayerX() / 1000, py = game::PlayerY() / 1000;
@@ -443,15 +590,21 @@ inline void TickHunts()
             h.lastAimAt = now;
             const int moved = h.havePos
                             ? Octagonal(hx - h.lastX, hy - h.lastY) : -1;
-            const int wasAim = h.aimCity;
+            const int dist = Octagonal(hx - px, hy - py);
+
+
+            const int closed = h.lastDist < 0 ? 0 : h.lastDist - dist;
             ReaimHunter(h);
-            // Whether she is actually SAILING is the open question behind the
-            // re-issue fix -- `moved 0` here across several ticks means the
-            // order is not enough by itself and she needs somewhere new to go.
-            Log("suspicion: %s hunter slot %d -- dist %d, moved %d, aim %d%s",
-                game::NationName(h.nation), h.slot,
-                Octagonal(hx - px, hy - py), moved, h.aimCity,
-                h.aimCity == wasAim ? " (re-issued)" : " (new)");
+            // `closed` is the health check for the whole approach. She is aimed
+            // PAST us, so while she is under way this should stay positive until
+            // she overshoots, then go negative as she runs on and comes about.
+            // A long run of `moved 0` means she is in harbour again and the
+            // aim-beyond trick has failed somewhere.
+            Log("suspicion: %s hunter slot %d -- dist %d, closed %d, moved %d, "
+                "aimed past us at city %d",
+                game::NationName(h.nation), h.slot, dist, closed, moved,
+                h.aimCity);
+            h.lastDist = dist;
             h.lastX = hx; h.lastY = hy; h.havePos = true;
         }
     }

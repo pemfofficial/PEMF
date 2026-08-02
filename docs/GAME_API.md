@@ -1113,6 +1113,83 @@ privateer is when two crowns go to war, and what a governor's blockade fleet is.
 
 So the primitive worth having is not a hostility switch. It is the constructor.
 
+### ⛔ `+0x08` is a pursuit target — and it does NOT accept the player
+
+There **is** a per-ship "chase that vessel" field, and it is the only thing in
+the record that overrides the war-relations check. It is still useless to us,
+and the measurements below are here so nobody spends another day on it.
+
+`0x00814300`, int16, offset `+0x08`. Six references in the whole binary, in two
+functions. The engagement test at `0x0046A4FC`:
+
+```
+relations[them][me] == 1 && ((purpose == 2 && ...) || purpose == 3)
+|| ship[me].target == them          <-- this arm ignores relations entirely
+```
+
+The engine writes it in exactly **one** place — `0x0044EF0D`, inside the convoy
+builder `FUN_0044EB10(city, homeCity, shipType, escortNation, kind)` — and
+always with a slot allocated moments earlier in the same call:
+
+```c
+if (param_4 != -1 && param_5 != 2) {          // escortNation given
+  do { iVar8 = AllocShip();
+       ship[iVar8].target  = iVar7;           // the ship built at the top
+       ship[iVar8].purpose = 2;               // privateer
+  } while (local_14 <= DAT_0085A158 / 2);
+}
+```
+
+That is convoy escorts and hunting packs. **It is never pointed at slot 0.**
+
+**Measured, three runs, 2026-08-02.** Slot 0 is both "the player" and the AI's
+"no target" sentinel (`if (0 < target)` guards every read; stale ones cleared at
+`0x00469F40`). Writing `target = 0` persists perfectly — read back on every one
+of ~25 samples, never wiped — and changes **nothing**:
+
+| | `target = 0` | `target = -1` (control) |
+|---|---|---|
+| spawn distance to player | 2,629 | 2,328 |
+| closest approach | 1,359 | 882 |
+| distance at end | 6,601 | 6,828 |
+| distance from home port | 867 → 8,274 | 1,025 → 8,739 |
+| progress to ordered port | steady | steady |
+
+Identical. Both sailed to their ordered port and left the player behind, both
+passing within the `dist < 0xBB8` window that the engagement test requires. The
+sentinel wins: a target of `0` reads as *no target*.
+
+**And the battle handshake excludes the player anyway.** Two engagement paths
+exist. The relations-based one is wrapped in `if (other != 0)` — slot 0 skipped
+explicitly. The other (`0x0046A61E`, which writes `+0x5C = 0x96`, `+0x60 =
+other` and flags `|= 0x60` reciprocally) has no such guard, but is reachable
+only through the target match above.
+
+The player *is* seen — the neighbour scan at `0x00469DF6` starts at slot 0 or 8
+depending on a bit in `0x0085A164`, and `0x00469DFB` explicitly permits slot 0
+as a candidate. That scan is what produces `"Stay clear you scurvy Pirate!"`
+(`0x00707A40`, hailed from `FUN_004612B0`). Being seen and being *engaged* are
+different things.
+
+**Conclusion: overworld ships never initiate combat with the player.** Contact
+does. A pursuer's job is to make contact unavoidable, not to open fire.
+
+### ⚠️ Ships far from the player are culled within ~2 seconds
+
+Measured during the same runs, and it invalidates any "spawn a ship over there"
+plan:
+
+| Spawn distance to player | Outcome |
+|---|---|
+| 2,328 – 6,315 | lived as long as observed (25 s+) |
+| 11,023 – 15,492 | **culled in 1.8 – 2.6 s** |
+
+A ship also dies if it has *arrived*: the factories set destination to the port
+of origin, so a spawned ship with no fresh destination docks and is removed in
+about two seconds. Both failure modes look identical from the outside — the ship
+simply is not there any more — which is why they were confused for each other
+twice during this work.
+
 ### Slot allocation — `+0x00 == -1` means free
 
 | Slots | Use |
@@ -1192,7 +1269,7 @@ Reproduced exactly (there is a duplicate at `0x00465670`):
 ```
 slot = FUN_00414FC0(city, kind)         ; the same factory PEMF calls
 rep  = reputation[CityNation(city)]     ; your standing with that crown
-str  = 2 - rep/10                       ; imul 0x66666667 / sar 1
+str  = 2 - rep/5                        ; imul 0x66666667 / sar 1  (/5, NOT /10)
 ship[slot].purpose = 1                  ; PIRATE-HUNTER
 clamp str to [2, 4]
 ```

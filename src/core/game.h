@@ -1154,7 +1154,7 @@ inline int ShipPurposeOf(int index)
 //
 //     slot = FUN_00414FC0(city, kind)          ; the factory PEMF already calls
 //     rep  = reputation[CityNation(city)]
-//     str  = 2 - rep/10                        ; imul 0x66666667 / sar 1
+//     str  = 2 - rep/5                         ; imul 0x66666667 / sar 1
 //     ship[slot].purpose = 1                   ; PIRATE-HUNTER
 //     clamp str to [2, 4]
 //
@@ -1245,7 +1245,12 @@ inline int HunterStrengthFor(int nation)
     int rep = 0;
     __try { rep = *(const short*)(addr::PlayerReputation + (uintptr_t)nation * 2); }
     __except (EXCEPTION_EXECUTE_HANDLER) { rep = 0; }
-    int s = 2 - (rep / 10);
+    // /5, not /10. The magic sequence at 0x0046568D is `imul 0x66666667` then
+    // `sar edx,1`, and that pair is a divide by FIVE -- divide by ten would be
+    // `sar edx,2`. This read /10 for a long time and the clamp hid it at both
+    // ends, so only the middle of the range was wrong: at reputation -10 the
+    // engine wants strength 4 and we were sending 3.
+    int s = 2 - (rep / 5);
     if (s < 2) s = 2;
     if (s > 4) s = 4;
     return s;
@@ -1319,6 +1324,43 @@ inline int ShipHomeCity(int index)
                                (uintptr_t)index * addr::kShipStride + kShipHomeCity);
     }
     __except (EXCEPTION_EXECUTE_HANDLER) { return -1; }
+}
+
+// ------------------------------------------------------- the pursuit target
+// +0x08, int16, holding a SHIP SLOT INDEX. Six references in the whole binary,
+// in two functions, and it is the only thing in the record that overrides the
+// war-relations check: the engagement test at 0x0046A4FC reads
+//
+//     (relations[them][me] == 1 && ((purpose == 2 && ...) || purpose == 3))
+//     || ship[me].target == them          <-- this arm ignores relations
+//
+// so a ship whose target is you comes for you whether or not your crowns are at
+// war. The engine writes it in exactly one place (0x0044EF0D, inside the convoy
+// builder) and ALWAYS with a slot it allocated moments earlier -- it never
+// points this at the player, which is why slot 0 is untested ground.
+//
+// ⚠️ 0 is both "the player" and the engine's "no target" sentinel: the AI guards
+// its reads with `if (0 < target)` and clears stale ones at 0x00469F40. Whether
+// a target of 0 reads as us or as nothing is THE question the probe exists to
+// answer. Do not build on this until a playtest has said.
+constexpr int kShipTarget = 0x08;     // 0x00814300
+
+inline int ShipTarget(int index)
+{
+    __try {
+        return *(const short*)(addr::ShipArray +
+                               (uintptr_t)index * addr::kShipStride + kShipTarget);
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER) { return -1; }
+}
+
+inline void SetShipTargetRaw(int index, int targetSlot)
+{
+    __try {
+        *(short*)(addr::ShipArray + (uintptr_t)index * addr::kShipStride
+                  + kShipTarget) = (short)targetSlot;
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER) {}
 }
 
 inline unsigned ShipFlagBits(int index)

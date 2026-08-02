@@ -126,6 +126,10 @@ levels are used throughout the docs:
 | Suspicion — rises on observation, falls in open water | **Verified** |
 | Being unmasked: reputation drops, colours struck | **Verified** |
 | Pirate-hunters dispatched, scaling with reputation | **Verified** — engine treats them as hostile |
+| A hunter that stays on you | **Verified** — held 873–3,874 units for 55 s by aiming her at a port *beyond* the player |
+| A hunt that ends, and says so | **Verified** — breaks off on escape, timeout, sinking, or reputation returning to 0 |
+| Making an *existing* vessel hostile | **Ruled out** — the engine's pursuit-target field ignores slot 0; measured three runs |
+| An AI ship opening fire on the overworld | **Ruled out** — no such behaviour exists; contact starts combat |
 | Suspicion tuning via `PEMF\suspicion.ini` | **Verified** |
 | Playing a named game sound with an event | **Verified** |
 | Officer simulation | Not started |

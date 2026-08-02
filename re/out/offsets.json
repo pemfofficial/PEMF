@@ -10,7 +10,6 @@
     "engine": "Gamebryo 10.1.0.0 / NiDX9",
     "aslr": false
   },
-
   "text_api": {
     "_comment": "printf-style formatter with named tokens (@NUM, @HAPPY, @NAME, @CITYNAME, @NATIONALITY, @CITYTYPE, @MONTH, @DIFFICULTY, @SHARE). Tokens consume varargs left-to-right exactly like printf. IMPORTANT: esi must equal 0x008E9F58 (the message-buffer object) before calling; the wrappers do not set it themselves.",
     "AddText_mode0": {
@@ -31,18 +30,43 @@
     },
     "msgbuf_object": "0x008E9F58"
   },
-
   "crew": {
     "_comment": "Discovered via the mutiny and 'Your crew of @NUM is @HAPPY' call sites.",
-    "crew_count":        { "va": "0x00869AB0", "type": "int32" },
-    "gold_869AB4":       { "va": "0x00869AB4", "type": "int32", "note": "GOLD (plunder). Read immediately after the divide-plunder text call at 0x0041032A (`mov eax,[0x869AB4]`), and it is slot 0 of the 7-entry contiguous cargo-hold array. Was 'gold or food?'; the divide-plunder read settles it." },
-    "months_at_sea":     { "va": "0x00869B1A", "type": "int16", "note": "used by mutiny message" },
-    "morale_byte_869B27":{ "va": "0x00869B27", "type": "int8",  "note": "shl 2 then subtracted in morale calc" },
-    "flags_869B34":      { "va": "0x00869B34", "type": "int32", "note": "bit 0x80 tested in morale calc" },
-    "unknown_869A76":    { "va": "0x00869A76", "type": "int16", "note": "morale calc input" },
-    "unknown_85A158":    { "va": "0x0085A158", "type": "int32", "note": "morale calc input" }
+    "crew_count": {
+      "va": "0x00869AB0",
+      "type": "int32"
+    },
+    "gold_869AB4": {
+      "va": "0x00869AB4",
+      "type": "int32",
+      "note": "GOLD (plunder). Read immediately after the divide-plunder text call at 0x0041032A (`mov eax,[0x869AB4]`), and it is slot 0 of the 7-entry contiguous cargo-hold array. Was 'gold or food?'; the divide-plunder read settles it."
+    },
+    "months_at_sea": {
+      "va": "0x00869B1A",
+      "type": "int16",
+      "note": "used by mutiny message"
+    },
+    "morale_byte_869B27": {
+      "va": "0x00869B27",
+      "type": "int8",
+      "note": "shl 2 then subtracted in morale calc"
+    },
+    "flags_869B34": {
+      "va": "0x00869B34",
+      "type": "int32",
+      "note": "bit 0x80 tested in morale calc"
+    },
+    "unknown_869A76": {
+      "va": "0x00869A76",
+      "type": "int16",
+      "note": "morale calc input"
+    },
+    "unknown_85A158": {
+      "va": "0x0085A158",
+      "type": "int32",
+      "note": "morale calc input"
+    }
   },
-
   "functions": {
     "GetCrewMoodString": {
       "va": "0x00404810",
@@ -78,29 +102,136 @@
       "va": "0x004741B0",
       "sig": "void ()",
       "note": "The sailing-screen HUD: Fame, '@NUM knots', '@NUM crew', the date, and the notice strip (gated on 0x8CA9E8, art 'tornPaper.dds', text drawn with FUN_004B06C0 in 0xFF1A3E1A)."
+    },
+    "ShipAI": {
+      "va": "0x00467F90",
+      "sig": "(int shipIndex)",
+      "note": "The overworld ship AI. Reads purpose a dozen times. Contains BOTH engagement paths: the relations-based one EXCLUDES the player (`if (other != 0)`), and the target-based one at 0x0046A61E does not but is unreachable for slot 0. Neighbour scan at 0x00469DF6 starts at slot 0 or 8 depending on a bit in 0x0085A164 and does include the player as a candidate."
+    },
+    "BuildConvoyWithEscorts": {
+      "va": "0x0044EB10",
+      "sig": "(int city, int homeCity, int shipType, int escortNation, int kind)",
+      "note": "Builds a ship, then N privateers (purpose 2) whose pursuit target is that ship. The only writer of +0x08."
+    },
+    "DispatchPirateHunter": {
+      "va": "0x00465670",
+      "sig": "void ()",
+      "note": "The crown's own hunter dispatch. strength = clamp(2 - reputation/5, 2, 4) -- the magic at 0x0046568D is `imul 0x66666667` + `sar edx,1`, which is a divide by FIVE. PEMF read this as /10 for a long time and undersized hunters in the mid-reputation band. Duplicate at 0x0045F060."
     }
   },
-
   "notice_strip": {
     "_comment": "The game's own notification line along the bottom of the sailing screen. TWO PLAIN GLOBALS -- posting needs no engine call at all. ONE SLOT, NO QUEUE: a post overwrites whatever is showing, so anything sharing it must gate on the counter being 0 or it will eat the game's own news.",
-    "text":  { "va": "0x00876BF8", "type": "char[256]", "note": "Capacity MEASURED: the next referenced global is 0x00876CF8, exactly +0x100, with 9 referents. The GAME does not respect it -- FUN_004600A0 strcpy's in from the 4096-byte compose buffer unbounded." },
-    "ttl":   { "va": "0x008CA9E8", "type": "uint8", "note": "Visibility COUNTDOWN, not a timestamp. Set to 100 by the game's own post; decremented once per update tick by FUN_004612B0 at 0x004633B3. Drawn while non-zero." },
+    "text": {
+      "va": "0x00876BF8",
+      "type": "char[256]",
+      "note": "Capacity MEASURED: the next referenced global is 0x00876CF8, exactly +0x100, with 9 referents. The GAME does not respect it -- FUN_004600A0 strcpy's in from the 4096-byte compose buffer unbounded."
+    },
+    "ttl": {
+      "va": "0x008CA9E8",
+      "type": "uint8",
+      "note": "Visibility COUNTDOWN, not a timestamp. Set to 100 by the game's own post; decremented once per update tick by FUN_004612B0 at 0x004633B3. Drawn while non-zero."
+    },
     "wrap_columns": 32
   },
-
   "call_sites": {
     "_comment": "These VAs point at the START OF THE ARGUMENT SETUP, not at the CALL instruction itself -- e.g. divide_plunder 0x00410321 sets up, and the actual `call 0x004F6090` is at 0x0041032A. Verified against Ghidra 2026-08-02.",
-    "mutiny_message":  "0x004125A0",
-    "crew_status":     "0x00443DC0",
-    "divide_plunder":  "0x00410321",
-    "morale_delta":    ["0x00437A5B", "0x00437CA6"],
-    "starving":        "0x004608E0"
+    "mutiny_message": "0x004125A0",
+    "crew_status": "0x00443DC0",
+    "divide_plunder": "0x00410321",
+    "morale_delta": [
+      "0x00437A5B",
+      "0x00437CA6"
+    ],
+    "starving": "0x004608E0"
   },
-
   "code_cave": {
     "_comment": "OUT OF SCOPE -- PEMF targets GOG + Steam ONLY. The Challenge Pack (cp-base) is NOT a supported target. Kept for reference only; do not build features on this. Present only in the cp-base/Challenge-Pack exe, NOT in gog-original. Empty (all zero) in cp-base.",
     "_status": "not-a-target",
-    "modCode": { "va": "0x004F3000", "size": 4096, "prot": "RWX" },
-    "modData": { "va": "0x004F4000", "size": 4096, "prot": "RW" }
+    "modCode": {
+      "va": "0x004F3000",
+      "size": 4096,
+      "prot": "RWX"
+    },
+    "modData": {
+      "va": "0x004F4000",
+      "size": 4096,
+      "prot": "RW"
+    }
+  },
+  "ship_record": {
+    "_comment": "Overworld ship array at 0x008142F8, stride 0x45C, 256 slots. Slot 0 is the player, 1-7 reserved, 8-255 the AI pool. Offsets below are from the record base.",
+    "pursuit_target": {
+      "offset": "+0x08",
+      "va": "0x00814300",
+      "type": "int16",
+      "note": "DEAD END FOR THE PLAYER, measured 2026-08-02 over three runs. Holds a SHIP SLOT INDEX and is the only field that overrides the war-relations check (0x0046A4FC). Written by the engine in exactly one place, 0x0044EF0D inside the convoy builder FUN_0044EB10, always with a slot allocated moments earlier -- NEVER slot 0. Writing 0 persists perfectly and changes nothing: 0 is also the AI's 'no target' sentinel. A ship given target 0 and a ship given no target behaved identically. Do not build on this."
+    },
+    "purpose": {
+      "offset": "+0x02",
+      "va": "0x008142FA",
+      "type": "int16",
+      "values": {
+        "0": "merchant (no hover label)",
+        "1": "pirate-hunter",
+        "2": "privateer",
+        "3": "raider",
+        "4": "smuggler",
+        "5": "unlabelled",
+        "6": "unlabelled"
+      },
+      "note": "Hover label jump table 0x00463CB4 -> strings 0x00707A60..AA4."
+    },
+    "role": {
+      "offset": "+0x2A",
+      "va": "0x00814322",
+      "type": "int16"
+    },
+    "dest_city": {
+      "offset": "+0x3E",
+      "va": "0x00814336",
+      "type": "int16",
+      "note": "THE steering lever. A ship whose destination equals its origin has ARRIVED, docks, and is culled in ~2s."
+    },
+    "home_city": {
+      "offset": "+0x40",
+      "va": "0x00814338",
+      "type": "int16"
+    },
+    "flags": {
+      "offset": "+0x58",
+      "va": "0x00814350",
+      "type": "uint32"
+    },
+    "engage_timer": {
+      "offset": "+0x5C",
+      "va": "0x00814354",
+      "type": "int16",
+      "note": "Set to 0x96 by the engagement handshake."
+    },
+    "engage_with": {
+      "offset": "+0x60",
+      "va": "0x00814358",
+      "type": "int16",
+      "note": "Reciprocal 'who I am fighting'. Written at 0x0046A61E."
+    }
+  },
+  "strings": {
+    "hostile_hail": {
+      "va": "0x00707A40",
+      "value": "Stay clear you scurvy Pirate!",
+      "note": "Pushed from FUN_004612B0 at 0x0046239A and 0x004628A9 -- the overworld hail from a hostile vessel. Proof the player IS seen by the AI scan."
+    }
+  },
+  "measured_behaviour": {
+    "_comment": "Observed in a running game, not read from code.",
+    "ship_culling": {
+      "note": "Ships spawned 2,328-6,315 from the player lived 25s+; ships spawned 11,023-15,492 were culled in 1.8-2.6s. Any 'spawn a ship over there' plan has to respect this."
+    },
+    "arrived_ships": {
+      "note": "A spawned ship keeps the factory's destination (its origin port), counts as arrived, docks and is removed in ~2s. Indistinguishable from culling without instrumentation."
+    },
+    "overworld_combat": {
+      "note": "Overworld vessels never open fire on the player. Combat begins on player contact. Hostility is real via negative reputation (ports close, hails fire) but no AI ship initiates."
+    }
   }
 }

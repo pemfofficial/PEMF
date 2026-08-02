@@ -170,19 +170,20 @@ Every input the design needs is confirmed working in a running game.
 
    And a hunter is not something we have to write: **`+0x02` on a ship record
    classifies it, and `1` means pirate-hunter** — the value behind the game's
-   own `"@NATIONALITY pirate-hunter"` hover label. Whether stamping it produces
-   hunting *behaviour* is the outstanding test.
+   own `"@NATIONALITY pirate-hunter"` hover label.
 
-   Still open underneath that: a spawned ship sails to a *place*, not at a
-   *ship*. If the purpose field does not bring behaviour with it, pointing a
-   hunter past the player is the fallback.
+   ~~Still open: a spawned ship sails to a *place*, not at a *ship*.~~
+   **Settled — the fallback was the answer.** See "How a hunt actually works"
+   below. The engine's pursuit-target field exists and does not accept the
+   player; measurements in
+   [`GAME_API.md`](GAME_API.md#-0x08-is-a-pursuit-target--and-it-does-not-accept-the-player).
 2. **Infamy is not located.** The game tracks an "@ORDINAL most notorious pirate"
    ranking, so a value exists, but the HUD only draws the *word* "Fame" and the
    two references to that string push no value. Wanted for the "a famous captain
    is harder to disguise" input; rank and reputation stand in until then.
-3. **Role values 1–4 are unmapped.** Only role 2 is known (a governor's blockade
-   dispatch). If one of them means "hunt the player", the hunter is a field
-   assignment rather than a behaviour we have to write.
+3. ~~**Role values 1–4 are unmapped.**~~ **Closed, negatively.** No role or
+   purpose value means "hunt the player", and the one field that *does* mean
+   "chase that ship" ignores slot 0. A hunt is steering, not a field assignment.
 4. **Witness detection is undesigned.** Which vessels count as having seen an
    attack, and how an escape is recognised, both need working out — probably
    from the battle instance rather than the overworld.
@@ -202,6 +203,77 @@ Every input the design needs is confirmed working in a running game.
    understood, and it should be built on a system that is already working.
 
 ---
+
+## How a hunt actually works
+
+The engine offers no way to make a ship hunt the player. Three measured runs
+closed that off for good — the pursuit-target field at `+0x08` exists, overrides
+the war-relations check, and does nothing when pointed at slot 0, because slot 0
+is also its "no target" sentinel. The battle handshake skips the player
+explicitly (`if (other != 0)`). Full evidence in
+[`GAME_API.md`](GAME_API.md#-0x08-is-a-pursuit-target--and-it-does-not-accept-the-player).
+
+So a hunt is **steering**, and it rests on one trick.
+
+### Aim BEYOND the player, never at them
+
+A destination is a *place*. Aim a hunter at the port nearest the player and she
+sails there, **arrives, and stops** — which is exactly what a playtest reported
+in those words, and why an earlier fix that merely re-issued the same order was
+treating a symptom.
+
+`ReaimHunter` reflects her position through the player's:
+
+```
+aim = player + (player - hunter)
+```
+
+and picks the port nearest *that* point, requiring it to be **farther from her
+than the player is**. The player now stands between her and where she is going.
+She sails at us the whole way and does not stop on arrival, because here was
+never the destination.
+
+Without the "farther than the player" rule the nearest port to the reflected
+point can be **the one she is standing in** — observed as `aimed past us at city
+24` on a hunter built at city 24. That is the parking bug in a new hat.
+
+The probe demonstrated the trick by accident before it was designed: a privateer
+ordered clear across the map drove straight through the player's water at speed
+and read, from the deck, exactly like a pursuit.
+
+### Two ways a hunt can silently produce nothing
+
+Both look identical in play — no ship — and both cost a test round here.
+
+| Cause | Fix |
+|---|---|
+| Built too far away; the overworld culls her in ~2 s | `hunterMaxSpawnDist` (9,000). Past it we decline and say so. |
+| Built with no fresh destination; she has *arrived* and docks | Aim her the instant she is built, not at the first re-aim. |
+
+Because the guard means a distant crown sends nobody, dispatch **retries every
+15 s while reputation is negative**. The guard defers a hunt rather than
+cancelling it: sail back into their waters and someone comes.
+
+### Ending one
+
+A hunt ends when she sinks, when `hunterGiveUpMs` expires, when you are more
+than `hunterEscapeDist` clear — and, added after this was found missing, **when
+reputation returns to 0 or better**. Without that last one the ledger could
+forgive a fright and reopen their ports while a warship was still hunting a
+captain nobody wanted. Reputation is the number that reopens the ports, so the
+two can never disagree.
+
+Break-offs are **announced**. A hunt that ends in silence is indistinguishable
+from one still coming, and knowing you got clear is the whole point of an escape.
+Sinkings stay silent — the world already showed you.
+
+### What a hunter does when she reaches you
+
+Nothing, on her own. **Overworld ships in this game never open fire** — combat
+begins when the player makes contact. A pursuer's job is to make contact
+unavoidable. Hostility itself is already real: negative reputation is the
+engine's own model, and its ships hail you with `"Stay clear you scurvy
+Pirate!"` off their own scan, which does include slot 0.
 
 ## Faults found by playing it
 
