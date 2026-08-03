@@ -16,7 +16,7 @@ through the game's **own** text and dialog routines, so they look native.
 
 ### **[Get the latest release →](https://github.com/pemfofficial/PEMF/releases/latest)**
 
-Grab **`PEMF-0.2.0.zip`** from that page — it's the file under **Assets**.
+Grab **`PEMF-0.2.2.zip`** from that page — it's the file under **Assets**.
 Unzip it into your game folder, the one with `Pirates!.exe` in it, and launch the
 game. That's the whole install; nothing else is needed and the game executable is
 never modified.
@@ -32,14 +32,14 @@ and the `PEMF` folder.
 ### Check what you downloaded
 
 ```powershell
-Get-FileHash .\PEMF-0.2.0.zip -Algorithm SHA256
+Get-FileHash .\PEMF-0.2.2.zip -Algorithm SHA256
 ```
 
 | File | SHA256 |
 |---|---|
-| `PEMF-0.2.0.zip` | `AF66FB5F0581AF8321725C13DC1311C78FBB9756EE69C29E5C78F2E2080AF690` |
-| `pemf_core.dll` | `4997313EA02A4496285A94F82AC17216031CCF7BA7559ED9F97A0625059AE8FE` |
-| `version.dll` | `4A97CF1D1812CF1CEC5C639AB83FB62F2E3AFAF76FD7F284834BAB8208DD8175` |
+| `PEMF-0.2.2.zip` | `D36A1A548382D580972034A827E62005D6AAFEA8CDB6C18B3F33B523E6F562D8` |
+| `pemf_core.dll` | `618CC24A97BE2F0C59A4AE22001DA8C058B3BC581D983A3DFBDB14F8CB4B84D6` |
+| `version.dll` | `80EBA27D8AB30A302AC53E67235BDA2CC6F34EC2372CA86A0364776A13FB5BC9` |
 
 PEMF is unsigned, so this hash is your integrity check. If it doesn't match,
 you didn't get the file from us.

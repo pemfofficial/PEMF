@@ -18,6 +18,7 @@ The game executable is never modified.
 | **[GAME_API.md](GAME_API.md)** | Developers | Reverse-engineered engine reference: functions, addresses, conventions |
 | **[SUSPICION.md](SUSPICION.md)** | Developers | False colours: what raises suspicion, what being unmasked costs, tuning, and the faults playing it exposed |
 | **[ARCHITECTURE_REVIEW.md](ARCHITECTURE_REVIEW.md)** | Developers | Nine passes: hazards found, fixed, and the invariants they establish |
+| **[RELEASE_NOTES_0.2.2.md](RELEASE_NOTES_0.2.2.md)** | Everyone | Fixes: the profile folder that broke WASD on GOG, notice wrapping, storms clearing behind cards |
 | **[RELEASE_NOTES_0.2.1.md](RELEASE_NOTES_0.2.1.md)** | Everyone | The Weather release: storm systems, cargo losses, storm music |
 | **[RELEASE_NOTES_0.2.0.md](RELEASE_NOTES_0.2.0.md)** | Everyone | The False Flag release: what it is, how to install, how to play |
 | **[`re/experiments/`](../re/experiments/)** | Developers | Write-ups of specific investigations — the question, the method, what the numbers said, and what was concluded (including the answers that were "no") |
