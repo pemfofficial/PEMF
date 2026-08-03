@@ -1,5 +1,4 @@
 PEMF - Pirates! Expanded Modding Framework
-False Flag release
 
 
 INSTALLING
@@ -18,17 +17,55 @@ INSTALLING
    You should end up with version.dll and pemf_core.dll sitting beside
    Pirates!.exe, and a new PEMF folder next to them.
 
+   *** WATCH OUT FOR THIS ONE ***
+
+   Windows' own "Extract All" does NOT put the files where you point it. It
+   creates a SUBFOLDER named after the zip and puts them in there, so you end
+   up with:
+
+       Sid Meier's Pirates!\PEMF-0.2.3\version.dll        <- wrong, does nothing
+
+   instead of:
+
+       Sid Meier's Pirates!\version.dll                   <- right
+
+   If you are UPGRADING, this is worse than nothing: the old DLLs are still
+   sitting in the game folder, so the game keeps running the OLD version while
+   you are certain you installed the new one.
+
+   The safe way is to open the zip, select all, and drag the files into the
+   game folder - or extract anywhere you like and then move version.dll,
+   pemf_core.dll and PEMF into place yourself.
+
 3. Launch the game as you normally would.
 
 That is all. The game executable is never modified.
+
+
+UPGRADING FROM AN EARLIER VERSION
+---------------------------------
+
+Extract straight over the top. Your saves, your key bindings and your edited
+.ini files are all left alone.
+
+Both DLLs must come from the SAME zip. If they do not, pemf.log says so in
+capitals on the third line - see below.
 
 
 CHECKING IT WORKED
 ------------------
 
 A file called pemf.log appears in the game folder the first time you run it.
-Open it - the first few lines say which build was detected and whether every
-engine entry point verified. If something is wrong it says so in plain English.
+Open it. The first lines tell you:
+
+    - which version of PEMF is running, and when it was built
+    - whether version.dll and pemf_core.dll are the same version
+      (a line beginning "*** MIXED INSTALL" means they are not, and that
+       you have the subfolder problem described above)
+    - which build of the game was detected, and whether every engine
+      address verified
+
+If something is wrong it says so in plain English.
 
 
 UNINSTALLING
@@ -37,11 +74,16 @@ UNINSTALLING
 Delete version.dll, pemf_core.dll and the PEMF folder. Nothing else was
 touched.
 
-If you want your original key bindings back, PEMF saved them:
+If you want your original key bindings back, PEMF saved them as
+KeyMap.ini.pemf-backup, next to the KeyMap.ini it replaced. That is in your
+Documents folder under My Games - and the folder name depends on which copy of
+the game you own:
 
-    My Documents\My Games\Sid Meier's Pirates!\KeyMap.ini.pemf-backup
+    Steam   My Documents\My Games\Sid Meier's Pirates!\
+    GOG     My Documents\My Games\Sid Meier's Pirates\
 
-Rename that over KeyMap.ini.
+Rename the backup over KeyMap.ini. (pemf.log names the folder PEMF chose, if
+you are not sure which is yours.)
 
 
 WHAT CHANGES IMMEDIATELY

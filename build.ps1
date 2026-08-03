@@ -34,7 +34,7 @@ param(
     # Bump this with each release. It is stamped into the DLL resources AND
     # logged on the first line of pemf.log, so a stale default is not cosmetic:
     # it makes a bug report name a version that was never shipped.
-    [string]$Version = "0.2.2"
+    [string]$Version = "0.2.3"
 )
 
 $ErrorActionPreference = 'Stop'
@@ -89,7 +89,7 @@ if errorlevel 1 exit /b 1
 rc /nologo /I "$build" /fo "$build\core.res" "$root\src\core\core.rc"
 if errorlevel 1 exit /b 1
 echo === proxy ===
-cl $common /LD "$root\src\proxy\proxy.cpp" /Fe:version.dll /link kernel32.lib user32.lib "$build\proxy.res" /DEF:"$root\src\proxy\proxy.def" /OUT:version.dll
+cl $common /LD "$root\src\proxy\proxy.cpp" /I"$build" /Fe:version.dll /link kernel32.lib user32.lib "$build\proxy.res" /DEF:"$root\src\proxy\proxy.def" /OUT:version.dll
 if errorlevel 1 exit /b 1
 echo === core ===
 cl $common /LD "$root\src\core\core.cpp" /I"$root\src\core" /I"$build" /Fe:pemf_core.dll /link kernel32.lib user32.lib winmm.lib ole32.lib mfplat.lib mfreadwrite.lib mfuuid.lib "$build\core.res" /OUT:pemf_core.dll

@@ -2295,6 +2295,41 @@ static DWORD WINAPI Init(LPVOID)
         st.wHour, st.wMinute, st.wSecond);
     Log("host: %s", dir);
 
+    // ------------------------------------------------ is the install all one build?
+    // PEMF ships two DLLs and they have to match. A player can easily end up
+    // with one new and one old: Explorer's "Extract All" defaults to unpacking
+    // into a SUBFOLDER named after the zip, so pointing it at the game folder
+    // leaves the old DLLs in place at the root, still loading, still logging --
+    // and the player is certain they are on the new version because they did
+    // download it.
+    //
+    // That happened, and it cost a round of bug reports against fixes that were
+    // never running. So say it here, in the log the report will contain.
+    // The proxy publishes its own version into the environment before it loads
+    // us, which is read here with no new imports. Reading version.dll's
+    // resource instead would mean linking version.lib -- into a process where
+    // "version.dll" IS our proxy, so the core would import from the very file
+    // it is trying to check. Not worth the entanglement for a diagnostic.
+    {
+        char proxyVer[32] = {0};
+        const DWORD got = GetEnvironmentVariableA("PEMF_PROXY_VERSION",
+                                                  proxyVer, sizeof(proxyVer));
+        if (got == 0 || got >= sizeof(proxyVer)) {
+            Log("*** MIXED INSTALL: pemf_core.dll is %s, but version.dll is "
+                "older than 0.2.3 and did not say which build it is ***",
+                PEMF_VER_S);
+            Log("*** Both files must come from the same zip, and both must sit "
+                "NEXT TO Pirates!.exe -- not in a subfolder. ***");
+        } else if (strcmp(proxyVer, PEMF_VER_S) != 0) {
+            Log("*** MIXED INSTALL: version.dll is %s but pemf_core.dll is "
+                "%s ***", proxyVer, PEMF_VER_S);
+            Log("*** Both files must come from the same zip, and both must sit "
+                "NEXT TO Pirates!.exe -- not in a subfolder. ***");
+        } else {
+            Log("install: version.dll and pemf_core.dll are both %s", proxyVer);
+        }
+    }
+
     // The file probe has to be armed BEFORE the game opens anything, because
     // the text and asset systems load during startup -- long before a hotkey
     // could be pressed. Toggling it in-game shows only the handful of files

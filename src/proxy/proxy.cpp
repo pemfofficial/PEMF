@@ -18,6 +18,7 @@
 #include <stdio.h>
 #include <stdarg.h>
 #include <string.h>
+#include "pemf_version.h"
 
 // ---------------------------------------------------------- forward pointers
 #define PROXY_EXPORT(name) extern "C" void* g_p_##name = nullptr;
@@ -115,7 +116,19 @@ static DWORD WINAPI LoadCore(LPVOID)
     if (char* slash = strrchr(path, '\\')) *slash = 0;
     strcat_s(path, sizeof(path), "\\pemf_core.dll");
 
-    ProxyLog("proxy: attempting to load core: %s", path);
+    // The version leads the proxy log for the same reason it leads the core's:
+    // a half-updated install reads as a broken release. A player who extracts a
+    // new zip into a subfolder by accident -- which is what Explorer's "Extract
+    // All" offers to do by default -- keeps running the old DLLs while being
+    // certain they are on the new ones, and nothing on screen disagrees.
+    // Two logs, each naming its own version, settle that in one glance.
+    ProxyLog("proxy: PEMF %s attempting to load core: %s", PEMF_VER_S, path);
+
+    // Hand our version to the core before it loads, so it can say plainly in
+    // pemf.log whether the two halves of the install match. Cheaper and safer
+    // than the core reading this file's version resource -- that would make it
+    // import from version.dll, which in this process is us.
+    SetEnvironmentVariableA("PEMF_PROXY_VERSION", PEMF_VER_S);
     HMODULE core = LoadLibraryA(path);
     if (core) {
         ProxyLog("proxy: core loaded OK at %p", (void*)core);
