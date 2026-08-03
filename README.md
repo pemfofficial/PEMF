@@ -5,9 +5,12 @@ data-driven **narrative event engine** — branching events with real choices an
 consequences, authored as JSON — plus expanded crew and morale systems, on top
 of the original game.
 
-It loads through a `version.dll` proxy and reaches the game with **IAT hooks
-only** — no inline code patching, no modified game files. Events are presented
-through the game's **own** text and dialog routines, so they look native.
+It loads through a `version.dll` proxy and reaches the game through **IAT
+hooks**, which is how everything the framework does is driven. Some features —
+weather is the current one — additionally rewrite a few immediates in the
+game's code **in memory**, once the game is running. **No game file is ever
+modified on disk.** Events are presented through the game's **own** text and
+dialog routines, so they look native.
 
 > **Not affiliated with Firaxis Games, 2K, or Atari.** PEMF ships **no game
 > files** and modifies none on disk. You must own a legitimate copy of the game.
@@ -16,7 +19,7 @@ through the game's **own** text and dialog routines, so they look native.
 
 ### **[Get the latest release →](https://github.com/pemfofficial/PEMF/releases/latest)**
 
-Grab **`PEMF-0.2.2.zip`** from that page — it's the file under **Assets**.
+Grab **`PEMF-0.2.3.zip`** from that page — it's the file under **Assets**.
 Unzip it into your game folder, the one with `Pirates!.exe` in it, and launch the
 game. That's the whole install; nothing else is needed and the game executable is
 never modified.
@@ -32,14 +35,14 @@ and the `PEMF` folder.
 ### Check what you downloaded
 
 ```powershell
-Get-FileHash .\PEMF-0.2.2.zip -Algorithm SHA256
+Get-FileHash .\PEMF-0.2.3.zip -Algorithm SHA256
 ```
 
 | File | SHA256 |
 |---|---|
-| `PEMF-0.2.2.zip` | `D36A1A548382D580972034A827E62005D6AAFEA8CDB6C18B3F33B523E6F562D8` |
-| `pemf_core.dll` | `618CC24A97BE2F0C59A4AE22001DA8C058B3BC581D983A3DFBDB14F8CB4B84D6` |
-| `version.dll` | `80EBA27D8AB30A302AC53E67235BDA2CC6F34EC2372CA86A0364776A13FB5BC9` |
+| `PEMF-0.2.3.zip` | `1D7B3880B9489F4FB545F7A9384B6CD56AA6DBE5BBCD53BCC5344B5DA8546EC4` |
+| `pemf_core.dll` | `E1A75858F7A37CF728387FC3620D9211E88ECB08697766E788DC2CA7EBFC7E71` |
+| `version.dll` | `FE5687E05AB4B90EFE6FC3FCDAC76E1CEC8EF7F3B98D00687DE69286E1291389` |
 
 PEMF is unsigned, so this hash is your integrity check. If it doesn't match,
 you didn't get the file from us.
