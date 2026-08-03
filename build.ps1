@@ -34,7 +34,7 @@ param(
     # Bump this with each release. It is stamped into the DLL resources AND
     # logged on the first line of pemf.log, so a stale default is not cosmetic:
     # it makes a bug report name a version that was never shipped.
-    [string]$Version = "0.2.0"
+    [string]$Version = "0.2.1"
 )
 
 $ErrorActionPreference = 'Stop'

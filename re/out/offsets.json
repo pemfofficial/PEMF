@@ -354,6 +354,19 @@
         "c3": "0x00726394"
       },
       "note": "FUN_004D4480 copies the four settings globals into the live channel array (stride 8) at DAT_008ED4BC. MusicVolume matched via the settings writer at 0x004D260F pushing key string 0x0070C948. Duck = save, write 0, call apply; restore in reverse. NEVER capture your own zero as the saved value."
+    },
+    "drift_model": {
+      "measured": "~350 map units/second WEST, latitude unchanged",
+      "note": "✅ A storm is a DRIFTING WEATHER SYSTEM seeded to windward and blown west by the trade wind. The position changing every frame is the storm MOVING, not the engine re-seeding. Reading drift as retirement made storms vanish as the player sailed toward one. A real re-seed is a large discontinuous jump."
+    },
+    "param8_is_a_timer": {
+      "note": "The last draw argument, stored as *(float*)(inst+0x28) = param_8 * 0.001, LOOKS like the 0..1000 fade convention and is not -- measured climbing ~1000/second (3125 -> 25681 over 22s). It is elapsed time. There is NO known opacity argument; scale is size, and ramping it inflates/shrinks rather than fading."
+    },
+    "never_skip_the_draw": {
+      "note": "⛔ Suppressing weather by not calling FUN_004BBC80 corrupts the scene graph progressively. That call marks an instance used for the frame (+0x24); FUN_004BB4B0 allocates a NEW instance whenever the current is already marked. Skip it and the flags never clear, so every subsequent draw allocates -- the pool grows unbounded, exhausts the shared scene-node budget, and clouds stop appearing ANYWHERE including prefabs never patched. To hide a storm, draw it at scale 1 (invisible) and let the bookkeeping run."
+    },
+    "arguments_are_ours": {
+      "note": "The position globals cannot be owned, but the shim owns every ARGUMENT to the draw -- size and x/y. PEMF therefore draws the engine's storm at scale 1 (invisible) and draws its own system instead: born to windward off screen, drifting west at the measured rate, living as long as chosen. Consequence: wind still comes from the engine's position while rain comes from our cloud, so anything that must agree with what the player SEES must measure against our system, not FUN_0045FA70."
     }
   }
 }

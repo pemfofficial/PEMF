@@ -32,6 +32,7 @@ struct Tuning {
     int  startAt     = 8;      // engine weather intensity that brings it in
     int  stopAt      = 5;      // ...and the lower one that takes it away
     int  fadeMs      = 2500;
+    int  settleMs    = 15000;  // overworld must be up this long first
     int  duckGameMusic = 1;    // silence the ship's own theme while ours plays
     char file[128]   = "storm.mp3";
 };
@@ -141,7 +142,17 @@ inline void Tick(int intensity, bool sailing)
     const int dt = g_lastTick ? (int)(now - g_lastTick) : 0;
     g_lastTick = now;
 
-    const bool want = sailing && intensity >= g_tune.startAt;
+    // A career that begins beside a storm should not OPEN with the storm
+    // track -- it reads as the mod playing music at you rather than the
+    // weather having a sound. So the overworld has to have been up for a
+    // little while before the music is allowed in at all.
+    static DWORD s_sailingSince = 0;
+    if (!sailing) s_sailingSince = 0;
+    else if (s_sailingSince == 0) s_sailingSince = now;
+    const bool settled = sailing && s_sailingSince != 0 &&
+                         (int)(now - s_sailingSince) >= g_tune.settleMs;
+
+    const bool want = settled && intensity >= g_tune.startAt;
     const bool keep = sailing && intensity >= g_tune.stopAt && g_track.playing;
     const int target = (want || keep) ? Clamp(g_tune.volume, 0, 1000) : 0;
 
@@ -165,12 +176,29 @@ inline void Tick(int intensity, bool sailing)
 
     // Ramp rather than jump. A storm arriving with a hard cut sounds like a
     // bug; arriving over a couple of seconds sounds like weather.
-    if (dt > 0 && g_tune.fadeMs > 0) {
-        const int step = 1000 * dt / g_tune.fadeMs;
-        if (g_level < target) g_level = (g_level + step > target) ? target : g_level + step;
-        else if (g_level > target) g_level = (g_level - step < target) ? target : g_level - step;
+    // ⚠️ dt == 0 MUST MEAN "DO NOTHING", NOT "SNAP".
+    //
+    // GetTickCount has ~15.6 ms granularity, so two calls inside one tick give
+    // a delta of zero -- and the old `else { g_level = target; }` treated that
+    // as "no fade configured" and jumped the whole way. A single zero-delta
+    // call anywhere in the ramp collapsed a 4-second fade into one frame,
+    // which is why it was measured finishing in 140 ms and 0 ms. The ramp was
+    // never wrong; one branch of it was.
+    if (g_tune.fadeMs > 0) {
+        if (dt > 0) {
+            // Clamp the delta as well, so a frame hitch cannot cover the range
+            // in one go either.
+            const int dtc  = dt > 50 ? 50 : dt;
+            int step = 1000 * dtc / g_tune.fadeMs;
+            if (step < 1) step = 1;            // never stall
+            if (g_level < target)
+                g_level = (g_level + step > target) ? target : g_level + step;
+            else if (g_level > target)
+                g_level = (g_level - step < target) ? target : g_level - step;
+        }
+        // dt == 0: leave the level exactly where it is and wait for real time.
     } else {
-        g_level = target;
+        g_level = target;                      // fades switched off
     }
 
     // Prove the ramp rather than assume it. This has now been "fixed" twice by

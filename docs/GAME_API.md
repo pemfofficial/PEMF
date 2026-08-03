@@ -1342,6 +1342,78 @@ So ducking is: save the player's value, write 0, call the apply — and reverse 
 after. ⚠️ Never capture your own zero as "the player's setting", or a storm will
 leave the game permanently silent.
 
+### ✅ A storm is a DRIFTING WEATHER SYSTEM — measured
+
+The single most useful measurement in this area, and it corrected three
+successive designs built on guesses. Watching the position for 24 seconds
+without intervening:
+
+```
+pos=(422993,110000)  moved=0
+pos=(422636,110000)  moved=347
+pos=(421880,110000)  moved=384
+pos=(415412,110000)  moved=341
+```
+
+**Latitude never changes. Longitude falls ~350 map units per second, steadily.**
+A storm is seeded to windward and then blows WEST with the trade wind, passes
+over, and recedes.
+
+So the position changing every frame — which an earlier round measured as "the
+engine rewrites it ten times a second" and read as constant re-seeding — is
+simply the storm **moving**. Treating that movement as "the engine retired this
+storm" is what made storms vanish the instant the player sailed toward one: a
+few seconds of ordinary drift crossed the threshold.
+
+A genuine re-seed is a large *discontinuous* jump, not 350 units of drift.
+
+### `param_8` is a millisecond timer, not opacity
+
+The last argument to `FUN_004BBC80` is stored as `*(float*)(inst + 0x28) =
+param_8 * 0.001`, which has the shape of the 0..1000 fade convention used by
+the world-text call. It is not. Measured climbing monotonically ~1000 per
+second (3125 → 25681 over 22 s) — it is elapsed time, for animation.
+
+**There is no known opacity argument on this draw.** Scale is the only size or
+visibility control, and scale is *size*: ramping it does not fade a cloud in or
+out, it inflates one and then shrinks it to a blob. Both were tried and reverted.
+
+### ⛔ NEVER SKIP THE ENGINE'S DRAW CALL
+
+Suppressing weather by simply not calling `FUN_004BBC80` corrupts the scene
+graph, progressively, and takes prefabs you never touched with it.
+
+`FUN_004BBC80` is where an instance is **marked used for this frame** (`+0x24`),
+and `FUN_004BB4B0` allocates a **new** instance whenever the current one is
+already marked. Miss the call and those flags are never cleared, so the next
+draw allocates instead of reusing — every frame, for as long as the suppression
+lasts. The pool grows without bound, exhausts the scene-node budget it shares
+with everything else, and clouds stop appearing **anywhere**.
+
+Reported from play as *"the sky is empty and I never see another cloud again"* —
+including the fair-weather prefab, which was never patched.
+
+**To hide a storm, draw it at scale 1** (a hundredth of a unit — invisible) and
+let all the bookkeeping run. Extra instances of our own are safe to skip,
+because the engine never expected them.
+
+### The draw's ARGUMENTS are ours, even though the position is not
+
+The lesson that unlocked everything else. Writing `0x008B98F0/E4` fights the
+engine and always will. But the shim owns every argument passed to
+`FUN_004BBC80` — the size **and** the x/y. So PEMF can draw a storm anywhere,
+at any size, on its own schedule, without touching a single engine global.
+
+That is how PEMF's weather works now: the engine's storm is drawn at scale 1
+(invisible, bookkeeping intact) and our own system is drawn instead — born to
+windward off screen, drifting west at the measured rate, living as long as we
+choose.
+
+⚠️ Consequence: the drawn storm and the engine's invisible one are in different
+places, so **wind still comes from the engine's position** while rain comes from
+our cloud. Anything that must agree with what the player SEES has to measure
+against our system, not `FUN_0045FA70`.
+
 ### Measured limits
 
 Vanilla storm scale is 80. Verified in game up to **700 (8.75x)** with height

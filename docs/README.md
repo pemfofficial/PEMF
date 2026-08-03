@@ -18,6 +18,7 @@ The game executable is never modified.
 | **[GAME_API.md](GAME_API.md)** | Developers | Reverse-engineered engine reference: functions, addresses, conventions |
 | **[SUSPICION.md](SUSPICION.md)** | Developers | False colours: what raises suspicion, what being unmasked costs, tuning, and the faults playing it exposed |
 | **[ARCHITECTURE_REVIEW.md](ARCHITECTURE_REVIEW.md)** | Developers | Nine passes: hazards found, fixed, and the invariants they establish |
+| **[RELEASE_NOTES_0.2.1.md](RELEASE_NOTES_0.2.1.md)** | Everyone | The Weather release: storm systems, cargo losses, storm music |
 | **[RELEASE_NOTES_0.2.0.md](RELEASE_NOTES_0.2.0.md)** | Everyone | The False Flag release: what it is, how to install, how to play |
 | **[`re/experiments/`](../re/experiments/)** | Developers | Write-ups of specific investigations — the question, the method, what the numbers said, and what was concluded (including the answers that were "no") |
 
@@ -135,7 +136,9 @@ levels are used throughout the docs:
 | Storm clusters — a squall line from one engine storm | **Verified** — the prefab pools instances, so extra draws give extra clouds |
 | Cargo lost to weather, using the engine's own storm curve | **Verified** — gold and cannon protected |
 | Denser rain | **Not found** — the available dial changes drop SIZE and wind, not count |
-| Storms that drift or persist | **Not started** — weather is seeded once relative to the player and never moves |
+| Storms that drift and persist | **Verified** — PEMF draws its own system: born to windward off screen, drifting west at the measured 350 units/sec, living as long as it likes |
+| Weather that costs cargo, with music that comes up with it | **Verified** — both read the same curve as the rain, so they agree with the clouds on screen |
+| A true fade on a storm | **Ruled out** — no opacity argument exists on the draw; scale is size, and ramping it inflates or shrinks |
 | More than 3 weather slots | **Ruled out** — the position arrays hold exactly 3; a 4th writes off the end |
 | Playing a named game sound with an event | **Verified** |
 | Officer simulation | Not started |

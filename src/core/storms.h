@@ -106,6 +106,29 @@ struct Tuning {
     //   1+  a fixed amount regardless of how bad the weather is
     int rainAmount = -1;
 
+    // How long a storm takes to grow to full size after the engine re-seeds it,
+    // so it does not simply appear. 0 disables. See PemfStormScale.
+    int growMs        = 6000;   // how long it takes to reach full size
+    int fadeOutMs     = 6000;   // ...and how long it takes to leave
+    // What counts as a NEW SYSTEM rather than the old one drifting. Measured
+    // drift is ~350 units/second, so anything at or below a few thousand will
+    // mistake ordinary weather movement for a re-seed -- which is exactly what
+    // made storms disappear as the player sailed into them.
+    int growJump      = 20000;
+    int probe         = 0;      // 1 = watch and report, manage nothing
+    int restMs        = 180000; // quiet between systems
+    int firstDelayMs  = 20000;  // ...but the FIRST one comes sooner
+    int lifeMs        = 420000; // how long one lives before it is spent
+    int driftPerSec   = 350;    // MEASURED: westward drift, map units/second
+    int spawnDistance = 26000;  // born this far to windward -- off screen
+    int killDistance  = 55000;  // once this far off, it is gone
+    int spreadPerScale = 19;    // ring spread = stormScale * this / 10
+    // How far off a storm must be before we will draw it. ⚠️ THE ENGINE SEEDS
+    // AT ABOUT 8000 MAP UNITS DUE EAST, always -- so anything above that means
+    // no weather ever appears. Measured the hard way. It cannot be used to
+    // guarantee an off-screen birth; the grow-in does that job instead.
+    int birthDistance = 6500;
+
     // The cull-bound fix. Scaling a cloud grows the visual but not its culling
     // sphere, so at high scale the engine drops the whole cloud while most of
     // it is still on screen -- reported from play as the storm vanishing once
@@ -227,6 +250,11 @@ namespace addr {
     // curve WITHOUT touching 0x0085A0F8, which also drives the wind and every
     // intensity threshold in this file.
     constexpr uintptr_t RainAmountSite = 0x0047BC3C;
+
+    // Where the engine says the storm is. Read-only for us -- see the note on
+    // the scheduler for why writing these is a losing fight.
+    constexpr uintptr_t StormX = 0x008B98F0;
+    constexpr uintptr_t StormY = 0x008B98E4;
 }
 
 // Opcode prefixes only -- the immediates are what we are about to change, so
@@ -263,11 +291,16 @@ constexpr uintptr_t kStormCallSite = 0x0046377A;
 constexpr int kMaxCluster = 12;
 
 extern "C" void __cdecl PemfFixStormBounds(void* prefab, int drawnScale);
+extern "C" int  __cdecl PemfStormScale(int gameScale);
 
 extern "C" {
     inline void* g_stormOrig  = nullptr;   // the real FUN_004BBC80
     inline int   g_clusterN   = 0;
     inline int   g_clusterSc  = 0;
+    inline int   g_clusterPct = 70;   // satellites, as a percent of the core
+    inline int   g_drawScale  = 0;    // the size decided for THIS frame
+    inline int   g_drawX = 0, g_drawY = 0;   // ...and WHERE, which is also ours
+    inline int   g_lastParam8 = 0;           // the draw's last argument
     inline int   g_offX[kMaxCluster] = {0};
     inline int   g_offY[kMaxCluster] = {0};
 }
@@ -285,6 +318,48 @@ __declspec(naked) void StormDrawShim()
 
         mov  ebx, ecx                       // the prefab; ecx is clobbered by
                                             // each call, so keep it somewhere
+
+        // Ask what size this storm should be drawn at RIGHT NOW -- full size
+        // normally, smaller while it is growing in after a relocation. The
+        // game's own draw uses the answer too, or the core would pop while the
+        // ring around it grew.
+        mov  eax, dword ptr [ebp+0x20]      // the draw's last argument
+        mov  dword ptr [g_lastParam8], eax
+        push dword ptr [ebp+0x18]
+        call PemfStormScale
+        add  esp, 4
+        mov  dword ptr [g_drawScale], eax
+
+        // Zero means "there is no storm right now". Skip OUR extra draws --
+        // but the game's own call still happens below, at a size too small to
+        // see.
+        //
+        // ⛔ DO NOT SKIP THE GAME'S CALL. That was the first version and it
+        // takes the sky with it: FUN_004BBC80 is where an instance is marked
+        // used for this frame (+0x24), and FUN_004BB4B0 allocates a NEW one
+        // whenever the current is already marked. Miss the call and the flags
+        // are never cleared, so the next draw allocates instead of reusing --
+        // every frame, for as long as the weather is quiet. The pool grows, the
+        // scene-node budget it shares with everything else runs out, and
+        // clouds stop appearing ANYWHERE, permanently, spreading to prefabs we
+        // never touched. Reported from play as "the sky is empty and I never
+        // see another cloud again".
+        //
+        // Drawing it at scale 1 -- a hundredth of a unit -- is invisible and
+        // keeps every bit of the engine's bookkeeping intact.
+        test eax, eax
+        jnz  have_storm
+        mov  dword ptr [g_drawScale], 1     // invisible, but still drawn
+        jmp  no_extras
+
+    have_storm:
+        mov  edx, dword ptr [g_clusterPct]
+        imul eax, edx
+        mov  ecx, 100
+        cdq
+        idiv ecx
+        mov  dword ptr [g_clusterSc], eax
+
         xor  esi, esi
     next_extra:
         cmp  esi, dword ptr [g_clusterN]
@@ -295,10 +370,10 @@ __declspec(naked) void StormDrawShim()
         push dword ptr [g_clusterSc]        // scale (satellites are smaller)
         push dword ptr [ebp+0x14]           // rotation matrix
         push dword ptr [ebp+0x10]           // z
-        mov  eax, dword ptr [ebp+0x0C]      // y + offset
+        mov  eax, dword ptr [g_drawY]       // OUR y + ring offset
         add  eax, dword ptr g_offY[esi*4]
         push eax
-        mov  eax, dword ptr [ebp+0x08]      // x + offset
+        mov  eax, dword ptr [g_drawX]       // OUR x + ring offset
         add  eax, dword ptr g_offX[esi*4]
         push eax
         mov  ecx, ebx
@@ -307,15 +382,17 @@ __declspec(naked) void StormDrawShim()
         inc  esi
         jmp  next_extra
 
+    no_extras:
     main_draw:
-        // The game's own storm, arguments untouched.
+        // The game's own storm -- everything as it asked for except the size,
+        // which is ours so the grow-in applies to the core cloud too.
         push dword ptr [ebp+0x20]
         push dword ptr [ebp+0x1C]
-        push dword ptr [ebp+0x18]
+        push dword ptr [g_drawScale]
         push dword ptr [ebp+0x14]
         push dword ptr [ebp+0x10]
-        push dword ptr [ebp+0x0C]
-        push dword ptr [ebp+0x08]
+        push dword ptr [g_drawY]
+        push dword ptr [g_drawX]
         mov  ecx, ebx
         call dword ptr [g_stormOrig]
 
@@ -435,6 +512,208 @@ extern "C" void __cdecl PemfFixStormBounds(void* prefab, int drawnScale)
     FixBounds(prefab, drawnScale);
 }
 
+// ---------------------------------------------------------------- the pop-in
+// The engine re-seeds the storm wherever it likes and the cloud simply EXISTS
+// at full size on the next frame. At vanilla scale nobody notices. At five
+// times that, a storm appearing whole in the corner of the screen is the most
+// obtrusive thing in the mod.
+//
+// We cannot move it -- the position is rewritten ten times a second and is not
+// ours (see the scheduler note above). But the SCALE passed to the draw is
+// ours, on every instance, every frame. So: notice when the storm has jumped,
+// and grow it from nothing over a second or two instead of letting it appear.
+//
+// This is the shape of every fix that is going to work here. Placement belongs
+// to the engine; appearance belongs to us.
+inline int   g_lastSeedX = 0, g_lastSeedY = 0;
+inline DWORD g_bornAt     = 0;
+inline DWORD g_quietUntil = 0;
+inline DWORD g_fadeFrom   = 0;      // when the fade-out began
+inline bool  g_seedSeen   = false;
+inline bool  g_showing    = false;
+inline int   g_seedCount  = 0;      // how many systems have come through
+inline bool  g_fading     = false;
+inline int   g_heldX = 0, g_heldY = 0;   // where it was when it started leaving
+
+// ---------------------------------------------------------------- the probe
+// Set stormProbe = 1 and PEMF stops managing weather entirely: no suppression,
+// no rest period, no size changes. It only WATCHES, once a second, and reports
+// what the engine is really doing.
+//
+// This exists because three designs in a row were built on beliefs about the
+// storm position that turned out to be wrong -- that it is written once per
+// flag (it is not), that its range varies (it does not), and that movement of
+// it means the storm was retired (unclear). Guessing again is not worth
+// another round.
+//
+// The two questions:
+//   - HOW does the position move? Does it track the player, jump occasionally,
+//     or stay put while the player sails away?
+//   - What is the LAST draw argument? FUN_004BBC80 stores it as
+//     `*(float*)(inst + 0x28) = param_8 * 0.001`, which has the shape of a
+//     0..1000 fade value -- the same convention the world-text call uses. If it
+//     is opacity, a real fade becomes possible; if it is constant, it is not.
+inline void ProbeTick(int x, int y, int dist, int gameScale, int param8)
+{
+    static DWORD s_last = 0;
+    static int   s_prevX = 0, s_prevY = 0;
+    static bool  s_have = false;
+    const DWORD now = GetTickCount();
+    if (s_last != 0 && now - s_last < 1000) return;
+    s_last = now;
+
+    int mx = s_have ? x - s_prevX : 0, my = s_have ? y - s_prevY : 0;
+    if (mx < 0) mx = -mx;
+    if (my < 0) my = -my;
+
+    Log("storms: PROBE pos=(%d,%d) moved=%d dist=%d playerDist=%d scale=%d "
+        "param8=%d", x, y, mx + my, dist,
+        dist, gameScale, param8);
+    s_prevX = x; s_prevY = y; s_have = true;
+}
+
+// ------------------------------------------------------- OUR weather system
+// PEMF owns the storm you SEE. The engine still owns its own -- we never write
+// its position -- but we stopped drawing it, and draw ours instead.
+//
+// This is possible because the shim owns every argument to the draw: the size,
+// and the x/y. So a system can be born where we choose, drift as we choose, and
+// live as long as we choose, without touching a single engine global.
+//
+// The model is the one the probe measured, because the engine's own behaviour
+// was right and only its timing was inconvenient:
+//
+//   - a system is born to WINDWARD (east), off screen
+//   - it DRIFTS WEST at ~350 map units a second, latitude unchanged
+//   - it passes over, recedes, and eventually is gone
+//   - then a rest, and another makes up
+//
+// Everything scales together off `stormScale`, so shrinking a system shrinks
+// its whole footprint rather than leaving nine clouds rattling around inside a
+// spread meant for bigger ones. Rain is deliberately NOT scaled -- it comes
+// from the cloud art itself, and the only useful control over it is how much
+// the instances overlap.
+inline bool  g_sysUp     = false;
+inline int   g_sysX = 0, g_sysY = 0;
+inline DWORD g_sysBorn   = 0;
+inline DWORD g_sysNext   = 0;      // earliest the next one may make up
+inline DWORD g_sysLastMs = 0;      // for the drift integration
+inline int   g_sysDist   = -1;     // player -> our system, for everything else
+
+inline int OctDist(int dx, int dy)
+{
+    if (dx < 0) dx = -dx;
+    if (dy < 0) dy = -dy;
+    const int lo = dx < dy ? dx : dy, hi = dx < dy ? dy : dx;
+    return (lo + hi * 2) / 2;
+}
+
+// The spread of the ring scales with the storm, so "make it smaller" makes the
+// whole SYSTEM smaller instead of scattering the same clouds more thinly.
+inline int SpreadForScale()
+{
+    if (g_tune.clusterSpread > 0) return g_tune.clusterSpread;
+    int sp = g_tune.stormScale * g_tune.spreadPerScale / 10;
+    if (sp < 500) sp = 500;
+    return sp;
+}
+
+extern "C" int __cdecl PemfStormScale(int gameScale)
+{
+    if (!g_tune.enabled) return gameScale;
+
+    const DWORD now = GetTickCount();
+    const int px = game::PlayerX() / 1000;
+    const int py = game::PlayerY() / 1000;
+
+    if (g_tune.probe) {
+        int ex = 0, ey = 0;
+        __try {
+            ex = *(const int*)addr::StormX;
+            ey = *(const int*)addr::StormY;
+        } __except (EXCEPTION_EXECUTE_HANDLER) { return gameScale; }
+        ProbeTick(ex, ey, OctDist(ex - px, ey - py), gameScale, g_lastParam8);
+        return gameScale;
+    }
+
+    const int dt = g_sysLastMs ? (int)(now - g_sysLastMs) : 0;
+    g_sysLastMs = now;
+
+    if (!g_sysUp) {
+        g_sysDist = -1;
+
+        // ⚠️ THE FIRST SYSTEM MUST NOT WAIT A FULL REST. Seeding g_sysNext with
+        // `now + restMs` on the first call meant no weather at all for the
+        // first 90 seconds of a session -- and because we skip the engine's
+        // draw while resting, that reads as "storms are broken", not "the
+        // weather is fair". A short opening delay instead, so a career begins
+        // in clear weather without the sky being empty for two minutes.
+        if (g_sysNext == 0) g_sysNext = now + (DWORD)g_tune.firstDelayMs;
+        if ((int)(now - g_sysNext) < 0) return 0;
+
+        // Make up to WINDWARD and far enough out to be born off screen. The
+        // player never sees it appear; it comes over the horizon.
+        g_sysUp   = true;
+        g_sysBorn = now;
+        // Always to windward and always off screen, but no further out than it
+        // needs to be -- every extra thousand units is another three seconds of
+        // empty sky before the weather arrives.
+        g_sysX    = px + g_tune.spawnDistance;
+        g_sysY    = py;
+        Log("storms: a system makes up to windward, %d off (arrives in ~%d s)",
+            g_tune.spawnDistance,
+            g_tune.driftPerSec > 0
+                ? (g_tune.spawnDistance - 18000) / g_tune.driftPerSec : 0);
+    }
+
+    // Drift west with the trade wind, at the rate the probe measured.
+    if (dt > 0 && dt < 1000) {
+        static int carry = 0;                 // keep the sub-unit remainder
+        carry += g_tune.driftPerSec * dt;
+        g_sysX -= carry / 1000;
+        carry  %= 1000;
+    }
+
+    g_sysDist = OctDist(g_sysX - px, g_sysY - py);
+
+    {   // Say where the system is now and then. A sky with no weather in it
+        // should never leave us guessing whether that is intended.
+        static DWORD s_beat = 0;
+        if (s_beat == 0 || now - s_beat > 20000) {
+            s_beat = now;
+            Log("storms: system at (%d,%d), %d off, %d s old",
+                g_sysX, g_sysY, g_sysDist, (int)(now - g_sysBorn) / 1000);
+        }
+    }
+
+    // Gone: either it has run its course or it is simply far astern.
+    const bool spent = (int)(now - g_sysBorn) > g_tune.lifeMs;
+    const bool lost  = g_sysDist > g_tune.killDistance;
+    if (spent || lost) {
+        // TWO DIFFERENT ENDINGS, and they should not cost the same wait.
+        //
+        //   SPENT   the weather genuinely blew itself out. A proper rest is
+        //           right -- fair weather is part of the cycle.
+        //   ASTERN  the player sailed away from it. Nothing "happened"; they
+        //           simply went somewhere else, and somewhere else should have
+        //           its own weather without a minute of empty sky first.
+        //
+        // Charging the full rest for leaving an area is what made the sky go
+        // blank every time the player relocated.
+        const int wait = spent ? g_tune.restMs : g_tune.restMs / 5;
+        g_sysUp   = false;
+        g_sysNext = now + (DWORD)wait;
+        g_sysDist = -1;
+        Log("storms: the system %s -- next in %d s",
+            spent ? "blows itself out" : "is left astern", wait / 1000);
+        return 0;
+    }
+
+    g_drawX = g_sysX;
+    g_drawY = g_sysY;
+    return gameScale;
+}
+
 // Offsets are computed ONCE and never move. Jittering them per frame would make
 // the squall line strobe, which is the opposite of weather.
 inline void BuildClusterOffsets(int count, int spread)
@@ -511,18 +790,28 @@ inline void LoadTuning(const char* gameDir)
         else if (_stricmp(key, "cargoLossProtect")  == 0) { g_tune.cargoLossProtect   = value; ++applied; }
         else if (_stricmp(key, "weatherPower")      == 0) { g_tune.weatherPower       = value; ++applied; }
         else if (_stricmp(key, "rainAmount")        == 0) { g_tune.rainAmount         = value; ++applied; }
+        else if (_stricmp(key, "stormGrowMs")       == 0) { g_tune.growMs             = value; ++applied; }
+        else if (_stricmp(key, "stormFadeOutMs")    == 0) { g_tune.fadeOutMs          = value; ++applied; }
+        else if (_stricmp(key, "stormGrowJump")     == 0) { g_tune.growJump           = value; ++applied; }
+        else if (_stricmp(key, "stormProbe")        == 0) { g_tune.probe              = value; ++applied; }
+        else if (_stricmp(key, "stormRestMs")       == 0) { g_tune.restMs             = value; ++applied; }
+        else if (_stricmp(key, "stormLifeMs")       == 0) { g_tune.lifeMs             = value; ++applied; }
+        else if (_stricmp(key, "stormFirstDelayMs")== 0) { g_tune.firstDelayMs       = value; ++applied; }
+        else if (_stricmp(key, "stormDriftPerSec")  == 0) { g_tune.driftPerSec        = value; ++applied; }
+        else if (_stricmp(key, "stormSpawnDistance")== 0) { g_tune.spawnDistance      = value; ++applied; }
+        else if (_stricmp(key, "stormKillDistance") == 0) { g_tune.killDistance       = value; ++applied; }
+        else if (_stricmp(key, "clusterSpreadScale")== 0) { g_tune.spreadPerScale     = value; ++applied; }
+        else if (_stricmp(key, "stormBirthDistance")== 0) { g_tune.birthDistance      = value; ++applied; }
         else if (_stricmp(key, "boundFix")          == 0) { g_tune.boundFix           = value; ++applied; }
         else if (_stricmp(key, "boundScalePct")     == 0) { g_tune.boundScalePct      = value; ++applied; }
-        else if (_stricmp(key, "stormSchedule")     == 0) { g_tune.schedule       = value; ++applied; }
         else if (_stricmp(key, "stormEveryNth")     == 0) { g_tune.everyNth       = value; ++applied; }
-        else if (_stricmp(key, "stormAtStart")      == 0) { g_tune.spawnAtStart   = value; ++applied; }
-        else if (_stricmp(key, "stormDistance")     == 0) { g_tune.placeDistance  = value; ++applied; }
         else if (_stricmp(key, "stormMusic")        == 0) { stormaudio::g_tune.enabled = value; ++applied; }
         else if (_stricmp(key, "stormMusicVolume")  == 0) { stormaudio::g_tune.volume  = value; ++applied; }
         else if (_stricmp(key, "stormMusicStartAt") == 0) { stormaudio::g_tune.startAt = value; ++applied; }
         else if (_stricmp(key, "stormMusicStopAt")  == 0) { stormaudio::g_tune.stopAt  = value; ++applied; }
         else if (_stricmp(key, "stormMusicFadeMs")  == 0) { stormaudio::g_tune.fadeMs  = value; ++applied; }
         else if (_stricmp(key, "stormMusicDuck")    == 0) { stormaudio::g_tune.duckGameMusic = value; ++applied; }
+        else if (_stricmp(key, "stormMusicSettleMs")== 0) { stormaudio::g_tune.settleMs  = value; ++applied; }
         else if (_stricmp(key, "cargoLossEveryMs")== 0) { g_tune.cargoLossEveryMs = value; ++applied; }
         else if (_stricmp(key, "cargoLossMax")    == 0) { g_tune.cargoLossMax     = value; ++applied; }
         else if (_stricmp(key, "enabled")     == 0) { g_tune.enabled = (value != 0); ++applied; }
@@ -663,12 +952,13 @@ inline void Apply()
     // The cluster is a call redirect, not an immediate, so it installs
     // separately and is allowed to fail without taking the rest with it.
     if (g_tune.clusterCount > 0) {
-        g_clusterSc = g_tune.stormScale * g_tune.clusterScale / 100;
+        g_clusterPct = g_tune.clusterScale;
+        g_clusterSc  = g_tune.stormScale * g_tune.clusterScale / 100;
         if (g_clusterSc < kScaleMin) g_clusterSc = kScaleMin;
-        BuildClusterOffsets(g_tune.clusterCount, g_tune.clusterSpread);
+        BuildClusterOffsets(g_tune.clusterCount, SpreadForScale());
         if (render::RedirectCall(kStormCallSite, (void*)&StormDrawShim, &g_stormOrig)) {
             Log("storms: cluster on -- %d extra cloud(s) at spread %d, scale %d "
-                "(%d%% of the storm)", g_clusterN, g_tune.clusterSpread,
+                "(%d%% of the storm)", g_clusterN, SpreadForScale(),
                 g_clusterSc, g_tune.clusterScale);
         } else {
             g_clusterN = 0;
@@ -700,9 +990,6 @@ inline void Apply()
 // GOLD IS NEVER TAKEN. Slot 0 of the hold is plunder, and having a squall empty
 // the strongbox would feel like theft rather than weather. Only trade goods go.
 namespace addr {
-    constexpr uintptr_t StormX = 0x008B98F0;
-    constexpr uintptr_t StormY = 0x008B98E4;
-
     // The game's OWN weather-proximity function, and the reason this file no
     // longer guesses a radius. Used by the ship AI at 0x0045FAB0.
     //
@@ -773,134 +1060,42 @@ inline int StormDistanceToPlayer()
 // should never arrive as a surprise from a visual mod.
 // Called from the safe point while sailing. Reads the engine's weather value
 // once and hands it to everything that cares.
-// ------------------------------------------------------------- the scheduler
-// The engine seeds ONE storm at eight coarse cells EAST of the player, which is
-// upwind -- the Caribbean trade wind in this game blows east to west, so
-// weather correctly arrives from windward every time. Vanilla clouds are small
-// enough that a storm always making up off the starboard quarter goes unnoticed.
-// Ours do not: they are large, they are loud, and the pattern is obvious.
+// ----------------------------------------------- why there is no scheduler
+// Two attempts at owning storm placement lived here and both are gone, because
+// the premise under them was wrong. Kept as a note so it is not tried a third
+// time:
 //
-// ⛔ DO NOT SOLVE THIS BY HOLDING THE POSITION EVERY TICK. That was the first
-// attempt and it is worse than the problem: writing the position every frame
-// nails the storm to one world coordinate, so the engine can never retire it or
-// seed another, and the weather stops behaving like weather. Trading "always
-// upwind" for "always exactly here" is not a trade.
+//   1. WRITE THE POSITION EACH SEED. Rests on the belief that the engine
+//      writes it once when a flag fires. It does not.
+//   2. HOLD THE POSITION EVERY TICK. "Wins" the fight and is worse -- it pins
+//      the storm to one coordinate forever, so it can never drift or be
+//      retired, and weather stops behaving like weather.
 //
-// ⛔ AND DO NOT INTERVENE "ONLY AT A RE-SEED" EITHER. That was the second
-// attempt, and it rests on an assumption the game does not honour: that the
-// position is written once when a flag fires and then left alone. MEASURED --
-// the engine rewrites it CONTINUOUSLY, about ten times a second:
+// What the probe actually found (see PemfStormScale) is that a storm is a real
+// weather system: seeded to windward, then DRIFTING WEST at ~350 map units a
+// second with its latitude unchanged. The position changes every frame because
+// the storm is MOVING. There was never a fight to win -- only a misreading.
 //
-//     122 interventions in one short session, one every ~95 ms
-//
-// so there is no quiet moment to act in. We write, the game overwrites, we see
-// a change and write again, and with thinning enabled the storm alternates
-// between near and far every few ticks. That fight IS the flicker reported from
-// play as "it just flickers and is all over the place".
-//
-// ⇒ THE STORM POSITION IS NOT OURS. Anything that writes it will fight the
-// engine. Making weather rarer has to come from somewhere else entirely --
-// most likely suppressing the DRAW in our own shim, which we already own,
-// rather than moving the storm. Left here, off, with the evidence attached so
-// the next attempt starts from what is known rather than from the same guess.
-//
-// The code below is the second attempt. It is disabled by default.
-inline bool  g_schedInit  = false;
-inline int   g_seenX = 0, g_seenY = 0;   // the last position we OBSERVED
-inline int   g_wroteX = 0, g_wroteY = 0; // the last position we WROTE
-inline int   g_seedCount = 0;
-inline unsigned g_rng = 0;
+// ⇒ Placement and drift belong to the engine and are correct. Everything PEMF
+// wants -- rarer weather, no pop, a different look -- comes from the DRAW,
+// which we own outright: the shim decides the size AND the x/y passed in, so it
+// can show a system, skip one, or put it somewhere else entirely without
+// touching a single engine global.
 
-inline void WriteStormPos(int x, int y)
+// The weather value everything else reads. It is derived from OUR system, not
+// the engine's, so the music, the cargo and the rain all agree with the clouds
+// actually on screen -- which they would not if we drew one storm and measured
+// another.
+inline int OurIntensity()
 {
-    __try {
-        *(int*)addr::StormX = x;
-        *(int*)addr::StormY = y;
-    }
-    __except (EXCEPTION_EXECUTE_HANDLER) {}
-    g_wroteX = x; g_wroteY = y;
-    g_seenX  = x; g_seenY  = y;
-}
-
-inline bool ReadStormPos(int& x, int& y)
-{
-    __try {
-        x = *(const int*)addr::StormX;
-        y = *(const int*)addr::StormY;
-        return true;
-    }
-    __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
-}
-
-// A cheap deterministic shuffle. Bearings must not be uniform-random per seed
-// either -- true random clusters, and a player who meets three storms from the
-// same quarter will believe nothing changed.
-inline int NextBearing()
-{
-    g_rng = g_rng * 1103515245u + 12345u;
-    return (int)((g_rng >> 16) & 7);
-}
-
-inline void SendStormAway()
-{
-    const int px = game::PlayerX() / 1000;
-    const int py = game::PlayerY() / 1000;
-    WriteStormPos(px + g_tune.parkDistance, py + g_tune.parkDistance);
-}
-
-inline void PlaceStormSomewhere()
-{
-    static const int kCos[8] = { 100,  71,   0, -71, -100, -71,   0,  71 };
-    static const int kSin[8] = {   0,  71, 100,  71,    0, -71, -100, -71 };
-    const int b  = NextBearing();
-    const int px = game::PlayerX() / 1000;
-    const int py = game::PlayerY() / 1000;
-
-    // Vary the range as well as the bearing, so storms are not all discovered
-    // at the same distance.
-    g_rng = g_rng * 1103515245u + 12345u;
-    const int spread = g_tune.placeDistance / 2;
-    const int d = g_tune.placeDistance + (int)((g_rng >> 16) % (unsigned)(spread ? spread : 1));
-
-    WriteStormPos(px + kCos[b] * d / 100, py + kSin[b] * d / 100);
-    Log("storms: weather makes up on bearing %d, %d away (seed %d)",
-        b, d, g_seedCount);
-}
-
-inline void TickSchedule(bool sailing)
-{
-    if (!g_tune.enabled || !g_tune.schedule || !sailing) return;
-
-    int x = 0, y = 0;
-    if (!ReadStormPos(x, y)) return;
-
-    if (!g_schedInit) {
-        g_schedInit = true;
-        g_rng = GetTickCount() | 1u;
-        g_seenX = x; g_seenY = y;
-        if (g_tune.spawnAtStart) { ++g_seedCount; PlaceStormSomewhere(); }
-        else                     SendStormAway();
-        return;
-    }
-
-    // Nothing moved, or the only thing that moved was us. Leave it alone -- the
-    // storm is the engine's to keep, drift and retire.
-    if (x == g_seenX && y == g_seenY) return;
-    if (x == g_wroteX && y == g_wroteY) { g_seenX = x; g_seenY = y; return; }
-
-    // The engine has just re-seeded. This is the ONE moment we get a say.
-    ++g_seedCount;
-    if (g_tune.everyNth > 1 && (g_seedCount % g_tune.everyNth) != 0) {
-        SendStormAway();          // thin them out: this one never arrives
-        return;
-    }
-    PlaceStormSomewhere();        // this one arrives, but from a new quarter
+    if (g_sysDist < 0) return 0;
+    const int p = g_tune.weatherPower > 0 ? g_tune.weatherPower : 128000;
+    return p / (g_sysDist + 4000);
 }
 
 inline void TickWeather(bool sailing)
 {
-    TickSchedule(sailing);
-    const int intensity = sailing ? StormIntensityHere() : -1;
+    const int intensity = sailing ? OurIntensity() : -1;
     stormaudio::Tick(intensity < 0 ? 0 : intensity, sailing);
 }
 
@@ -913,8 +1108,8 @@ inline void TickCargoLoss()
 
     // Ask the ENGINE how bad the weather is here rather than measuring it
     // ourselves against a radius we invented.
-    const int intensity = StormIntensityHere();
-    const int d = StormDistanceToPlayer();
+    const int intensity = OurIntensity();
+    const int d = g_sysDist;
     if (intensity < 0) return;                      // could not ask; do nothing
     if (intensity < g_tune.cargoLossIntensity) return;
     g_lastLossAt = now;
