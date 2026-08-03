@@ -331,6 +331,29 @@
     "instance_pool": {
       "va": "0x004BB4B0",
       "note": "Prefab keeps a list at +0x10 and allocates another instance when the current is already used this frame (+0x24, set by FUN_004BBC80). Calling the draw again yields ANOTHER cloud, not a moved one -- this is what makes clusters possible. PEMF redirects the call at 0x0046377A. Cluster offsets must be FIXED; per-frame jitter strobes."
+    },
+    "position_is_engine_owned": {
+      "globals": [
+        "0x008B98F0",
+        "0x008B98E4"
+      ],
+      "note": "⛔ MEASURED: rewritten ~10x/second (122 interventions in one session, one per ~95ms), NOT once per flag. Any write fights the engine and the storm flickers; holding it every tick pins the storm forever. Placement belongs to the engine. Seeds 8 coarse cells EAST = upwind, since the trade wind blows east-west."
+    },
+    "global_rain_site": {
+      "va": "0x0047BC3C",
+      "original": "0F AF 05 F8 A0 85 00",
+      "meaning": "imul eax,[0x0085A0F8]",
+      "note": "Screen-wide rain amount x weather intensity. 7 bytes; `imul eax,eax,imm8` (6B C0 imm8) is 3, so it can be replaced with a constant + 4 NOPs to decouple rain from the weather curve without touching 0x0085A0F8 (which drives wind and all thresholds). 0 = no global rain, leaving only the rain the storm prefab carries. The global rain draws OVER clouds with no depth test -- engine draw order, not reorderable."
+    },
+    "music_duck": {
+      "music_volume": "0x0072638C",
+      "apply_fn": "0x004D4480",
+      "others": {
+        "sound": "0x00726388",
+        "c2": "0x00726390",
+        "c3": "0x00726394"
+      },
+      "note": "FUN_004D4480 copies the four settings globals into the live channel array (stride 8) at DAT_008ED4BC. MusicVolume matched via the settings writer at 0x004D260F pushing key string 0x0070C948. Duck = save, write 0, call apply; restore in reverse. NEVER capture your own zero as the saved value."
     }
   }
 }

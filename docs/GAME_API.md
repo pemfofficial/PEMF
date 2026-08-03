@@ -1279,6 +1279,69 @@ own — same phase, same ordering, no guessing about render stages.
 
 ⚠️ Offsets must be **fixed**. Jittering them per frame makes the front strobe.
 
+### ⛔ The storm POSITION is not ours — measured
+
+`0x008B98F0` / `0x008B98E4` are rewritten by the engine **about ten times a
+second**, not once when a flag fires. Measured by intervening and counting:
+**122 interventions in one short session, one every ~95 ms.**
+
+So there is no quiet moment in which our value survives. Anything that writes
+those addresses fights the engine, and the fight is visible: the storm flickers
+between wherever we put it and wherever the game wants it. Holding the position
+every tick "wins" the fight and is worse still — it pins the storm to one
+coordinate forever, so it can never be retired or re-seeded and weather stops
+behaving like weather.
+
+**Storm placement belongs to the engine.** It seeds eight coarse cells EAST of
+the player, which is *upwind* — the trade wind in this game blows east to west,
+so weather correctly arrives from windward every time. That is not a bug; it is
+only conspicuous once the clouds are large.
+
+Anything we want to change about *when* and *where* has to come from what we
+already own — the draw call — not from the position.
+
+### Global rain is separate from the cloud's rain
+
+Rain falls across the **whole screen**, including clear sky with no cloud above
+it, and draws over the storm rather than under it. It is not emitted by the
+cloud: the storm prefab carries its own rain underneath, and this is a second,
+global effect scaled by the weather value.
+
+```
+0047BC3C  imul eax, dword ptr [0x0085A0F8]     0F AF 05 F8 A0 85 00
+```
+
+Seven bytes, where `imul eax, eax, imm8` (`6B C0 imm8`) is three. Replacing it
+decouples the screen-wide rain from the weather curve **without** touching
+`0x0085A0F8`, which also drives the wind and every intensity threshold. A
+constant of `0` removes the global rain entirely and leaves only the rain the
+cloud itself carries — which falls under the cloud, where it belongs.
+
+The engine's draw order puts that global rain over the clouds with no depth
+test, and reordering engine passes is not available to us. Removing the effect
+is.
+
+### Ducking the game's music — `0x0072638C` and `FUN_004D4480`
+
+The game keeps four volume settings in globals and copies them into the live
+channel array when its options screen applies them:
+
+```c
+FUN_004D4480(void):
+    channels[0] = 0x00726388      // sound
+    channels[1] = 0x0072638C      // MUSIC
+    channels[2] = 0x00726390
+    channels[3] = 0x00726394
+```
+
+The pairing is **matched, not guessed**: the settings writer at `0x004D260F`
+reads `0x0072638C` immediately before pushing the key string `"MusicVolume"`
+(`0x0070C948`).
+
+So ducking is: save the player's value, write 0, call the apply — and reverse it
+after. ⚠️ Never capture your own zero as "the player's setting", or a storm will
+leave the game permanently silent.
+
 ### Measured limits
 
 Vanilla storm scale is 80. Verified in game up to **700 (8.75x)** with height

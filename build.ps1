@@ -92,7 +92,7 @@ echo === proxy ===
 cl $common /LD "$root\src\proxy\proxy.cpp" /Fe:version.dll /link kernel32.lib user32.lib "$build\proxy.res" /DEF:"$root\src\proxy\proxy.def" /OUT:version.dll
 if errorlevel 1 exit /b 1
 echo === core ===
-cl $common /LD "$root\src\core\core.cpp" /I"$root\src\core" /I"$build" /Fe:pemf_core.dll /link kernel32.lib user32.lib winmm.lib "$build\core.res" /OUT:pemf_core.dll
+cl $common /LD "$root\src\core\core.cpp" /I"$root\src\core" /I"$build" /Fe:pemf_core.dll /link kernel32.lib user32.lib winmm.lib ole32.lib mfplat.lib mfreadwrite.lib mfuuid.lib "$build\core.res" /OUT:pemf_core.dll
 if errorlevel 1 exit /b 1
 exit /b 0
 "@

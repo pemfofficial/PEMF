@@ -2321,6 +2321,7 @@ BOOL APIENTRY DllMain(HMODULE mod, DWORD reason, LPVOID reserved)
         render::Uninstall();
         d3d9hook::Uninstall();
         storms::Restore();
+        stormaudio::Shutdown();
         // Restore the slots only on an explicit FreeLibrary. On process teardown
         // the address space is going away and touching locks risks a hang.
         // By-address restore works whether the hook was installed by name or by
