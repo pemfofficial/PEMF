@@ -868,6 +868,120 @@ static char g_gameDir[MAX_PATH] = {0};
 static char g_flagNames[64][128];
 static int  g_flagNameCount = 0;
 
+// ------------------------------------------------- the player's profile folder
+// The folder under My Games is NOT one fixed name. The GOG build uses
+//     Documents\My Games\Sid Meier's Pirates
+// and the Steam build
+//     Documents\My Games\Sid Meier's Pirates!
+// -- the exclamation mark follows the install folder, which differs the same
+// way. A machine that has run both has BOTH folders, which is exactly how this
+// went unnoticed here: the dev box's Steam copy has the "!" spelling, so the
+// hardcoded name worked every time it was tested.
+//
+// It did not work for anyone on GOG. The keymap write went to a directory that
+// did not exist, so no KeyMap.ini changed and no .pemf-backup appeared next to
+// it -- reported from play as "still no WASD keys, and no backup file" -- and
+// the flag scan quietly found nothing in the player's own folder. Neither said
+// which path it had even looked at, which is the part that made it a mystery
+// rather than a one-line log.
+//
+// So: enumerate instead of assuming, and pick by INSTALL FOLDER NAME first.
+// The profile folder is spelled exactly like the folder the game is running
+// from -- "Sid Meier's Pirates!" beside "Sid Meier's Pirates!" -- because both
+// come from the same title string in the build. That is a match on the copy
+// being played, not a guess about it, and it is the only rule that gets a
+// dual-install machine right: on this one the Steam profile has the newer
+// Config.ini, so "most recently played" would hand the GOG build the Steam
+// folder every time it ran second.
+//
+// Most-recent-Config.ini stays as the FALLBACK, for a renamed install folder.
+// Config is the right witness there because the game rewrites it on exit, every
+// time, whereas KeyMap.ini may never have been touched.
+//
+// Log every candidate and the winner, so a wrong pick is visible in a tester's
+// log instead of being invisible.
+static char g_profileDir[MAX_PATH] = {0};
+
+static void ResolveProfileDir(const char* gameDir)
+{
+    g_profileDir[0] = 0;
+
+    char docs[MAX_PATH] = {0};
+    if (SHGetFolderPathA(nullptr, CSIDL_PERSONAL, nullptr, 0, docs) != S_OK) {
+        Log("profile: could not find My Documents -- per-player files "
+            "(WASD keymap, custom flags) are unavailable this session");
+        return;
+    }
+
+    // The leaf of the install path, which is what we hope to match.
+    const char* installName = gameDir ? gameDir : "";
+    for (const char* p = installName; *p; ++p)
+        if (*p == '\\' || *p == '/') installName = p + 1;
+
+    char pattern[MAX_PATH];
+    _snprintf_s(pattern, sizeof(pattern), _TRUNCATE,
+                "%s\\My Games\\Sid Meier's Pirates*", docs);
+
+    WIN32_FIND_DATAA fd{};
+    HANDLE h = FindFirstFileA(pattern, &fd);
+    if (h == INVALID_HANDLE_VALUE) {
+        Log("profile: no \"%s\" -- the game has not written a profile folder "
+            "yet, so there is nothing to install into", pattern);
+        return;
+    }
+
+    ULONGLONG best = 0;
+    int seen = 0;
+    bool exact = false;
+    do {
+        if (!(fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)) continue;
+        if (fd.cFileName[0] == '.') continue;
+        ++seen;
+
+        char cand[MAX_PATH];
+        _snprintf_s(cand, sizeof(cand), _TRUNCATE,
+                    "%s\\My Games\\%s", docs, fd.cFileName);
+
+        const bool matchesInstall = _stricmp(fd.cFileName, installName) == 0;
+
+        // How recently did the game write here? A folder with no Config.ini
+        // still counts, just at zero -- it is better than nothing if it is all
+        // there is.
+        char cfg[MAX_PATH];
+        _snprintf_s(cfg, sizeof(cfg), _TRUNCATE, "%s\\Config.ini", cand);
+
+        ULONGLONG when = 0;
+        WIN32_FILE_ATTRIBUTE_DATA ad{};
+        if (GetFileAttributesExA(cfg, GetFileExInfoStandard, &ad)) {
+            when = ((ULONGLONG)ad.ftLastWriteTime.dwHighDateTime << 32)
+                 |  (ULONGLONG)ad.ftLastWriteTime.dwLowDateTime;
+        }
+
+        Log("profile: candidate \"%s\" (Config.ini %s)%s",
+            fd.cFileName, when ? "present" : "absent",
+            matchesInstall ? "  <- matches the install folder" : "");
+
+        if (matchesInstall) {
+            if (!exact) {                       // first exact match wins outright
+                exact = true;
+                strncpy_s(g_profileDir, sizeof(g_profileDir), cand, _TRUNCATE);
+            }
+        } else if (!exact && (g_profileDir[0] == 0 || when > best)) {
+            best = when;
+            strncpy_s(g_profileDir, sizeof(g_profileDir), cand, _TRUNCATE);
+        }
+    } while (FindNextFileA(h, &fd));
+    FindClose(h);
+
+    if (g_profileDir[0])
+        Log("profile: using %s%s", g_profileDir,
+            exact ? "" : (seen > 1 ? "  (no name match -- most recently played "
+                                     "of several)"
+                                   : "  (no name match -- the only one there)"));
+    else
+        Log("profile: nothing under \"%s\" was a directory", pattern);
+}
+
 static void ScanFlagFolder(const char* folder)
 {
     char pattern[MAX_PATH];
@@ -901,12 +1015,10 @@ static void ScanFlags()
         ScanFlagFolder(folder);
     }
     // The player's own folder, which the game reads in preference to nothing --
-    // see re/experiments/flags.
-    char docs[MAX_PATH];
-    if (SHGetFolderPathA(nullptr, CSIDL_PERSONAL, nullptr, 0, docs) == S_OK) {
+    // see re/experiments/flags. Resolved, never spelled out: see ResolveProfileDir.
+    if (g_profileDir[0]) {
         char folder[MAX_PATH];
-        _snprintf_s(folder, sizeof(folder), _TRUNCATE,
-                    "%s\\My Games\\Sid Meier's Pirates!\\Custom", docs);
+        _snprintf_s(folder, sizeof(folder), _TRUNCATE, "%s\\Custom", g_profileDir);
         ScanFlagFolder(folder);
     }
     Log("flags: %d flag(s) found by our own scan -- no need to open the "
@@ -1024,15 +1136,14 @@ static void ReportColours(const char* when)
 // afterwards keeps it. Deleting the marker line asks for the layout back.
 static void InstallWasdKeymap(const char* gameDir)
 {
-    char docs[MAX_PATH] = {0};
-    if (SHGetFolderPathA(nullptr, CSIDL_PERSONAL, nullptr, 0, docs) != S_OK) {
-        Log("keymap: could not find My Documents -- WASD not installed");
+    if (!g_profileDir[0]) {
+        Log("keymap: no profile folder resolved -- WASD not installed");
         return;
     }
 
     char target[MAX_PATH];
     _snprintf_s(target, sizeof(target), _TRUNCATE,
-                "%s\\My Games\\Sid Meier's Pirates!\\KeyMap.ini", docs);
+                "%s\\KeyMap.ini", g_profileDir);
 
     // Already ours? Then the file belongs to the player now.
     {
@@ -1086,14 +1197,29 @@ static void InstallWasdKeymap(const char* gameDir)
     fclose(in);
 
     // Back up whatever is there, once, before replacing it.
+    //
+    // AND REFUSE TO PROCEED IF THAT FAILS. Overwriting a file we could not copy
+    // first destroys a player's own bindings with nothing to restore from --
+    // the one outcome worth failing loudly for, since the alternative to WASD
+    // is merely the game's default layout.
     char backup[MAX_PATH];
     _snprintf_s(backup, sizeof(backup), _TRUNCATE, "%s.pemf-backup", target);
-    if (GetFileAttributesA(backup) == INVALID_FILE_ATTRIBUTES)
-        CopyFileA(target, backup, TRUE);
+    const bool haveTarget =
+        GetFileAttributesA(target) != INVALID_FILE_ATTRIBUTES;
+    if (haveTarget && GetFileAttributesA(backup) == INVALID_FILE_ATTRIBUTES) {
+        if (!CopyFileA(target, backup, TRUE)) {
+            Log("keymap: could not back up %s to %s (error %lu) -- WASD NOT "
+                "installed, your bindings are untouched",
+                target, backup, GetLastError());
+            free(ascii);
+            return;
+        }
+    }
 
     FILE* out = nullptr;
     if (fopen_s(&out, target, "wb") != 0 || !out) {
-        Log("keymap: could not write %s -- WASD not installed", target);
+        Log("keymap: could not write %s (errno %d) -- WASD not installed",
+            target, errno);
         free(ascii);
         return;
     }
@@ -1106,7 +1232,11 @@ static void InstallWasdKeymap(const char* gameDir)
     fclose(out);
     free(ascii);
 
-    Log("keymap: WASD installed -> %s (original saved as %s)", target, backup);
+    if (haveTarget)
+        Log("keymap: WASD installed -> %s (original saved as %s)", target, backup);
+    else
+        Log("keymap: WASD installed -> %s (there was no previous file to back "
+            "up)", target);
 }
 
 // ---------------------------------------------------- the shipyard experiment
@@ -2183,6 +2313,7 @@ static DWORD WINAPI Init(LPVOID)
     }
 
     strncpy_s(g_gameDir, sizeof(g_gameDir), dir, _TRUNCATE);
+    ResolveProfileDir(dir);   // both of the next two depend on it
     ScanFlags();
     suspicion::LoadTuning(dir);
     storms::LoadTuning(dir);

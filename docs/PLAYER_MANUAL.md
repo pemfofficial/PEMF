@@ -211,9 +211,17 @@ Two keys had to move to free up the letters:
 | Attack ship | `a` | **Space** |
 | Quick save | `S` | **F5** (quick load is **F9**) |
 
-Your original bindings are kept as `KeyMap.ini.pemf-backup` in
-`My Documents\My Games\Sid Meier's Pirates!\`. PEMF writes the layout **once**
-and never touches the file again, so anything you rebind afterwards stays put.
+Your original bindings are kept as `KeyMap.ini.pemf-backup`, next to the
+`KeyMap.ini` it replaced. That lives in your Documents folder, under
+`My Games` — but **the folder name depends on which copy of the game you own**:
+the Steam build uses `Sid Meier's Pirates!` and the GOG build
+`Sid Meier's Pirates`, without the exclamation mark. PEMF finds it for you and
+writes the folder it chose into `pemf.log`, so if the keys did not change, that
+line says where it looked.
+
+PEMF writes the layout **once** and never touches the file again, so anything
+you rebind afterwards stays put. If PEMF cannot back your file up, it does not
+replace it — your bindings are never overwritten with no way back.
 
 ### Developer tools
 

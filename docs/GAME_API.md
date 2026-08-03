@@ -891,9 +891,10 @@ far more reliable choice than the literal minimum.
 
 The game enumerates them rather than loading fixed names, so **adding flags
 needs no mod at all**. `FUN_004B00E0(filter, container)` splits its filter on
-`;` (`flag_*.dds;flag_*.tga`), scans the game's `custom\` **and**
-`My Documents\My Games\Sid Meier's Pirates!\Custom\` with `FindFirstFileA`,
-de-duplicates, and appends into an array it resizes as needed.
+`;` (`flag_*.dds;flag_*.tga`), scans the game's `custom\` **and** the player's
+profile `Custom\` folder (see [The profile folder](#the-profile-folder-is-not-one-name))
+with `FindFirstFileA`, de-duplicates, and appends into an array it resizes as
+needed.
 
 | Global | Holds |
 |---|---|
@@ -2191,10 +2192,37 @@ Worth stating plainly, since this file may be read as authoritative:
 
 ---
 
+## The profile folder is not one name
+
+Everything per-player — `Config.ini`, saves, `KeyMap.ini`, `Custom\` — lives in
+`My Documents\My Games\<game>\`, and **`<game>` differs between builds**:
+
+| Build | Install folder | Profile folder |
+|---|---|---|
+| Steam | `Sid Meier's Pirates!` | `My Games\Sid Meier's Pirates!` |
+| GOG | `Sid Meier's Pirates` | `My Games\Sid Meier's Pirates` |
+
+The exclamation mark follows the install folder. **A machine that has run both
+has both folders**, which is exactly how hardcoding the Steam spelling survived
+testing here and broke every GOG install: the WASD keymap wrote into a directory
+that did not exist, so no bindings changed and no `.pemf-backup` appeared, and
+the flag scan silently missed the player's own folder.
+
+`ResolveProfileDir()` in `core.cpp` enumerates `My Games\Sid Meier's Pirates*`
+and takes the candidate **spelled exactly like the install folder** — both come
+from the same title string in the build, so it identifies the copy being played
+rather than guessing at it. Where no name matches (a renamed install), it falls
+back to the newest `Config.ini`; the game rewrites that on exit every time.
+
+The fallback is *only* a fallback on purpose. On a machine with both builds
+installed, "most recently played" hands the GOG build the Steam folder whenever
+it runs second. Every candidate and the winner go in the log. **Never spell this
+path out; ask the resolver.**
+
 ## Key bindings — no reverse engineering required
 
-The game ships a **documented, user-editable `KeyMap.ini`** at
-`My Documents\My Games\Sid Meier's Pirates!\KeyMap.ini`, with a shortcut to it
+The game ships a **documented, user-editable `KeyMap.ini`** in the profile
+folder above, with a shortcut to it
 in the install folder. UTF-16LE with a BOM; one section per context —
 `[Battle]`, `[Dance]`, `[Duel]`, `[Fight]`, `[Menu]`, `[Sail]`, `[Shell]`,
 `[Sneak]`.

@@ -826,18 +826,34 @@ inline std::string g_stripLast;       // what we put up most recently
 // the game's own news breaks.
 constexpr int kStripWrapCols = 32;
 
+// ⚠️ BREAK AT THE LAST SPACE THAT FITS, NOT THE FIRST ONE PAST THE BUDGET.
+// The first version waited until it was standing on a space with the column
+// already at 32 and broke there, which puts the whole word that took the line
+// over its limit ON the overlong line. "She's coming about: They don't believe
+// you" came out as a 38-column first line -- still running off the parchment,
+// under a rule that was supposed to have fixed exactly that, which is why it
+// was reported a second time. Remembering the last space and going back to it
+// is the difference between "no line exceeds 32" and "every line exceeds 32 by
+// up to one word".
 inline void WrapForStrip(const char* in, char* out, size_t outsz)
 {
     size_t o = 0, col = 0;
-    for (size_t i = 0; in[i] && o + 2 < outsz; ++i) {
-        if (in[i] == '\n') { out[o++] = '\n'; col = 0; continue; }
+    size_t lastSpace = (size_t)-1;   // where in `out` this line may still break
 
-        // At the budget and standing on a space: that space becomes the break.
-        if (in[i] == ' ' && col >= (size_t)kStripWrapCols) {
-            out[o++] = '\n'; col = 0; continue;
+    for (size_t i = 0; in[i] && o + 2 < outsz; ++i) {
+        if (in[i] == '\n') {
+            out[o++] = '\n'; col = 0; lastSpace = (size_t)-1; continue;
         }
+
         out[o++] = in[i];
         ++col;
+        if (in[i] == ' ') lastSpace = o - 1;
+
+        if (col > (size_t)kStripWrapCols && lastSpace != (size_t)-1) {
+            out[lastSpace] = '\n';          // that space becomes the break
+            col = o - lastSpace - 1;        // what has already spilled onto the
+            lastSpace = (size_t)-1;         // new line comes with it
+        }
     }
     out[o] = 0;
 }

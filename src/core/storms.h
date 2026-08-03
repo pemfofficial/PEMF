@@ -48,6 +48,7 @@
 #include "log.h"
 #include "game.h"
 #include "render.h"   // RedirectCall
+#include "events.h"   // Busy -- a card freezes the world, and the weather with it
 #include "stormaudio.h"
 
 namespace storms {
@@ -636,6 +637,33 @@ extern "C" int __cdecl PemfStormScale(int gameScale)
         return gameScale;
     }
 
+    // ---------------------------------------------- a card freezes the weather
+    // While an event card is up the game still renders the overworld behind the
+    // dialog, so this shim keeps being called -- but the safe point does not
+    // run, the player cannot move, and nothing about the weather can honestly
+    // change. Letting the model keep running there means a card can retire a
+    // system mid-dialog: the sky clears behind the consequence box and a fresh
+    // one makes up once the player clicks through.
+    //
+    // Reported from play as "if you're in a storm and a choice event fires,
+    // when the consequence box renders the weather is changed to clear and
+    // sunny, then returns to stormy after the box is acknowledged" -- which is
+    // a storm being retired and replaced across the two cards.
+    //
+    // Holding is also simply correct. The player did not live through those
+    // seconds, so neither should the weather: the paused time is handed back to
+    // whichever clock was running, and the last size and position are drawn
+    // again unchanged.
+    if (events::Busy()) {
+        const int paused = g_sysLastMs ? (int)(now - g_sysLastMs) : 0;
+        g_sysLastMs = now;
+        if (paused > 0 && paused < 60000) {
+            g_sysBorn += (DWORD)paused;      // the storm does not age behind a card
+            g_sysNext += (DWORD)paused;      // nor does a rest run down
+        }
+        return g_sysUp ? gameScale : 0;      // exactly what the last frame drew
+    }
+
     const int dt = g_sysLastMs ? (int)(now - g_sysLastMs) : 0;
     g_sysLastMs = now;
 
@@ -704,8 +732,15 @@ extern "C" int __cdecl PemfStormScale(int gameScale)
         g_sysUp   = false;
         g_sysNext = now + (DWORD)wait;
         g_sysDist = -1;
-        Log("storms: the system %s -- next in %d s",
-            spent ? "blows itself out" : "is left astern", wait / 1000);
+        // The numbers go in the line because "left astern" and "blows itself
+        // out" have looked identical in a log before, and the difference
+        // between a storm the player sailed away from and one a dialog aged to
+        // death is exactly these two figures.
+        Log("storms: the system %s after %d s -- %d off (life %d s, kill %d) "
+            "-- next in %d s",
+            spent ? "blows itself out" : "is left astern",
+            (int)(now - g_sysBorn) / 1000, g_sysDist,
+            g_tune.lifeMs / 1000, g_tune.killDistance, wait / 1000);
         return 0;
     }
 

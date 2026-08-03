@@ -22,7 +22,10 @@ On purpose, so you can see the whole arc in a minute. Open `PEMF\suspicion.ini` 
 Yes — and you always could. Drop `flag_*.dds` files in `custom\`. The game has read that folder since 2004; the old claim that you must *replace* flags was never true for your own. PEMF just lets you change them at sea.
 
 **How do I get my old key bindings back?**
-`My Documents\My Games\Sid Meier's Pirates!\KeyMap.ini.pemf-backup` — rename it over `KeyMap.ini`.
+Rename `KeyMap.ini.pemf-backup` over `KeyMap.ini`. Both are in your Documents folder under `My Games`, in `Sid Meier's Pirates!` on Steam or `Sid Meier's Pirates` on GOG — the folder name follows your copy of the game. `pemf.log` names the one PEMF used.
+
+**The WASD keys didn't change and there's no `.pemf-backup` file.**
+Fixed in 0.2.2. PEMF only ever looked in the Steam-spelled folder (`Sid Meier's Pirates!`), so on a GOG install it wrote nothing, backed up nothing, and said nothing useful about it. It now finds the folder whichever build you own, and logs which one it picked.
 
 **Can I write my own events?**
 Yes, in JSON, no compiling. See `PEMF\docs\EVENT_AUTHORING.md`. A broken file is skipped with a reason in the log rather than taking the rest down.
