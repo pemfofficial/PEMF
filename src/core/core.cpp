@@ -326,6 +326,28 @@ static void RunSafePoint()
     if (!g_safePointFound) {
         g_safePointFound = true;
         Log("safe point reached (main loop PeekMessageA) -- deferred dispatch live");
+
+        // ⛔ THE ONLY PLACE PEMF MAY WRITE TO THE GAME'S CODE.
+        //
+        // The Steam executable is DRM-wrapped, and the wrapper checks its own
+        // .text. Patching it during startup -- which is what this used to do,
+        // about four milliseconds after the DLL loaded -- races that check.
+        // Lose the race and the wrapper puts up "Application corrupt." and the
+        // game never starts. Win it and everything is fine, which is why it
+        // presented as "fails to launch every other time".
+        //
+        // v0.2.0 never wrote to .text at all and never showed this. Weather
+        // (v0.2.1) was the first feature to patch code, and brought the fault
+        // in with it.
+        //
+        // Reaching the safe point proves what no timer can: the wrapper has
+        // finished, the image is whole, and the game is in its main loop. There
+        // is nothing weather needs before the first frame, so there was never a
+        // reason to write this early.
+        if (g_targetOK) {          // implied here, but this is a code write
+            storms::Apply();
+            render::Install();
+        }
     }
 
     // A career starting, ending, or being loaded invalidates all trigger
@@ -2427,9 +2449,10 @@ static DWORD WINAPI Init(LPVOID)
         // so this is the only verification that build ever gets.
         game::ReportFeatureProbes();
 
-        // Weather is a byte patch on three immediates, so it waits for the
-        // target check like every other write into the game's code.
-        storms::Apply();
+        // Weather patches the game's code, so it does NOT happen here. It waits
+        // for the first safe point -- see RunSafePoint. Writing to .text during
+        // startup races the Steam wrapper's integrity check and gets the game
+        // killed with "Application corrupt." about half the time.
 
         // Install the hooks. On the packed build a slot may be filled slightly
         // after .text unpacks, so retry until all four take (or time out). Each
@@ -2458,9 +2481,10 @@ static DWORD WINAPI Init(LPVOID)
     content::LoadFolder(contentDir);
     triggers::Reset("startup");
 
-    // The render-phase hook. Only attempted once the target is verified, since
-    // it writes to the game's code.
-    if (g_targetOK) render::Install();
+    // The render-phase hook also writes to the game's code, so it waits for the
+    // safe point alongside weather. It is a no-op at stage 0 today, so moving it
+    // changes nothing now -- the point is that raising the stage later cannot
+    // quietly reintroduce a startup-time write to .text.
 
     // The D3D9 render hook attaches to the game's own device from the safe
     // point, once that device exists -- nothing to do at init but announce it.
