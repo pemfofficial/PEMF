@@ -178,14 +178,20 @@ is that moment.
 
 ## Order of work
 
-**Phase A — the loot hook. ✅ Researched; the design is settled.** The award site
-is `FUN_004DCF20` at `0x004DD01F`, and the signal to watch is `0x00861FF8`.
-Remaining: build `loot::`, sampling that total at the safe point and applying a
-multiplier PEMF owns.
+**Phase A — the loot hook. ✅ BUILT AND VERIFIED IN GAME (2026-08-06).**
+`loot.h` samples `0x00861FF8` at the safe point. Measured on a real capture:
+`660 plundered -> +330 (50%)`, applied through `state::AddPlunder` and logged as
+`state: plunder 1260 -> 1590 [loot share]`. One award detected per capture, so
+there is nothing to double-count. Off by default (`crew.ini`,
+`lootBonusPercent = 0`).
 
-**Phase B — measure morale.** Log the formula's inputs live and sweep
-`0x869B27` to learn its real authority. A measurement, not a build. Then the
-wide scale, the sidecar, the tier names, and the closed loop.
+**Phase B — measure morale. ✅ MEASURED (2026-08-06).** The formula reading is
+confirmed (`predicted == actual` every sample). The byte has **full authority**
+over the 0–4 range, but with **only about four usable notches (−8…0)**, and
+**level 3 was unreachable** at the wealth tested. The expectation base was 4
+because `A` and `B` were both zero, so the loop must solve from current inputs
+rather than a baked table. Details in `GAME_API.md`. Remaining: build the wide
+scale, the sidecar field, the tier names and the closed loop.
 
 **Phase C — officers.** Roles, tiers, generation, hiring, the roster, the card.
 Skills land in whichever ring is real by then.
