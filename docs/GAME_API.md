@@ -2228,10 +2228,22 @@ This was assumed on a first reading and it is wrong. Traced:
 
 - It has **exactly one xref** — the `JA` above. Nothing else reaches it, and it
   is not a jump-table target.
-- The **last option row the menu composes** (`0x004118A8`) is
-  `" Leave Town\n"` / `" Leave Village\n"` / `" Leave Mission\n"` /
-  `" Leave Pirate Haven\n"` (`0x006F5AEC`, `0x6F5AFC`, `0x6F5B0C`, `0x6F5B1C`),
-  picked by settlement type.
+- The **last option row the menu composes** is a single `AddText1` call at
+  `0x004118A8` reached by **five** different pushes:
+
+  | Push site | String | |
+  |---|---|---|
+  | `0x0041186C` | `" Sail away\n"` (`0x006F5B34`) | **the ordinary colonial case — seen in game** |
+  | `0x00411889` | `" Leave Town\n"` (`0x006F5AEC`) | |
+  | `0x00411890` | `" Leave Village\n"` (`0x006F5AFC`) | |
+  | `0x00411897` | `" Leave Mission\n"` (`0x006F5B0C`) | |
+  | `0x0041189E` | `" Leave Pirate Haven\n"` (`0x006F5B1C`) | |
+
+  ⚠️ An earlier version of this section listed only the four `" Leave …"`
+  strings and implied one of them was always the leave row. A playtest showed
+  **"Sail away"** in an English settlement, which is why anything keying off the
+  leave row's *text* would be wrong. Anchor on the last option **line**, not on
+  a known string.
 - `0x00411BF4` is therefore **the departure sequence**: leaving is simply the row
   whose id is above 5, and the `JA` is how the game routes it — not a bounds
   check that happens to be safe.
@@ -2305,6 +2317,38 @@ Between **Check Status (id 5)** and the leave row. That keeps every game id
 stable, keeps "leave" last where players expect it, and means our rows occupy
 positions `6…n` on screen — all of which the game would route to the departure
 path, and all of which the shim intercepts before it can.
+
+### Confirmed in game (2026-08-06, Steam)
+
+A PEMF row composed, placed directly above the leave row, picked, and fired its
+event, with every game option keeping its position. Two things the playtest
+corrected:
+
+- The leave row read **"Sail away"** — see the five-string table above.
+- **"Divide the Plunder" can appear greyed out and unselectable** (observed with
+  no plunder aboard). It is drawn as a row but is not one. Our row still
+  resolved correctly, so the engine's numbering and ours agreed here — but this
+  has **not** been proven in general, and it is the most likely source of an
+  off-by-one if PEMF rows ever land on the wrong action. Worth reading the
+  greyed path properly before relying on it.
+- "English **Village** of Antigua" showed the full Governor/Tavern/Merchant/
+  Shipwright menu, so "Village" in the description is a **size**, not the
+  settlement type behind the 5/6 remap. That remap remains untested; Indian
+  villages and missions are the cases to try.
+
+### ⚠️ A menu holds the safe point open
+
+The town menu runs the game's own nested pump, so PEMF's safe point keeps being
+reached **while the world behind the menu is not being drawn**. An event fired
+from in there presents its card over an empty background — measured: the card
+came up 2ms after the row was picked, on a flat blue screen.
+
+This is not re-entrancy; nothing is nested that should not be. The queue is
+simply being drained at a moment when the screen is not what the player is
+looking at. `events::Suspend()` / `Resume()` exists for exactly this, and
+`townmenu` holds it for as long as the menu is up.
+
+Anything else that presents from inside a game menu will meet the same problem.
 
 ### Still open
 

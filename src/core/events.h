@@ -96,6 +96,31 @@ inline bool Post(EventFn fn, int arg, const char* name)
 inline bool Busy() { return g_inEvent; }
 inline int  Pending() { return g_count; }
 
+// ------------------------------------------------------------------ suspend
+// A menu that runs the game's own nested pump reaches the safe point WITHOUT
+// the world being drawn behind it -- the town menu is the case that found this.
+// An event fired from in there presents its card over an empty background,
+// because the scene the card composites onto was never rendered that frame.
+//
+// This is not the same hazard as g_inEvent. Nothing is re-entering; the queue
+// is simply being drained somewhere the screen is not what the player is
+// looking at. So the caller holding such a menu open suspends the queue, and
+// the card comes up at the next ordinary safe point once the menu has closed --
+// which is what "posted, not presented" was always supposed to mean.
+inline int g_suspend = 0;
+
+inline void Suspend()
+{
+    ++g_suspend;
+}
+
+inline void Resume()
+{
+    if (g_suspend > 0) --g_suspend;
+}
+
+inline bool Suspended() { return g_suspend > 0; }
+
 // Drain one event. Called ONLY from the safe point.
 //
 // One per frame deliberately: presenting a second card while the first is still
@@ -103,6 +128,7 @@ inline int  Pending() { return g_count; }
 inline void Pump()
 {
     if (g_faulted || g_inEvent) return;
+    if (g_suspend > 0) return;                   // a menu is up; see Suspend()
     if (!session::Ready()) return;               // no career loaded
 
     DWORD now = GetTickCount();

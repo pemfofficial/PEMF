@@ -287,15 +287,31 @@ inline int Present(int bg, int flags, int form)
 inline int PresentGuarded(int bg, int flags, int form)
 {
     if (g_faulted) return CallOriginal(bg, flags, form);
+
+    // Hold the event queue for as long as the menu is up. The menu runs the
+    // game's own nested pump, so the safe point keeps being reached while the
+    // world behind it is not being drawn -- an event fired from in there puts
+    // its card over an empty background. Measured, not theorised: the first
+    // build presented the card 2ms after the row was picked, and it came up on
+    // a flat blue screen.
+    //
+    // Suspending here rather than inside Present() covers the fault path too:
+    // whatever happens below, the queue is released on the way out.
+    events::Suspend();
+
+    int result;
     __try {
-        return Present(bg, flags, form);
+        result = Present(bg, flags, form);
     }
     __except (EXCEPTION_EXECUTE_HANDLER) {
         g_faulted = true;
         Log("!! townmenu: FAULT (0x%08X) -- PEMF rows disabled for this session",
             GetExceptionCode());
-        return CallOriginal(bg, flags, form);
+        result = CallOriginal(bg, flags, form);
     }
+
+    events::Resume();
+    return result;
 }
 
 // The redirect target. Marshals the game's register convention into a normal

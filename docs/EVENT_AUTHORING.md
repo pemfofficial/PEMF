@@ -436,14 +436,18 @@ Rows live in the same file as your events, in a top-level `menuRows` array:
 A file may contain `menuRows` and no `events` at all, if the events it points
 at are defined elsewhere.
 
-**Where the row appears.** Just above *Leave Town* — so every one of the game's
+**Where the row appears.** Just above the row that leaves the settlement —
+*Sail away*, or *Leave Town* depending on where you are. Every one of the game's
 own options keeps the position it has always had, and leaving stays at the
 bottom where players reach for it.
 
 **When the event happens.** The row **posts** the event rather than showing it
-on the spot, so the card comes up once you are out of the menu. That is how
-every other PEMF trigger behaves, and it is deliberate: the framework's one
-rule is that nothing presents from the place it was triggered.
+on the spot, so the card comes up **once you have left the menu**, not while it
+is still open. That is how every other PEMF trigger behaves, and it is
+deliberate twice over: the framework's rule is that nothing presents from the
+place it was triggered, *and* a card shown while a game menu is up composites
+onto a background the game never drew that frame — it appears over a flat
+colour. Picking your row will look like nothing happened until you sail.
 
 **Six rows maximum**, across all files. A menu that runs past the bottom of the
 screen is not a feature.
