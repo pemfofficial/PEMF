@@ -46,6 +46,7 @@
 #include "loot.h"
 #include "morale.h"
 #include "crewwatch.h"
+#include "crewmorale.h"
 #include "officers.h"
 #include "townmenu.h"
 #include "plugin.h"
@@ -366,6 +367,9 @@ static void RunSafePoint()
         // would read as one enormous award the moment the new one is sampled.
         loot::Rebase("career context changed");
         crewwatch::Rebase("career context changed");
+        crewmorale::Reset(session::MoraleValue(),
+                          "career context changed");
+        officers::Restore();
         // Anything still on screen belongs to the career that just ended. A
         // lookout's call from the last captain's voyage has no business
         // hanging over this one's ship.
@@ -505,7 +509,7 @@ static void RunSafePoint()
 
     // PEMF's share of what the crew took. A read and a compare in the common
     // case; see loot.h for why this is sampled rather than hooked.
-    if (g_targetOK) { loot::Tick(); crewwatch::Tick(); }
+    if (g_targetOK) { loot::Tick(); crewwatch::Tick(); crewmorale::Tick(); }
 
     // Presenting only moves to the render phase once stage 3 is reached; until
     // then it happens here. The half-drawn background this used to leave behind
@@ -1412,8 +1416,9 @@ static void CrewMenu(int)
     for (int guard = 0; guard < 16; ++guard) {
         char title[256];
         _snprintf_s(title, sizeof(title), _TRUNCATE,
-                    "Your crew of @NUM stands @HAPPY. Do you...");
-        int args[2] = { state::Crew(), state::Morale() };
+                    "Your crew of @NUM stands %s. Do you...",
+                    crewmorale::Name());
+        int args[1] = { state::Crew() };
 
         const char* opts[5] = {
             "Ask after ship's officers",
@@ -1421,7 +1426,7 @@ static void CrewMenu(int)
             "Look over the roster",
             "Never mind."
         };
-        const int pick = game::AskChoiceN(title, opts, 4, args, 2);
+        const int pick = game::AskChoiceN(title, opts, 4, args, 1);
 
         switch (pick) {
             case 0: ShowRoleMenu("Ship's officers. Who do you want found?",
@@ -2165,6 +2170,7 @@ static DWORD WINAPI Hook_timeGetTime(void)
         morale::LogState("probe");
         loot::Report();
         crewwatch::Report();
+        crewmorale::Report();
         content::PostDebugNotice("Morale + loot written to pemf.log.", 6);
         return r;
     }
@@ -2696,6 +2702,12 @@ static DWORD WINAPI Init(LPVOID)
                 "%s\\PEMF\\events", dir);
     content::LoadFolder(contentDir);
     officers::Load(dir);
+    // One hook rather than session.h knowing about every system that wants to
+    // be in the sidecar. Runs immediately before the file is written.
+    session::g_beforeSave = []() {
+        session::SetMorale(crewmorale::g_value);
+        officers::Serialize();
+    };
     townmenu::LoadFromContent();   // resolves ids, so it must follow the load
     InstallCrewMenu();
     // Plugins last: LoadFromContent clears the row list, and a plugin may want

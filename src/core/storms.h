@@ -47,6 +47,7 @@
 
 #include "log.h"
 #include "officerfx.h"
+#include "crewmorale.h"
 #include "game.h"
 #include "render.h"   // RedirectCall
 #include "events.h"   // Busy -- a card freezes the world, and the weather with it
@@ -1178,6 +1179,11 @@ inline void TickCargoLoss()
                 before, lost, officerfx::g_cargoGuard);
         if (lost <= 0) return;      // nothing went over the side
     }
+
+    // Losing cargo in a blow is exactly the sort of thing a crew takes badly,
+    // and it is why the morale system has to be able to be moved by anything.
+    // Small: a storm is a bad day, not a mutiny.
+    crewmorale::Nudge(-2, "cargo lost in a storm");
     if (lost > have) lost = have;
 
     __try {

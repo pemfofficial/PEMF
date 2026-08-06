@@ -61,6 +61,22 @@ struct ModState {
     int  version      = kStateVersion;
     int  eventsFired  = 0;      // lifetime count for this career
     int  lastEventTick = 0;     // pacing, so events do not cluster
+
+    // The crew's temper on PEMF's own scale, and the officers aboard.
+    //
+    // Kept as key=value in the existing sidecar rather than a second file:
+    // session.h's own note says to move to JSON WHEN IT GROWS, and a handful of
+    // lines is not that yet -- but inventing a separate persistence path would
+    // be the mistake that note is warning about, so this stays here.
+    int  morale = 0;
+    bool haveMorale = false;    // false = a save from before morale existed
+
+    // Officers as authored IDS, never indices. An index is a position in
+    // roster.json, and a player who adds a name or reorders a role turns every
+    // saved officer into a different man. Ids survive that.
+    static constexpr int kMaxSavedOfficers = 6;
+    char officers[kMaxSavedOfficers][320] = {{0}};
+    int  officerCount = 0;
     bool valid        = false;  // false = no career loaded yet
 
     // The colours this career flies, and the ones that are honestly its own.
@@ -198,6 +214,34 @@ inline void SidecarPathFor(const char* savePath, char* out, size_t cch)
     strncat_s(out, cch, kSidecarExt, _TRUNCATE);
 }
 
+// The crew's temper, as the save remembers it. A save written before morale
+// existed has none, and a fresh career starts level rather than inheriting the
+// last captain's mood.
+inline int  MoraleValue()    { return g_state.haveMorale ? g_state.morale : 0; }
+inline void SetMorale(int v) { g_state.morale = v; g_state.haveMorale = true; }
+
+// Officers, as opaque lines. session.h deliberately does not know what is in
+// them -- officers.h owns the format, this owns the file.
+inline int         SavedOfficerCount() { return g_state.officerCount; }
+inline const char* SavedOfficer(int i)
+{
+    return (i >= 0 && i < g_state.officerCount) ? g_state.officers[i] : nullptr;
+}
+inline void ClearSavedOfficers() { g_state.officerCount = 0; }
+inline bool AddSavedOfficer(const char* line)
+{
+    if (!line || !*line) return false;
+    if (g_state.officerCount >= ModState::kMaxSavedOfficers) return false;
+    strncpy_s(g_state.officers[g_state.officerCount++],
+              sizeof(g_state.officers[0]), line, _TRUNCATE);
+    return true;
+}
+
+// Anything that wants to be in the sidecar registers here, and Save() calls it
+// just before writing. One hook rather than Save() knowing about every system,
+// which would make session.h depend on all of them.
+inline void (*g_beforeSave)() = nullptr;
+
 // ------------------------------------------------------------ persistence
 // Plain key=value text: trivially debuggable, and a player can inspect or hand
 // edit it. Binary would buy nothing here.
@@ -205,6 +249,8 @@ inline bool Save(const char* savePath)
 {
     char path[MAX_PATH];
     SidecarPathFor(savePath, path, sizeof(path));
+
+    if (g_beforeSave) g_beforeSave();
 
     FILE* f = nullptr;
     if (fopen_s(&f, path, "w") != 0 || !f) {
@@ -214,6 +260,9 @@ inline bool Save(const char* savePath)
     fprintf(f, "version=%d\n",       kStateVersion);
     fprintf(f, "eventsFired=%d\n",   g_state.eventsFired);
     fprintf(f, "lastEventTick=%d\n", g_state.lastEventTick);
+    fprintf(f, "morale=%d\n",        g_state.morale);
+    for (int i = 0; i < g_state.officerCount; ++i)
+        if (g_state.officers[i][0]) fprintf(f, "officer=%s\n", g_state.officers[i]);
     // Written only when set, so a career that never touched its colours leaves
     // a sidecar identical to the ones earlier builds produced.
     if (g_state.flagName[0])     fprintf(f, "flag=%s\n",     g_state.flagName);
@@ -279,6 +328,18 @@ inline bool LoadInto(const char* savePath, ModState& out)
         if (sscanf_s(line, "version=%d", &v) == 1)            loaded.version = v;
         else if (sscanf_s(line, "eventsFired=%d", &v) == 1)   loaded.eventsFired = v;
         else if (sscanf_s(line, "lastEventTick=%d", &v) == 1) loaded.lastEventTick = v;
+        else if (sscanf_s(line, "morale=%d", &v) == 1) {
+            loaded.morale = v;
+            loaded.haveMorale = true;
+        }
+        else if (strncmp(line, "officer=", 8) == 0 &&
+                 loaded.officerCount < ModState::kMaxSavedOfficers) {
+            char* p = line + 8;
+            // strip the newline the reader leaves on
+            for (char* q = p; *q; ++q) if (*q == '\n' || *q == '\r') { *q = 0; break; }
+            if (*p) strncpy_s(loaded.officers[loaded.officerCount++],
+                              sizeof(loaded.officers[0]), p, _TRUNCATE);
+        }
         else if (strncmp(line, "flag=", 5) == 0)
             ReadName(line + 5, loaded.flagName, sizeof(loaded.flagName));
         else if (strncmp(line, "trueFlag=", 9) == 0)

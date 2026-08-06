@@ -242,9 +242,18 @@ Two things learned in play and worth keeping:
   sending men ashore costs him and would not know his chances; a percentage on
   the row turns a gamble into arithmetic.
 
-**Still open in Phase C:** officers do not persist — the roster is session-only
-until the sidecar work lands. And a save/reload loses it silently, which is the
-next thing to fix.
+**Phase D — morale and persistence. ✅ BUILT (2026-08-06).** `crewmorale.h`
+keeps PEMF's own −100..100 scale with seven tiers of its own, drifts slowly
+toward a resting point the officers set, and drives the engine by **solving its
+formula backwards** for the byte each tick. Officers and morale both travel in
+the save sidecar now, written through one `g_beforeSave` hook so `session.h`
+need not know about either system.
+
+The solver **searches rather than calculates**, because the measurement said it
+must: level 3 was unreachable at the wealth tested, and the reachable set moves
+with the player's gold. It takes the closest level it can actually reach and
+logs when that is not the one asked for, so an expected limitation does not read
+as a bug.
 
 ---
 

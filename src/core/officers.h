@@ -35,8 +35,10 @@
 #include "game.h"
 #include "state.h"
 #include "content.h"
+#include "session.h"
 #include "loot.h"
 #include "officerfx.h"
+#include "crewmorale.h"
 
 namespace officers {
 
@@ -540,25 +542,27 @@ inline void SpeakWith(int roleIndex)
     if (!RosterHas(roleIndex)) return;
     const Officer& o = g_roster[roleIndex];
 
+    // PEMF's own tier, not the engine's five -- this is the one place a player
+    // sees the wider scale, and the word for it is ours.
     char card[512];
     _snprintf_s(card, sizeof(card), _TRUNCATE,
                 "%s knuckles his forehead. \"Crew of @NUM, captain, and they "
-                "stand @HAPPY. What would you have of them?\"",
-                o.name.c_str());
+                "stand %s. What would you have of them?\"",
+                o.name.c_str(), crewmorale::Name());
 
-    int args[2] = { state::Crew(), state::Morale() };
+    int args[1] = { state::Crew() };
     const char* opts[3] = {
         "\"How do the men find the voyage?\"",
         "\"Nothing for now.\"",
         nullptr
     };
-    const int pick = game::AskChoiceN(card, opts, 2, args, 2);
+    const int pick = game::AskChoiceN(card, opts, 2, args, 1);
     if (pick != 0) return;
 
     // Honest about its own limits: this reports what the engine actually says
     // rather than inventing a crew system that does not exist yet. The morale
     // work is what turns this into orders that mean something.
-    const int m = state::Morale();
+    const int m = crewmorale::TargetEngineLevel(crewmorale::g_value);
     const char* answer =
         (m >= 4) ? "\"Well enough that they'd follow you into a lee shore, and "
                    "say so where you can hear it.\""
@@ -633,6 +637,119 @@ inline void ShowRoster()
 
         ShowOfficer(idx[pick]);
     }
+}
+
+// ------------------------------------------------------------- persistence
+// Officers are written as AUTHORED IDS, never indices. An index is a position
+// in roster.json, so a player who adds a name or reorders a role would turn
+// every saved officer into a different man. Ids survive an edited file; a trait
+// that has since been deleted is dropped, with a line saying whose it was.
+//
+//   roleId|tierId|hiredMonth|Name|Bio|skillId,skillId,...
+//
+// Pipes, because a bio contains commas and spaces and will not contain a pipe.
+inline int FindTier(const std::string& id)
+{
+    for (size_t i = 0; i < g_tiers.size(); ++i)
+        if (g_tiers[i].id == id) return (int)i;
+    return -1;
+}
+
+inline void Serialize()
+{
+    session::ClearSavedOfficers();
+
+    for (int i = 0; i < kMaxRoster && i < (int)g_roles.size(); ++i) {
+        if (!g_hired[i]) continue;
+        const Officer& o = g_roster[i];
+
+        char skills[192] = {0};
+        for (int k = 0; k < o.skillCount; ++k) {
+            if (o.skills[k] < 0 || o.skills[k] >= (int)g_skills.size()) continue;
+            if (skills[0]) strncat_s(skills, sizeof(skills), ",", _TRUNCATE);
+            strncat_s(skills, sizeof(skills),
+                      g_skills[(size_t)o.skills[k]].id.c_str(), _TRUNCATE);
+        }
+
+        char line[320];
+        _snprintf_s(line, sizeof(line), _TRUNCATE, "%s|%s|%d|%s|%s|%s",
+                    g_roles[(size_t)o.roleIndex].id.c_str(),
+                    g_tiers[(size_t)o.tierIndex].id.c_str(),
+                    o.hiredMonth, o.name.c_str(), o.bio.c_str(), skills);
+        session::AddSavedOfficer(line);
+    }
+}
+
+inline void Restore()
+{
+    for (int i = 0; i < kMaxRoster; ++i) g_hired[i] = false;
+
+    const int n = session::SavedOfficerCount();
+    int restored = 0;
+
+    for (int i = 0; i < n; ++i) {
+        const char* src = session::SavedOfficer(i);
+        if (!src) continue;
+
+        char buf[320];
+        strncpy_s(buf, sizeof(buf), src, _TRUNCATE);
+
+        char* field[6] = { nullptr };
+        int nf = 0;
+        field[nf++] = buf;
+        for (char* p = buf; *p && nf < 6; ++p)
+            if (*p == '|') { *p = 0; field[nf++] = p + 1; }
+
+        if (nf < 5) {
+            Log("officers: a saved officer line is malformed -- skipped");
+            continue;
+        }
+
+        const int role = FindRole(field[0]);
+        const int tier = FindTier(field[1]);
+        if (role < 0 || tier < 0) {
+            // roster.json was edited and this post or standing is gone. Said by
+            // name: the alternative is an officer who silently vanishes between
+            // one launch and the next.
+            Log("officers: saved officer '%s' had role '%s' tier '%s', which "
+                "roster.json no longer defines -- dropped",
+                field[3] ? field[3] : "?", field[0], field[1]);
+            continue;
+        }
+
+        Officer o;
+        o.roleIndex  = role;
+        o.tierIndex  = tier;
+        o.hiredMonth = atoi(field[2]);
+        o.name       = field[3];
+        o.bio        = (nf > 4 && field[4]) ? field[4] : "";
+        o.skillCount = 0;
+
+        if (nf > 5 && field[5] && *field[5]) {
+            char* start = field[5];
+            for (char* sp = field[5];; ++sp) {
+                if (*sp == ',' || *sp == 0) {
+                    const char end = *sp;
+                    *sp = 0;
+                    if (*start && o.skillCount < kMaxSkillsPerOfficer) {
+                        const int sk = FindSkill(start);
+                        if (sk >= 0) o.skills[o.skillCount++] = sk;
+                        else Log("officers: %s had trait '%s', which no longer "
+                                 "exists -- dropped", o.name.c_str(), start);
+                    }
+                    if (end == 0) break;
+                    start = sp + 1;
+                }
+            }
+        }
+
+        g_roster[role] = o;
+        g_hired[role]  = true;
+        ++restored;
+    }
+
+    ApplyEffects("roster restored");
+    if (restored) Log("officers: %d restored from the save", restored);
 }
 
 } // namespace officers
