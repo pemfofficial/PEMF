@@ -102,6 +102,39 @@ inline int             g_worldSigCount = 0;
 inline bool WorldOnScreen();
 inline void LearnWorldSignature(int id, int depth);
 
+// ⛔ A SHIP BATTLE IS NOT THE OVERWORLD, AND IT MOVES THE SHIP.
+//
+// LearnWorldSignature is called whenever the player's map position changes,
+// because a position that moved proves the overworld is on screen. That
+// reasoning is sound everywhere except a ship battle, which ALSO moves the
+// position -- so PEMF learned the battle screen as an overworld signature, and
+// from then on treated a battle as open sea.
+//
+// Two reports, one cause: a "Land ho!" notice drawn over a ship battle, and the
+// storm drums playing on through a fight that should have had the game's own
+// battle music.
+//
+// The battle screen is separable without hardcoding a value. Every screen this
+// project has ever recorded has a signature of the form 0x0FFxxxxx -- the
+// overworld, towns, Load/Save, the main menu -- and the battle alone sets the
+// TOP BIT:
+//
+//     sailing / overworld   0x0FFFEFDF, 0x0FFFFFDF
+//     town                  0x0FFFEFFA, 0x0FFFFFFA
+//     Load / Save           0x0FFBE770, 0x0FFBE750
+//     battle                0x8FFFEFFF, 0x8FFFFFFF   <- high bit
+//     main menu             0x0FFFEFF0, 0x0FFFFFF0
+//
+// So this tests the bit rather than the value. It is still an observation
+// rather than a reading of the engine's intent, which is why it only ever
+// REFUSES to learn -- the worst it can do is make PEMF slightly more cautious
+// about what it calls the overworld, and a wrong reading of a screen we have
+// never seen fails in the safe direction.
+inline bool LooksLikeBattle(int id)
+{
+    return (id & 0x80000000) != 0;
+}
+
 inline int   g_lastX = 0, g_lastY = 0;
 inline DWORD g_lastMovedAt = 0;
 inline bool  g_havePos = false;
@@ -131,7 +164,19 @@ inline WorldSample Sample()
             // what is on screen. That is the only moment worth learning from --
             // a moment later the ship could be stationary in a menu with the
             // same recent-movement history.
-            LearnWorldSignature(s.screenId, s.screenDepth);
+            // ...unless it is a battle. A battle moves the ship too, and
+            // learning it here is what put notices over a fight.
+            if (!LooksLikeBattle(s.screenId))
+                LearnWorldSignature(s.screenId, s.screenDepth);
+            else {
+                static bool told = false;
+                if (!told) {
+                    told = true;
+                    Log("triggers: ignoring screen 0x%08X depth %d for "
+                        "learning -- that is a battle, not the overworld",
+                        (unsigned)s.screenId, s.screenDepth);
+                }
+            }
         }
         s.moving = (now - g_lastMovedAt) < kMovingWindowMs;
 
@@ -199,6 +244,10 @@ inline bool WorldOnScreen()
     __try {
         const int id    = *(const int*)game::addr::ScreenId;
         const int depth = *(const int*)game::addr::ScreenDepth;
+
+        // Belt as well as braces. A signature learned before this check existed
+        // would otherwise stay in the table for the rest of the session.
+        if (LooksLikeBattle(id)) return false;
         for (int i = 0; i < g_worldSigCount; ++i)
             if (g_worldSig[i].id == id && g_worldSig[i].depth == depth)
                 return true;

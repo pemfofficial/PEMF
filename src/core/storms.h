@@ -157,6 +157,11 @@ struct Tuning {
     // having been fought in it. The audio uses an intensity threshold; this
     // uses distance directly because it is a yes/no question asked once.
     int battleStormDist = 14000;
+    // How hard it rains in a battle fought in weather. The battle derives its
+    // own intensity and clamps it to 4..20, so 4 is the calm it already gives
+    // you and 20 is the hardest the engine will draw. VANILLA behaviour is 0,
+    // which leaves whatever the battle chose.
+    int battleIntensity = 18;
 
     int boundFix = 1;
     int boundScalePct = 100;   // MULTIPLIER on the radius the engine computed
@@ -955,6 +960,7 @@ inline void LoadTuning(const char* gameDir)
         else if (_stricmp(key, "clusterScale")  == 0) { g_tune.clusterScale  = value; ++applied; }
         else if (_stricmp(key, "battleWeather")   == 0) { g_tune.battleWeather   = value; ++applied; }
         else if (_stricmp(key, "battleStormDist") == 0) { g_tune.battleStormDist = value; ++applied; }
+        else if (_stricmp(key, "battleIntensity") == 0) { g_tune.battleIntensity = value; ++applied; }
         else if (_stricmp(key, "cargoLoss")       == 0) { g_tune.cargoLossEnabled = value; ++applied; }
         else if (_stricmp(key, "cargoLossRadius") == 0) { g_tune.cargoLossRadius  = value; ++applied; }
         else if (_stricmp(key, "cargoLossIntensity")== 0) { g_tune.cargoLossIntensity = value; ++applied; }
@@ -1273,7 +1279,7 @@ inline int OurIntensity()
 // (see the note on time spent elsewhere above) -- so `g_sysDist` still holds
 // what it held when the fight began. That fix and this feature are the same
 // idea seen twice.
-inline void UpdateBattleWeather()
+inline void UpdateBattleWeather(bool worldLive)
 {
     const int want = (g_tune.battleWeather && g_sysUp && g_sysDist >= 0 &&
                       g_sysDist < g_tune.battleStormDist) ? 1 : 0;
@@ -1281,6 +1287,38 @@ inline void UpdateBattleWeather()
         g_battleWantStorm = want;
         Log("storms: a battle fought now would be %s (system %d off)",
             want ? "IN THE WEATHER" : "under clear sky", g_sysDist);
+    }
+
+    // ------------------------------------------------- rain and dark in battle
+    // The battle derives its OWN weather intensity and writes it at 0x0047EE97,
+    // clamped to 4..20 -- so a fight always has a little weather whatever the
+    // sea outside was doing. That is the faint drizzle a playtest reported, and
+    // it is also the lever: the global rain multiply at 0x0047BC3C reads this
+    // same value, INSIDE the same function.
+    //
+    // So a fight begun in a storm gets the intensity pushed up, and the engine
+    // draws the rain and the darkness itself. No new hook, no cloud needed.
+    //
+    // ⚠️ 0x0085A0F8 IS SHARED -- the overworld and the wind read it too. Written
+    // only while a battle is actually on screen, and only when the fight began
+    // in weather, so the value the overworld sees is never touched: the battle
+    // overwrites it on entry anyway, and the overworld recomputes on return.
+    if (g_tune.battleIntensity > 0 && g_battleWantStorm && !worldLive) {
+        __try {
+            int& intensity = *(int*)0x0085A0F8;
+            int want = g_tune.battleIntensity;
+            if (want > 20) want = 20;          // the engine's own ceiling
+            if (intensity < want) {
+                static int s_said = 0;
+                if (s_said != want) {
+                    s_said = want;
+                    Log("storms: battle weather -- intensity %d -> %d",
+                        intensity, want);
+                }
+                intensity = want;
+            }
+        }
+        __except (EXCEPTION_EXECUTE_HANDLER) { }
     }
 
     // Say when the shim actually fires. Without this there was no way to tell
