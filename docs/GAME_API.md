@@ -2505,9 +2505,29 @@ world term.
 ### The one lever: `0x00869B27`
 
 It enters as `- 4 * value`, which *lowers* the expectation, which *raises* the
-resulting level. So **writing this byte is how morale is nudged** without
-touching the player's gold or crew. It is a signed byte (`int8`), so the useful
-range is small and it saturates quickly — this is a nudge, not a dial.
+resulting level. So **writing this byte is how morale is moved** without
+touching the player's gold or crew.
+
+**Nothing in the game writes it.** `0x00869B27` has exactly **one** cross
+reference in the whole executable — the READ at `0x0040482A`, inside
+`GetMoraleLevel` itself. No code path anywhere assigns to it. It sits inside the
+player record (which ends at `MessageText`, `0x00869B48`), so it is loaded and
+saved wholesale with the career rather than being maintained by code.
+
+Two consequences, and they are what make a morale system possible at all:
+
+- **PEMF owns this byte during a session.** Write it and it stays written; the
+  engine will not fight back, because no engine code touches it.
+- **A save load replaces it**, along with the rest of the player record. So it
+  has to be re-applied after a load — which is a moment PEMF already detects and
+  already restores its own state at.
+
+⚠️ **Its authority is not yet known.** As a signed byte it shifts the expectation
+by at most ±508, against a base of `(worldTerm)² / 4` whose magnitude has never
+been measured in a running game. If that base is small the byte is a complete
+lever, able to pin morale at 0 or 4; if it is large the byte is a modest trim.
+**Measure before designing around it** — log the formula's inputs at runtime and
+find out, rather than assuming either.
 
 Everything else in the formula is either the player's actual wealth and crew, or
 a world term we have not identified. Raising morale by giving the player gold
