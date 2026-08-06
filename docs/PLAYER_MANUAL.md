@@ -242,6 +242,47 @@ into a career it does not belong to.
 
 ### WASD steering
 
+**If WASD is not working, settle which build you are on first.** The top line of
+`pemf.log` says. A line like
+
+```
+=== PEMF loaded === pid=...
+```
+
+with **no version number** is older than 0.2.2, and on those builds WASD never
+installed on GOG at all — the layout was written to a folder that does not exist
+on a GOG install, so no `KeyMap.ini` changed and no `.pemf-backup` appeared.
+Update and it installs on the next launch.
+
+A current build says
+
+```
+=== PEMF 0.2.3.0 loaded === built ...
+```
+
+and then prints exactly which folder it picked and what it did:
+
+```
+profile: candidate "Sid Meier's Pirates" (Config.ini present)  <- matches the install folder
+profile: using ...\My Games\Sid Meier's Pirates
+keymap: WASD installed -> ...\KeyMap.ini (original saved as ...\KeyMap.ini.pemf-backup)
+```
+
+If there are no `profile:` or `keymap:` lines at all, PEMF is not the build you
+think it is.
+
+**Getting the layout back after you have changed it.** PEMF writes your keymap
+once and then leaves it alone, so your own rebinds are safe. To have the layout
+put back, delete the `PEMF-WASD-INSTALLED` line from
+
+```
+Documents\My Games\Sid Meier's Pirates[!]\KeyMap.ini
+```
+
+⚠️ **Not** the copy in your game folder under `PEMF\KeyMap_WASD.ini` — that one
+is only the template PEMF copies from, and editing it changes nothing about the
+keymap you are playing with.
+
 Installed automatically the first time you run the game. Sailing, ship battles,
 land battles, duels, sneaking — all of it.
 
