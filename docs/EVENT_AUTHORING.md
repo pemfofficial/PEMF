@@ -583,6 +583,18 @@ What an option does to the game.
 | `setPlunder` | set it outright |
 | `addCrew` | add or remove crew |
 | `setCrew` | set crew size |
+| `addMorale` | move the crew's temper by this many points, up or down |
+
+**About `addMorale`.** That is points on PEMF's own crew scale, which runs from
+−100 to +100 across seven states from `MUTINOUS` to `DEVOTED` — not the game's
+0–4 level. For a sense of scale: cargo lost in a storm is **−2**, losing men is
+up to **−12**, and dividing a good haul of plunder is up to **+25**. An event
+worth more than that should be a rare one.
+
+There is deliberately no `setMorale`. An event describes something that
+*happened* to the crew; "the men are now exactly content" is not something that
+happens.
+
 
 ```json
 {

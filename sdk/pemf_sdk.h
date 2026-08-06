@@ -76,11 +76,18 @@ extern "C" {
 #define PEMF_ANY (-1)
 
 // Crew morale, as the game models it.
+// The GAME's five levels, as get_morale_level() reports them.
 #define PEMF_MORALE_MUTINOUS  0
 #define PEMF_MORALE_ANGRY     1
 #define PEMF_MORALE_UNHAPPY   2
 #define PEMF_MORALE_CONTENT   3
 #define PEMF_MORALE_DEVOTED   4
+
+// PEMF's own scale is wider and signed -- see get_morale() below. Do not
+// confuse the two: the constants above are the engine's, and a plugin nudging
+// PEMF's number by 4 is doing something quite different from setting a level.
+#define PEMF_MORALE_MIN     (-100)
+#define PEMF_MORALE_MAX       100
 
 // city_nation() returns one of these. The same byte carries both the owning
 // nation and the two kinds of settlement that have no owner, which is the
@@ -170,6 +177,33 @@ typedef struct PemfApi {
     // Fire an event that exists in JSON, by its id. Returns 1 if it was found.
     // Presents immediately when called from a menu callback.
     int (*fire_event)(const char* event_id);
+
+    // ------------------------------------------------- added after ABI 1.0
+    // Everything below was appended after the first release. `abi_version` is
+    // unchanged because nothing above changed meaning -- check `size` before
+    // calling these, as described at the top of this file.
+
+    // The crew's temper on PEMF's own scale, -100..100.
+    //
+    // ⚠️ NOT the same quantity as get_morale() above. That one returns the
+    // GAME's 0-4 level, which is derived from the crew's share of the plunder.
+    // This one is PEMF's own wider, signed number -- mood rather than pay --
+    // and PEMF drives the game's level from it. Deliberately named differently
+    // so the two are hard to confuse at a call site.
+    int (*get_mood)(void);
+
+    // The NAME of that state -- "MUTINOUS" through "DEVOTED". Points at storage
+    // PEMF owns; copy it if you need to keep it.
+    const char* (*mood_name)(void);
+
+    // Move the crew's temper by `delta` points, with a reason that appears in
+    // the log beside the change. This is the only way to change it: there is
+    // deliberately no setter, because an event describes something that
+    // HAPPENED to the crew rather than declaring how they now feel.
+    //
+    // Be sparing. Storms are worth 2 points and losing men up to 12; a plugin
+    // handing out 50 is not a system, it is a cheat.
+    void (*nudge_mood)(int delta, const char* reason);
 } PemfApi;
 
 // Your entry point. PEMF looks for this exact name.

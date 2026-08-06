@@ -25,6 +25,7 @@
 #include "log.h"
 #include "state.h"
 #include "officerfx.h"
+#include "crewmorale.h"
 
 namespace crewwatch {
 
@@ -58,6 +59,16 @@ inline void Tick()
     const int lost = g_last - now;
     g_last = now;
     InterlockedExchangeAdd(&g_lost, lost);
+
+    // Men going over the side is the clearest thing that sours a crew, and it
+    // is worth more than a storm. Scaled by how many, and capped: losing forty
+    // men is terrible, and losing eighty is not twice as terrible.
+    if (lost > 0) {
+        int hit = lost / 2;
+        if (hit < 1)  hit = 1;
+        if (hit > 12) hit = 12;
+        crewmorale::Nudge(-hit, "men lost");
+    }
 
     const int pct = officerfx::g_surgeon;
     if (pct == 0) return;

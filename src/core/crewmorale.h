@@ -224,6 +224,43 @@ inline int RestingPoint()
     return officerfx::g_morale * 4;
 }
 
+// ------------------------------------------------------- paying the crew
+// "Divide the Plunder" is the one thing in the game that is unambiguously the
+// captain settling up, and the crew's whole grievance is their share. It is
+// menu id 4 in the town menu, which townmenu.h already sees.
+//
+// Scaled by what was actually divided: a captain who splits four thousand
+// pieces has done something the men will remember, and one who splits forty has
+// not. Read BEFORE the game spends it, which is why townmenu passes the amount.
+inline void PlunderDivided(int amount)
+{
+    if (amount <= 0) {
+        Nudge(-3, "divided nothing worth having");
+        return;
+    }
+    int lift = amount / 250;
+    if (lift < 1)  lift = 1;
+    if (lift > 25) lift = 25;
+    Nudge(lift, "the plunder divided");
+}
+
+// ------------------------------------------------------------ time at sea
+// A long voyage wears on a crew, whatever else is going well. Slow: this is a
+// month, not a tick, and the drift toward the resting point will fight it --
+// which is the point. Good officers make a long voyage bearable.
+inline int g_lastMonth = -1;
+
+inline void CheckMonths()
+{
+    const int m = state::Months();
+    if (g_lastMonth < 0) { g_lastMonth = m; return; }
+    if (m <= g_lastMonth) { g_lastMonth = m; return; }   // reset, or a new career
+
+    const int elapsed = m - g_lastMonth;
+    g_lastMonth = m;
+    Nudge(-2 * elapsed, "another month at sea");
+}
+
 // ------------------------------------------------------------------- the tick
 // Slow on purpose. Morale should be something a player notices over a voyage,
 // not something that visibly ticks. Everything sharp comes through Nudge().
@@ -238,6 +275,8 @@ inline void Tick()
     if (!state::InGame()) return;
 
     const DWORD now = GetTickCount();
+
+    CheckMonths();
 
     // Drift toward the resting point, one point at a time.
     if (now - g_lastDrift >= kDriftEveryMs) {
@@ -281,6 +320,7 @@ inline void Reset(int value, const char* why)
     g_value     = value;
     g_faulted   = false;
     g_lastDrift = g_lastPush = GetTickCount();
+    g_lastMonth = -1;              // re-read from the career we just loaded
     Clamp();
     Log("morale: %d [%s] -- the crew are %s", g_value, why ? why : "?", Name());
 }

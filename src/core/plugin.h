@@ -40,6 +40,7 @@
 #include "nations.h"
 #include "content.h"
 #include "events.h"
+#include "crewmorale.h"
 #include "townmenu.h"
 #include "../../sdk/pemf_sdk.h"
 
@@ -198,6 +199,23 @@ inline int Api_FireEvent(const char* eventId)
     return 1;
 }
 
+inline int Api_GetMood() { return crewmorale::g_value; }
+
+inline const char* Api_MoodName() { return crewmorale::Name(); }
+
+inline void Api_NudgeMood(int delta, const char* reason)
+{
+    // Bounded per call. A plugin that wants to swing the crew from mutinous to
+    // devoted in one go is not expressing an event, and the log would give no
+    // hint where it came from. It can call again if it means it.
+    if (delta >  25) delta =  25;
+    if (delta < -25) delta = -25;
+    char why[96];
+    _snprintf_s(why, sizeof(why), _TRUNCATE, "%s: %s", CurrentName(),
+                (reason && *reason) ? reason : "no reason given");
+    crewmorale::Nudge(delta, why);
+}
+
 // The one table, built once.
 inline PemfApi g_api = {
     sizeof(PemfApi), PEMF_ABI_VERSION,
@@ -208,6 +226,7 @@ inline PemfApi g_api = {
     &Api_NearestCity, &Api_CityNation, &Api_CityType, &Api_NationsAtWar,
     &Api_ShowCard, &Api_PostNotice,
     &Api_AddMenuRow, &Api_FireEvent,
+    &Api_GetMood, &Api_MoodName, &Api_NudgeMood,
 };
 
 // ------------------------------------------------------------------ the guard

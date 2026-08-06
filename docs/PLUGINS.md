@@ -71,6 +71,7 @@ plugins: loaded 'My Mod' 1.0  (my_mod.dll)
 | Show something | `show_card`, `post_notice` |
 | Town menu | `add_menu_row` |
 | Content | `fire_event` |
+| Crew mood | `get_mood`, `mood_name`, `nudge_mood` |
 
 Each is documented where it is declared, in `pemf_sdk.h`. Read that file — it is
 the reference, and it is written to be read.
@@ -115,6 +116,14 @@ disabled for the session, with its name in the log, and the game carries on:
 `PEMF_ABI_VERSION` changes only when something already in the header changes
 meaning. New calls are appended to the **end** of `PemfApi`, and the struct
 carries its own `size`, so a plugin built against an older SDK keeps working.
+
+`get_mood` / `mood_name` / `nudge_mood` were added after the first release, so
+they are past the end of the original struct. Check `size` before calling them.
+
+⚠️ **`get_mood` is not `get_morale`.** `get_morale` returns the game's 0–4
+level, derived from the crew's share of the plunder. `get_mood` returns PEMF's
+own −100..100 number — mood rather than pay — and it is what drives the game's
+level. They are named differently on purpose.
 
 If you use a call added after the version you targeted, check first:
 

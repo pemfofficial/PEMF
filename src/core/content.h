@@ -34,6 +34,7 @@
 #include "state.h"
 #include "nations.h"
 #include "suspicion.h"
+#include "crewmorale.h"
 #include "render.h"
 #include "d3d9hook.h"
 
@@ -136,7 +137,8 @@ inline int ResolveArgs(const std::vector<Arg>& args, int* out, int maxSlots)
 }
 
 // ------------------------------------------------------------------ effects
-enum class EffectOp { AddPlunder, SetPlunder, AddCrew, SetCrew };
+enum class EffectOp { AddPlunder, SetPlunder, AddCrew, SetCrew,
+                      AddMorale };
 
 struct Effect {
     EffectOp op    = EffectOp::AddPlunder;
@@ -460,9 +462,15 @@ inline bool ParseEffect(const json& j, Effect* out, std::string* err)
     else if (op == "setPlunder") out->op = EffectOp::SetPlunder;
     else if (op == "addCrew")    out->op = EffectOp::AddCrew;
     else if (op == "setCrew")    out->op = EffectOp::SetCrew;
+    // Morale is PEMF's own scale, so this is points on it rather than a level.
+    // There is deliberately no setMorale: an event describes something that
+    // HAPPENED to the crew, and "the men are now exactly content" is not a
+    // thing that happens.
+    else if (op == "addMorale")  out->op = EffectOp::AddMorale;
     else {
         *err = "unknown effect op '" + op +
-               "' (expected addPlunder, setPlunder, addCrew, setCrew)";
+               "' (expected addPlunder, setPlunder, addCrew, setCrew, "
+               "addMorale)";
         return false;
     }
     if (!j.contains("value") || !j["value"].is_number_integer()) {
@@ -1590,6 +1598,7 @@ inline void Fire(int index)
             case EffectOp::SetPlunder: state::SetPlunder(ef.value, why.c_str()); break;
             case EffectOp::AddCrew:    state::AddCrew(ef.value,    why.c_str()); break;
             case EffectOp::SetCrew:    state::SetCrew(ef.value,    why.c_str()); break;
+            case EffectOp::AddMorale:  crewmorale::Nudge(ef.value,  why.c_str()); break;
         }
     }
 

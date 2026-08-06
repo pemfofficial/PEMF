@@ -51,6 +51,7 @@
 #include "render.h"
 #include "events.h"
 #include "content.h"
+#include "crewmorale.h"
 
 namespace townmenu {
 
@@ -375,6 +376,12 @@ inline int Present(int bg, int flags, int form)
         // Below our block, or above it: the game's own row, untouched. The
         // remap that follows is the game's business and still works, because
         // this is exactly the number it would have seen without us.
+        // "Divide the Plunder" is action id 4 -- see the row table in
+        // GAME_API.md. Read the purse BEFORE handing the pick back, because the
+        // game is about to spend it and the amount is the whole point.
+        if (pick == 4 && bg == city)
+            crewmorale::PlunderDivided(state::Plunder());
+
         if (pick < ourFirst || pick >= ourFirst + ourCount) {
             if (guard > 0)
                 Log("townmenu: handing back %d after %d re-present(s)",
