@@ -129,6 +129,39 @@
           "outcomeArgs": [100]
         }
       ]
+    },
+    {
+      "id": "harbourmaster_word",
+      "kind": "choice",
+      "body": "The harbourmaster of {port} keeps a ledger of every hull that has put in this season, and for a coin he is not shy about reading from it.",
+      "options": [
+        {
+          "text": "Pay for a look at the ledger.",
+          "effects": [ { "op": "addPlunder", "value": -50 } ],
+          "outcome": "Fifty pieces lighter, you learn which flags have been calling at {port} and which have been avoiding it."
+        },
+        {
+          "text": "Keep your coin.",
+          "outcome": "You leave him to his ledger. Whatever it says, it says without you."
+        }
+      ]
+    }
+  ],
+
+  "_menuRowsComment": [
+    "TEST ROW -- decide before release whether this ships.",
+    "",
+    "menuRows add PEMF's own options to the game's town menu. Each row needs",
+    "a 'label' and the 'event' id it fires. Rows appear just above",
+    "'Leave Town', so every one of the game's own options keeps its place.",
+    "",
+    "The event is POSTED, not shown on the spot: it comes up once you are out",
+    "of the menu, the same way every other PEMF trigger works."
+  ],
+  "menuRows": [
+    {
+      "label": "Ask after the harbourmaster",
+      "event": "harbourmaster_word"
     }
   ]
 }

@@ -540,6 +540,55 @@ inline int Count() { return (int)g_events.size(); }
 // Load and validate ONE file, APPENDING to the library. Returns how many events
 // it contributed. A malformed file never throws into the game: it is reported
 // and skipped, so one bad mod cannot take the others down with it.
+// ------------------------------------------------------------- menu rows
+// A row PEMF adds to the game's town menu, authored alongside events in the
+// same file. Held as the id the author wrote rather than an index, because a
+// row may name an event that a later file defines -- resolution happens once
+// everything is loaded. See townmenu.h.
+struct MenuRowDef {
+    std::string label;
+    std::string eventId;
+};
+
+inline std::vector<MenuRowDef> g_menuRows;
+
+inline int ParseMenuRows(const json& root, const char* path)
+{
+    if (!root.contains("menuRows")) return 0;
+    if (!root["menuRows"].is_array()) {
+        Log("content: %s has 'menuRows' but it is not an array -- ignored", path);
+        return 0;
+    }
+
+    int added = 0;
+    for (const auto& jr : root["menuRows"]) {
+        MenuRowDef r;
+        r.label   = jr.value("label", "");
+        r.eventId = jr.value("event", "");
+
+        if (r.label.empty()) {
+            Log("content: REJECTED menu row -- missing 'label'");
+            continue;
+        }
+        if (r.eventId.empty()) {
+            Log("content: REJECTED menu row '%s' -- missing 'event'",
+                r.label.c_str());
+            continue;
+        }
+        // The row is drawn through the game's own text system, which is not
+        // Unicode-aware; the same rule events live under.
+        int bad = -1;
+        if (!IsAscii(r.label, &bad)) {
+            Log("content: REJECTED menu row '%s' -- non-ASCII at byte %d",
+                r.label.c_str(), bad);
+            continue;
+        }
+        g_menuRows.push_back(r);
+        ++added;
+    }
+    return added;
+}
+
 inline int LoadFile(const char* path)
 {
     const size_t before = g_events.size();
@@ -564,8 +613,13 @@ inline int LoadFile(const char* path)
         return 0;
     }
 
+    ParseMenuRows(root, path);
+
     if (!root.contains("events") || !root["events"].is_array()) {
-        Log("content: %s has no top-level 'events' array", path);
+        // A file may legitimately carry only menu rows, so this is only worth
+        // saying when the file turned out to carry nothing at all.
+        if (!root.contains("menuRows"))
+            Log("content: %s has no top-level 'events' array", path);
         return 0;
     }
 
@@ -689,6 +743,7 @@ inline int LoadFile(const char* path)
 inline int LoadFolder(const char* dir)
 {
     g_events.clear();
+    g_menuRows.clear();
 
     char pattern[MAX_PATH];
     _snprintf_s(pattern, sizeof(pattern), _TRUNCATE, "%s\\*.json", dir);

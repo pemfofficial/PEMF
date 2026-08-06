@@ -405,6 +405,59 @@ starting a new career resets accumulated sailing time and re-arms everything.
 
 ---
 
+## Menu rows — your own option in the town menu
+
+An event does not have to wait for the world to fire it. A **menu row** puts
+your own line in the game's town menu, so the player can ask for it.
+
+Rows live in the same file as your events, in a top-level `menuRows` array:
+
+```json
+{
+  "events": [
+    {
+      "id": "harbourmaster_word",
+      "body": "The harbourmaster of {port} keeps a ledger...",
+      "options": [ { "text": "Pay for a look." } ]
+    }
+  ],
+
+  "menuRows": [
+    { "label": "Ask after the harbourmaster", "event": "harbourmaster_word" }
+  ]
+}
+```
+
+| Field | Meaning |
+|---|---|
+| `label` | the line the player sees. Plain ASCII, same rule as event text. |
+| `event` | the `id` of the event this row fires. It may live in another file. |
+
+A file may contain `menuRows` and no `events` at all, if the events it points
+at are defined elsewhere.
+
+**Where the row appears.** Just above *Leave Town* — so every one of the game's
+own options keeps the position it has always had, and leaving stays at the
+bottom where players reach for it.
+
+**When the event happens.** The row **posts** the event rather than showing it
+on the spot, so the card comes up once you are out of the menu. That is how
+every other PEMF trigger behaves, and it is deliberate: the framework's one
+rule is that nothing presents from the place it was triggered.
+
+**Six rows maximum**, across all files. A menu that runs past the bottom of the
+screen is not a feature.
+
+**If your row does not appear**, check `pemf.log`. A row naming an event that
+does not exist is rejected by name at load, rather than silently doing nothing
+when picked:
+
+```
+townmenu: REJECTED row 'Ask after the harbourmaster' -- no event with id 'harbourmster_word'
+```
+
+---
+
 ## Effects
 
 What an option does to the game.

@@ -43,6 +43,7 @@
 #include "triggers.h"
 #include "render.h"
 #include "storms.h"
+#include "townmenu.h"
 #include "d3d9hook.h"
 
 #pragma intrinsic(_ReturnAddress)
@@ -346,6 +347,7 @@ static void RunSafePoint()
         // reason to write this early.
         if (g_targetOK) {          // implied here, but this is a code write
             storms::Apply();
+            townmenu::Install();
             render::Install();
         }
     }
@@ -2479,6 +2481,7 @@ static DWORD WINAPI Init(LPVOID)
     _snprintf_s(contentDir, sizeof(contentDir), _TRUNCATE,
                 "%s\\PEMF\\events", dir);
     content::LoadFolder(contentDir);
+    townmenu::LoadFromContent();   // resolves ids, so it must follow the load
     triggers::Reset("startup");
 
     // The render-phase hook also writes to the game's code, so it waits for the
@@ -2511,6 +2514,7 @@ BOOL APIENTRY DllMain(HMODULE mod, DWORD reason, LPVOID reserved)
         render::Uninstall();
         d3d9hook::Uninstall();
         storms::Restore();
+        townmenu::Restore();
         stormaudio::Shutdown();
         // Restore the slots only on an explicit FreeLibrary. On process teardown
         // the address space is going away and touching locks risks a hang.
