@@ -169,6 +169,15 @@ struct Tuning {
     // experimenting; not shipped on until it looks right.
     int battleIntensity = 0;
 
+    // The battle draws its cloud at scale 100. The storm prefab is a different
+    // shape and the battle camera sits far closer than the overworld's, so the
+    // size that suits one need not suit the other. 0 = leave the game's.
+    int battleCloudScale = 0;
+    // Nudge it, in the battle's own units. The cloud is placed for a small
+    // white puff; a storm may want to sit differently.
+    int battleCloudDX = 0;
+    int battleCloudDY = 0;
+
     int boundFix = 1;
     int boundScalePct = 100;   // MULTIPLIER on the radius the engine computed
 
@@ -476,24 +485,67 @@ extern "C" {
     inline void* g_battleCloudOrig = nullptr;
     inline int   g_battleWantStorm = 0;   // set from the safe point
     inline LONG  g_battleSwaps     = 0;
+
+    // What the GAME asked for, captured on the way past. There is no other way
+    // to learn these -- they are computed in the battle's own code from values
+    // we have never mapped -- and without them, tuning the cloud is guesswork.
+    inline int   g_battleSeenX     = 0;
+    inline int   g_battleSeenY     = 0;
+    inline int   g_battleSeenScale = 0;
+
+    // What we substitute. Read by the shim, written from the safe point, so the
+    // asm stays trivial and everything that thinks lives in C.
+    inline int   g_battleUseScale  = 0;    // 0 = leave the game's
+    inline int   g_battleAddX      = 0;
+    inline int   g_battleAddY      = 0;
 }
 
 // Naked and a TAIL JUMP, so the arguments, edx, and whatever the callee does
 // about cleaning the stack are all exactly as the game left them. The only
 // difference is one dword.
+// The stack on entry, from the call site above:
+//
+//     [esp +  0]  return address
+//     [esp +  4]  prefab
+//     [esp +  8]  position (the pushed ECX)
+//     [esp + 12]  position (the pushed EAX)
+//     [esp + 16]  scale -- 0x64
+//
+// After `pushfd` and `push eax` every offset moves on by 8.
 __declspec(naked) inline void BattleCloudShim()
 {
     __asm {
         pushfd
         push eax
 
+        // Record what the game asked for, whether or not we change anything.
+        // This is the only place those numbers exist.
+        mov  eax, dword ptr [esp + 16]
+        mov  dword ptr [g_battleSeenX], eax
+        mov  eax, dword ptr [esp + 20]
+        mov  dword ptr [g_battleSeenY], eax
+        mov  eax, dword ptr [esp + 24]
+        mov  dword ptr [g_battleSeenScale], eax
+
         mov  eax, dword ptr [g_battleWantStorm]
         test eax, eax
         jz   leave_it
 
-        // [esp] = eax, [esp+4] = flags, [esp+8] = return address,
-        // [esp+12] = the prefab argument.
-        mov  dword ptr [esp + 12], 0x008CCB58   // kStormPrefab
+        mov  dword ptr [esp + 12], 0x008CCB58   // the storm prefab
+
+        // Scale, if we have been given one.
+        mov  eax, dword ptr [g_battleUseScale]
+        test eax, eax
+        jz   no_scale
+        mov  dword ptr [esp + 24], eax
+    no_scale:
+
+        // ...and a nudge, in the battle's own units.
+        mov  eax, dword ptr [g_battleAddX]
+        add  dword ptr [esp + 16], eax
+        mov  eax, dword ptr [g_battleAddY]
+        add  dword ptr [esp + 20], eax
+
         inc  dword ptr [g_battleSwaps]
 
     leave_it:
@@ -967,6 +1019,9 @@ inline void LoadTuning(const char* gameDir)
         else if (_stricmp(key, "battleWeather")   == 0) { g_tune.battleWeather   = value; ++applied; }
         else if (_stricmp(key, "battleStormDist") == 0) { g_tune.battleStormDist = value; ++applied; }
         else if (_stricmp(key, "battleIntensity") == 0) { g_tune.battleIntensity = value; ++applied; }
+        else if (_stricmp(key, "battleCloudScale")== 0) { g_tune.battleCloudScale = value; ++applied; }
+        else if (_stricmp(key, "battleCloudDX")   == 0) { g_tune.battleCloudDX   = value; ++applied; }
+        else if (_stricmp(key, "battleCloudDY")   == 0) { g_tune.battleCloudDY   = value; ++applied; }
         else if (_stricmp(key, "cargoLoss")       == 0) { g_tune.cargoLossEnabled = value; ++applied; }
         else if (_stricmp(key, "cargoLossRadius") == 0) { g_tune.cargoLossRadius  = value; ++applied; }
         else if (_stricmp(key, "cargoLossIntensity")== 0) { g_tune.cargoLossIntensity = value; ++applied; }
@@ -1327,6 +1382,12 @@ inline void UpdateBattleWeather(bool worldLive)
         __except (EXCEPTION_EXECUTE_HANDLER) { }
     }
 
+    // Hand the shim its numbers. Done here rather than in the asm so the shim
+    // stays a few moves and a jump.
+    g_battleUseScale = g_tune.battleCloudScale;
+    g_battleAddX     = g_tune.battleCloudDX;
+    g_battleAddY     = g_tune.battleCloudDY;
+
     // Say when the shim actually fires. Without this there was no way to tell
     // "the swap never ran" from "it ran and drew something invisible" -- and a
     // playtest reported no cloud with nothing in the log either way, which is
@@ -1334,8 +1395,17 @@ inline void UpdateBattleWeather(bool worldLive)
     static LONG s_reported = 0;
     if (g_battleSwaps != s_reported) {
         s_reported = g_battleSwaps;
-        Log("storms: battle cloud swapped to the storm prefab (%ld so far) -- "
-            "intensity now %d", g_battleSwaps, *(const int*)0x0085A0F8);
+        // Every FRAME, so report the first and then stay quiet -- 842 lines in
+        // twenty seconds is not a diagnostic, it is a denial of service on the
+        // log. What matters is the arguments, once.
+        static bool s_said = false;
+        if (!s_said) {
+            s_said = true;
+            Log("storms: battle cloud IS being drawn -- the game asks for "
+                "pos (%d, %d) scale %d; we draw the storm prefab at scale %d",
+                g_battleSeenX, g_battleSeenY, g_battleSeenScale,
+                g_battleUseScale ? g_battleUseScale : g_battleSeenScale);
+        }
     }
 }
 
