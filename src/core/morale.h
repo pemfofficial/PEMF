@@ -149,3 +149,46 @@ inline void Sweep()
 }
 
 } // namespace morale
+
+// ---------------------------------------------------------------- careerstats
+// What the game already keeps about a career.
+//
+// FUN_00453A20 -- the end-of-career / Hall of Champions screen -- reads a run of
+// globals at a regular stride of 0x1C starting at 0x00861FF8, and 0x861FF8 is
+// already known independently: it is the "gold plundered" total that loot.h
+// watches, and it rises exactly when the player earns plunder.
+//
+// The labels that screen draws are, in the order they appear in the data:
+// Unique Items, Treasures Found, Promotions Earned, Towns Ransacked, Ships
+// Captured, Gold Plundered -- plus Romances, Rank and Career Entered elsewhere.
+//
+// ⚠️ THE INDEX-TO-LABEL MAPPING IS NOT ESTABLISHED. The stride and the base are
+// read from the disassembly; which slot holds which statistic is not, and
+// guessing would be exactly the kind of inference this project keeps having to
+// undo. This probe prints them so they can be compared against the game's own
+// screen, and the mapping written down once it is a reading rather than a hope.
+namespace careerstats {
+
+constexpr uintptr_t kBase   = 0x00861FF8;
+constexpr int       kStride = 0x1C;
+constexpr int       kCount  = 10;
+
+inline int Slot(int i)
+{
+    __try { return *(const int*)(kBase + (uintptr_t)i * kStride); }
+    __except (EXCEPTION_EXECUTE_HANDLER) { return -1; }
+}
+
+inline void Dump()
+{
+    Log("careerstats: base 0x%08X stride 0x%02X -- compare these against the "
+        "game's own stats screen and record which is which",
+        (unsigned)kBase, kStride);
+    for (int i = 0; i < kCount; ++i)
+        Log("careerstats:   [%d] 0x%08X = %d", i,
+            (unsigned)(kBase + (uintptr_t)i * kStride), Slot(i));
+    Log("careerstats: slot 0 is gold plundered -- established, loot.h watches "
+        "it. The rest are candidates.");
+}
+
+} // namespace careerstats

@@ -2134,8 +2134,9 @@ static DWORD WINAPI Hook_timeGetTime(void)
     bool kY = mods && (GetAsyncKeyState('Y') & 0x8000);
     bool kM = mods && (GetAsyncKeyState('M') & 0x8000);   // morale probe
     bool kB = mods && (GetAsyncKeyState('B') & 0x8000);   // morale sweep
+    bool kV = mods && (GetAsyncKeyState('V') & 0x8000);   // career stats
     bool down = k1 || k2 || k3 || k4 || k5 || k6 || k7 || k8 || k9 || k0 ||
-                kN || kH || kJ || kK || kL || kO || kU || kP || kY || kM || kB;
+                kN || kH || kJ || kK || kL || kO || kU || kP || kY || kM || kB || kV;
 
     bool rising = down && !g_prevKeyDown;
     g_prevKeyDown = down;
@@ -2149,7 +2150,7 @@ static DWORD WINAPI Hook_timeGetTime(void)
     // one file away, which is what makes a player's bug report useful.
     const bool devKey = k1 || k2 || k3 || k4 || k5 || k6 || k7 || kN ||
                         kH || kJ || kK || kL || kO || kU || kP || kY ||
-                        kM || kB;
+                        kM || kB || kV;
     if (devKey && !g_devTools) {
         static bool told = false;
         if (!told) {
@@ -2178,6 +2179,11 @@ static DWORD WINAPI Hook_timeGetTime(void)
     // it can actually move morale. This is the measurement the extended-morale
     // design is waiting on. The byte is restored afterwards, fault path
     // included.
+    if (kV) {
+        careerstats::Dump();
+        content::PostDebugNotice("Career stats written to pemf.log.", 6);
+        return r;
+    }
     if (kB) {
         morale::Sweep();
         content::PostDebugNotice("Morale sweep written to pemf.log.", 6);

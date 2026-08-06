@@ -219,9 +219,39 @@ inline bool Load(Track& t, const char* path)
 }
 
 // ------------------------------------------------------------------ voice
+// ⚠️ `t.playing` IS OUR BELIEF, NOT THE VOICE'S STATE, and the two can part
+// company. XAudio2 stops a source voice on its own when it runs out of queued
+// buffers -- and once that happens while our flag still says "playing",
+// everything downstream is wrong: the caller never restarts it because it
+// thinks it is already running, and a stop it never issued is never issued.
+//
+// Reported from play as "the drums start, fade out once, and never come back
+// even in a new storm", which is exactly the shape of that disagreement.
+//
+// So ask the voice. This reconciles the flag with reality and is the only thing
+// callers should test.
+inline bool Playing(Track& t)
+{
+    if (!t.playing) return false;
+    if (!t.voice)   { t.playing = false; return false; }
+
+    XAUDIO2_VOICE_STATE st = {};
+    t.voice->GetState(&st);
+    if (st.BuffersQueued == 0) {
+        // It ran dry. Our flag was stale; say so once and correct it.
+        Log("audiomix: the voice ran out of buffers -- clearing a stale "
+            "playing flag so it can start again");
+        t.playing = false;
+        return false;
+    }
+    return true;
+}
+
 inline bool Play(Track& t)
 {
-    if (t.playing || !t.pcm || !g_ready) return t.playing;
+    // Playing() rather than t.playing: a stale flag would make this a no-op
+    // for the rest of the session.
+    if (Playing(t) || !t.pcm || !g_ready) return t.playing;
 
     if (!t.voice) {
         const HRESULT hr = g_xa->CreateSourceVoice(&t.voice, &t.fmt);
@@ -248,7 +278,8 @@ inline bool Play(Track& t)
 
 inline void Stop(Track& t)
 {
-    if (!t.playing || !t.voice) return;
+    if (!t.voice) return;
+    if (!t.playing) return;
     t.voice->Stop(0);
     t.voice->FlushSourceBuffers();
     t.playing = false;

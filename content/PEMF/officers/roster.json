@@ -28,18 +28,85 @@
     "Write the text so a player knows what it DOES. 'He counts a prize twice'",
     "is flavour; the number after it is the promise."
   ],
-
   "names": [
-    "Abel Hawkins", "Amos Quill", "Bartholomew Creed", "Caleb Rook",
-    "Cyrus Vane", "Diego Herrera", "Edmund Slade", "Elias Marsh",
-    "Ezekiel Crow", "Gideon Pike", "Hugh Tarrant", "Ignatius Bell",
-    "Jasper Wrenn", "Jonas Ketch", "Josiah Flint", "Lazarus Boyd",
-    "Lucien Marchand", "Malachi Doone", "Mathias Storr", "Nathaniel Frost",
-    "Obadiah Gale", "Percival Dunn", "Rafael Ortiz", "Reuben Stark",
-    "Samuel Thresher", "Silas Bream", "Simon Ashgrove", "Thaddeus Vaughn",
-    "Tobias Lark", "Uriah Penn", "Willem de Vries", "Zachariah Coates"
+    "Abel Hawkins",
+    "Amos Quill",
+    "Bartholomew Creed",
+    "Caleb Rook",
+    "Cyrus Vane",
+    "Diego Herrera",
+    "Edmund Slade",
+    "Elias Marsh",
+    "Ezekiel Crow",
+    "Gideon Pike",
+    "Hugh Tarrant",
+    "Ignatius Bell",
+    "Jasper Wrenn",
+    "Jonas Ketch",
+    "Josiah Flint",
+    "Lazarus Boyd",
+    "Lucien Marchand",
+    "Malachi Doone",
+    "Mathias Storr",
+    "Nathaniel Frost",
+    "Obadiah Gale",
+    "Percival Dunn",
+    "Rafael Ortiz",
+    "Reuben Stark",
+    "Samuel Thresher",
+    "Silas Bream",
+    "Simon Ashgrove",
+    "Thaddeus Vaughn",
+    "Tobias Lark",
+    "Uriah Penn",
+    "Willem de Vries",
+    "Zachariah Coates",
+    "Ambrose Teale",
+    "Barnaby Finch",
+    "Cassian Roe",
+    "Cornelius Vane",
+    "Dermot Kane",
+    "Ephraim Sole",
+    "Fergus Doyle",
+    "Garrett Mow",
+    "Hector Salas",
+    "Isaac Bell",
+    "Jeremiah Todd",
+    "Kit Harrow",
+    "Leon Bosch",
+    "Martin Aubry",
+    "Nicolas Faure",
+    "Oswald Crane",
+    "Pieter Kloos",
+    "Quentin Rale",
+    "Roderick Shaw",
+    "Sebastian Cruz",
+    "Terrence Wilde",
+    "Ulric Manns",
+    "Vincent Barre",
+    "Walter Ashby",
+    "Xavier Mendez",
+    "Anders Holm",
+    "Bram Visser",
+    "Duarte Pinto",
+    "Emile Chastain",
+    "Felix Ravel",
+    "Gaspar Nunes",
+    "Halvard Ness",
+    "Ivo Bakker",
+    "Joaquin Salvo",
+    "Klaas Meijer",
+    "Lorcan Byrne",
+    "Mateo Aguilar",
+    "Niall Feeny",
+    "Osmund Rye",
+    "Pascal Nadeau",
+    "Rutger Damme",
+    "Solomon Pike",
+    "Tycho Reyn",
+    "Urban Sacks",
+    "Valentin Pace"
   ],
-
   "bios": [
     "Sailed nine years under a captain he will not name, and does not care to be asked.",
     "Lost a brother off Campeche and has been looking for the ship that did it ever since.",
@@ -55,9 +122,23 @@
     "Was quartermaster on a ship that voted itself to pieces, and learned from it.",
     "Deserted a plantation and would rather hang than see one again.",
     "Can read a sky better than most men read a chart.",
-    "Owes money in four ports and remembers exactly which four."
+    "Owes money in four ports and remembers exactly which four.",
+    "Turned down a boatswain's berth on a King's ship and has never once regretted it.",
+    "Reads the wind by the feel of it on his neck and has yet to be wrong.",
+    "Was three days on a spar after the Isabella went down, and does not discuss it.",
+    "Keeps a ledger of every man who ever cheated him. It is not a short ledger.",
+    "Buried his share twice and dug it up twice, both times in a hurry.",
+    "Speaks four languages badly and swears in all of them fluently.",
+    "Once talked a Spanish captain out of a fight and into a trade, and got the better of it.",
+    "Has a wife in Bridgetown who believes he is a customs clerk.",
+    "Sailed with Morgan, or says he did, and nobody has found him out yet.",
+    "Will not sail on a Friday and will not say why.",
+    "Was a ship's boy on the vessel that took the Cadiz plate fleet.",
+    "Came aboard with nothing but a sea chest and a very good knife.",
+    "Can splice, caulk, cook and cut a man's leg off, in roughly that order of skill.",
+    "Has been marooned twice and rescued twice, by different crews.",
+    "Every port has a story about him and no two of them agree."
   ],
-
   "skills": [
     {
       "id": "sharp_eye",
@@ -143,7 +224,6 @@
       "target": "surgeon",
       "value": 15
     },
-
     {
       "id": "flaw_drinker",
       "name": "FLAW: Drinks",
@@ -185,57 +265,234 @@
       "text": "The hands work slower when he is watching, and stop when he is not",
       "target": "morale",
       "value": -5
+    },
+    {
+      "id": "quick_count",
+      "name": "Quick With a Count",
+      "text": "Tallies a hold in half the time and misses nothing",
+      "target": "loot",
+      "value": 8
+    },
+    {
+      "id": "knows_a_buyer",
+      "name": "Knows a Buyer",
+      "text": "Always has somebody ashore who will take the cargo quietly",
+      "target": "loot",
+      "value": 12
+    },
+    {
+      "id": "keeps_order",
+      "name": "Keeps Order",
+      "text": "Settles a quarrel before it becomes a grievance",
+      "target": "morale",
+      "value": 6
+    },
+    {
+      "id": "shares_the_watch",
+      "name": "Shares the Watch",
+      "text": "Stands his turn with the hands instead of above them",
+      "target": "morale",
+      "value": 3
+    },
+    {
+      "id": "dry_hold",
+      "name": "Keeps a Dry Hold",
+      "text": "Finds the leak before the cargo does",
+      "target": "cargoGuard",
+      "value": 20
+    },
+    {
+      "id": "forged_hand",
+      "name": "A Forger's Hand",
+      "text": "Papers, seals and manifests, all convincing enough to pass",
+      "target": "discretion",
+      "value": 22
+    },
+    {
+      "id": "cold_nerve",
+      "name": "Cold Nerve Ashore",
+      "text": "Answers a harbourmaster's questions without blinking once",
+      "target": "discretion",
+      "value": 15
+    },
+    {
+      "id": "clean_hands",
+      "name": "Clean Hands",
+      "text": "Boils his instruments, which the men mock until they need him",
+      "target": "surgeon",
+      "value": 20
+    },
+    {
+      "id": "flaw_gambler",
+      "name": "FLAW: Gambles",
+      "text": "Loses his share, then borrows against yours",
+      "target": "loot",
+      "value": -7
+    },
+    {
+      "id": "flaw_bully",
+      "name": "FLAW: A Bully",
+      "text": "Gets the work done and leaves the crew hating the doing of it",
+      "target": "morale",
+      "value": -6
+    },
+    {
+      "id": "flaw_superstitious",
+      "name": "FLAW: Superstitious",
+      "text": "Will not work in a blow until he has said the right words",
+      "target": "cargoGuard",
+      "value": -15
+    },
+    {
+      "id": "flaw_boastful",
+      "name": "FLAW: Boastful in Drink",
+      "text": "Names the ship, the captain and the cargo before the second cup",
+      "target": "discretion",
+      "value": -30
+    },
+    {
+      "id": "flaw_shaky",
+      "name": "FLAW: A Shaking Hand",
+      "text": "Steady enough sober, and he is not often sober",
+      "target": "surgeon",
+      "value": -15
     }
   ],
-
   "roles": [
     {
       "id": "quartermaster",
       "name": "Quartermaster",
       "blurb": "a fairer share, and a crew that knows it",
-      "skills": [ "fair_share", "sharp_eye", "well_liked", "hard_bargain" ],
-      "flaws":  [ "flaw_light_fingers", "flaw_drinker", "flaw_hated" ]
+      "skills": [
+        "fair_share",
+        "sharp_eye",
+        "well_liked",
+        "hard_bargain",
+        "quick_count",
+        "knows_a_buyer",
+        "keeps_order"
+      ],
+      "flaws": [
+        "flaw_light_fingers",
+        "flaw_drinker",
+        "flaw_hated",
+        "flaw_gambler",
+        "flaw_bully"
+      ]
     },
     {
       "id": "sailing_master",
       "name": "Sailing Master",
       "blurb": "she weathers a blow better",
-      "skills": [ "old_salt", "ready_pumps", "well_liked" ],
-      "flaws":  [ "flaw_drinker", "flaw_careless" ]
+      "skills": [
+        "old_salt",
+        "ready_pumps",
+        "well_liked",
+        "dry_hold",
+        "shares_the_watch",
+        "cold_nerve"
+      ],
+      "flaws": [
+        "flaw_drinker",
+        "flaw_careless",
+        "flaw_superstitious"
+      ]
     },
     {
       "id": "bosun",
       "name": "Bosun",
       "blurb": "the hands work faster and grumble less",
-      "skills": [ "well_liked", "old_salt", "well_stowed" ],
-      "flaws":  [ "flaw_hated", "flaw_drinker", "flaw_careless" ]
+      "skills": [
+        "well_liked",
+        "old_salt",
+        "well_stowed",
+        "keeps_order",
+        "shares_the_watch",
+        "dry_hold"
+      ],
+      "flaws": [
+        "flaw_hated",
+        "flaw_drinker",
+        "flaw_careless",
+        "flaw_bully"
+      ]
     },
     {
       "id": "master_gunner",
       "name": "Master Gunner",
       "blurb": "the broadsides tell, and the prizes are richer",
-      "skills": [ "prize_master", "sharp_eye", "old_salt" ],
-      "flaws":  [ "flaw_light_fingers", "flaw_drinker" ]
+      "skills": [
+        "prize_master",
+        "sharp_eye",
+        "old_salt",
+        "quick_count",
+        "cold_nerve"
+      ],
+      "flaws": [
+        "flaw_light_fingers",
+        "flaw_drinker",
+        "flaw_gambler"
+      ]
     },
     {
       "id": "carpenter",
       "name": "Carpenter",
       "blurb": "less goes over the side in heavy weather",
-      "skills": [ "well_stowed", "ready_pumps", "hard_bargain" ],
-      "flaws":  [ "flaw_careless", "flaw_drinker" ]
+      "skills": [
+        "well_stowed",
+        "ready_pumps",
+        "hard_bargain",
+        "dry_hold",
+        "shares_the_watch"
+      ],
+      "flaws": [
+        "flaw_careless",
+        "flaw_drinker",
+        "flaw_superstitious"
+      ]
     },
     {
       "id": "surgeon",
       "name": "Surgeon",
       "blurb": "fewer die of their wounds",
-      "skills": [ "steady_hand", "ships_physic", "well_liked" ],
-      "flaws":  [ "flaw_butcher", "flaw_drinker" ]
+      "skills": [
+        "steady_hand",
+        "ships_physic",
+        "well_liked",
+        "clean_hands",
+        "keeps_order"
+      ],
+      "flaws": [
+        "flaw_butcher",
+        "flaw_drinker",
+        "flaw_shaky"
+      ]
     }
   ],
-
   "tiers": [
-    { "id": "novice",     "name": "Novice",     "skills": 1, "cost": 200,  "chance": 70, "flawChance": 45 },
-    { "id": "journeyman", "name": "Journeyman", "skills": 2, "cost": 500,  "chance": 45, "flawChance": 25 },
-    { "id": "master",     "name": "Master",     "skills": 3, "cost": 1200, "chance": 25, "flawChance": 10 }
+    {
+      "id": "novice",
+      "name": "Novice",
+      "skills": 1,
+      "cost": 200,
+      "chance": 70,
+      "flawChance": 45
+    },
+    {
+      "id": "journeyman",
+      "name": "Journeyman",
+      "skills": 2,
+      "cost": 500,
+      "chance": 45,
+      "flawChance": 25
+    },
+    {
+      "id": "master",
+      "name": "Master",
+      "skills": 3,
+      "cost": 1200,
+      "chance": 25,
+      "flawChance": 10
+    }
   ]
 }

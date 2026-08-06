@@ -153,7 +153,8 @@ inline void Tick(int intensity, bool sailing)
                          (int)(now - s_sailingSince) >= g_tune.settleMs;
 
     const bool want = settled && intensity >= g_tune.startAt;
-    const bool keep = sailing && intensity >= g_tune.stopAt && g_track.playing;
+    const bool keep = sailing && intensity >= g_tune.stopAt &&
+                      audiomix::Playing(g_track);
     const int target = (want || keep) ? Clamp(g_tune.volume, 0, 1000) : 0;
 
     // Say what is being seen, until the music has actually started once. Two
@@ -218,7 +219,9 @@ inline void Tick(int intensity, bool sailing)
     }
 
     if (g_level > 0) {
-        if (!g_track.playing) {
+        // Playing() and not the raw flag -- see the note in audiomix.h. This is
+        // what makes a second storm start the drums again.
+        if (!audiomix::Playing(g_track)) {
             audiomix::SetLevel(g_track, 0.0f);   // always come UP from silence
             if (audiomix::Play(g_track)) Log("storm audio: in");
         }
@@ -226,17 +229,23 @@ inline void Tick(int intensity, bool sailing)
         // Duck once we are past the toe of the fade, so the ship's theme goes
         // out as ours comes in rather than both being audible at full tilt.
         if (g_tune.duckGameMusic && g_level > 40) duck::Set(true);
-    } else if (g_track.playing) {
+    } else if (audiomix::Playing(g_track)) {
         audiomix::Stop(g_track);
         duck::Set(false);
         Log("storm audio: out");
+    } else if (g_track.playing) {
+        // The flag said yes and the voice said no. Tidy up the rest of the
+        // state anyway, or the music stays ducked with nothing playing.
+        g_track.playing = false;
+        duck::Set(false);
     }
 }
 
 // Career change, or leaving the sailing view for good.
 inline void Silence()
 {
-    if (g_track.playing) audiomix::Stop(g_track);
+    if (audiomix::Playing(g_track)) audiomix::Stop(g_track);
+    g_track.playing = false;
     duck::Set(false);          // never leave the game silent
     g_level = 0;
 }
