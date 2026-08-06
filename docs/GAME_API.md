@@ -2727,7 +2727,7 @@ Why this is the right shape here:
 
 ---
 
-## Weather during a ship battle — a lead
+## Weather during a ship battle
 
 Asked: can a battle keep the weather it started in?
 
@@ -2738,31 +2738,60 @@ come out into the same weather you went in with. That was also the real cause of
 "the storm music never comes back after a fight": the drums had nothing left to
 play for, because the storm had been retired mid-battle without moving an inch.
 
-**Drawing a cloud INSIDE the battle scene is unproven.** What is known:
+### ✅ The battle already draws a cloud
 
-- PEMF draws storms by redirecting `call FUN_004BBC80` at `0x0046377A`, which is
-  in the **overworld** draw. That call site does not run in a battle.
-- `FUN_004BBC80` itself has **many** callers, several in `0x484xxx`–`0x487xxx`.
-  The capture and surrender handler is `FUN_00478730`, so that region is battle
-  code, and it looks as though **the battle scene draws prefabs through the same
-  routine**.
+Settled by cross-referencing the two prefabs rather than guessing:
 
-If that holds, the mechanism PEMF already uses would transfer: redirect one of
-those calls and draw the storm prefab (`0x008CCB58`) with a fixed position, so
-the cloud sits overhead and does not drift.
+| Prefab | Referenced from |
+|---|---|
+| **Storm** `0x008CCB58` | `0x0042A0CC` (registration) · `0x00463775` (**overworld only**) |
+| **Fair cloud** `0x008CC498` | `0x0042A0CC` (registration) · `0x00463964` (overworld) · **`0x0047B3CB` in `FUN_0047A040`** |
 
-**What has to be established first**, none of it yet done:
+`FUN_0047A040` is the battle function — it is the one carrying the in-battle
+`+50` loot pickup at `0x0047EBE2`. So **the battle scene already draws the
+fair-weather cloud**, which answers all three of the open questions at once: the
+prefab system works there, the camera does show clouds, and there is a call site
+to work with.
 
-1. Which of those callers is actually the battle render.
-2. Whether the storm prefab is alive in the battle scene at all — a prefab keeps
-   its instances on a list at `+0x10`, and a scene that never registered it has
-   nothing to draw from.
-3. Whether the battle camera would even show it. The battle view sits low and
-   close; a cloud at overworld scale and altitude may be entirely off screen.
+The storm prefab is only ever drawn from the overworld. It is registered
+globally, though, at the same place the fair cloud is.
 
-⚠️ Worth remembering `FUN_004BBC80` must never be skipped once entered — the
-instance pool leaks and every cloud in the game disappears permanently. Any
-experiment here inherits that.
+### The call site
+
+```
+0047B3BF  XOR  EDI, EDI
+0047B3C1  PUSH EDI                 ; 0
+0047B3C2  PUSH -1
+0047B3C4  PUSH EDI                 ; 0
+0047B3C5  PUSH EDI                 ; 0
+0047B3C6  PUSH EDI                 ; 0
+0047B3C7  PUSH 0x64                ; scale -- 100
+0047B3C9  PUSH EAX                 ; position
+0047B3CA  PUSH ECX                 ; position
+0047B3CB  PUSH 0x008CC498          ; THE PREFAB, as a stack argument
+0047B3D0  MOV  EDX, 0x3E8          ; 1000
+0047B3D5  CALL 0x004BBC10
+```
+
+Two things make this straightforward. The prefab arrives as a **pushed
+argument** rather than in `ecx` as it does on the overworld, so which cloud is
+drawn is one value on the stack. And `FUN_004BBC10` is a wrapper that calls
+`FUN_004BBC80` — the same routine PEMF already redirects for the storm cluster.
+
+**So the technique transfers directly.** Redirect the `CALL` at `0x0047B3D5`,
+and the shim decides which prefab to pass: the storm when the battle began in
+weather, the fair cloud otherwise. A static patch of the immediate would be
+simpler and is the wrong choice — it would put a storm over every battle,
+including the ones fought in clear sky.
+
+⚠️ `FUN_004BBC80` must never be skipped once entered — the instance pool leaks
+and every cloud in the game disappears permanently. A redirect that decides
+*which* prefab, and always calls through, does not have that problem; one that
+sometimes returns early does.
+
+**Not yet built.** The remaining unknown is whether the storm prefab has
+instances available in the battle scene — it is registered globally and the pool
+allocates on demand, so probably, but "probably" is not "measured".
 
 ---
 
