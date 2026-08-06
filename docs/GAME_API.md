@@ -2336,6 +2336,35 @@ corrected:
   settlement type behind the 5/6 remap. That remap remains untested; Indian
   villages and missions are the cases to try.
 
+### The backdrop is a scene, with named cameras
+
+`FUN_004108A0(city)` — the colonial branch of `FUN_00410BF0` — does not load a
+flat image. It builds a scene:
+
+```c
+FUN_004F2600("tm_%c_menu.nif", letters[kind]);        // scene, per nation
+... Tm_%c_settlement.dds  or  Tm_%c_townback_%s.dds   // and its dressing
+FUN_004BAAA0(0, "transparent.tga", ...);
+FUN_004AE5B0("Camera01");                             // a NAMED camera
+FUN_00533D10(0, 1);
+FUN_00412840(1.0f, 100000.0f);                        // near / far
+DAT_00722738 = city;
+DAT_008CA904 = 1;                                     // "a backdrop is up"
+```
+
+Two things worth having:
+
+- **Cameras are selected by name.** `FUN_004AE5B0` takes a string, and the town
+  backdrop asks for `"Camera01"`. If the `.nif` files carry more than one
+  camera, other shots of the same port are a string away. **What cameras exist
+  has not been checked** — that needs reading the `.nif`s out of the archives
+  (`tools/fpk.py`, see [`ASSETS.md`](ASSETS.md)), not the executable.
+- **The backdrop is refcounted and cached.** `FUN_004108A0` returns immediately
+  when `DAT_008CADEC` is already set, and `ShowMessage` releases it on the way
+  out. So a second `ShowMessage` on the same screen rebuilds rather than
+  leaking — which is the answer to whether PEMF re-presenting a menu thrashes
+  it. It does not.
+
 ### Cards with a port behind them
 
 A card presented in a settlement needs that settlement drawn behind it, and
@@ -2398,12 +2427,25 @@ Anything else that presents from inside a game menu will meet the same problem.
 Nothing blocking. Remaining unknowns are cosmetic or belong to the
 implementation:
 
-- **Settled.** `0x00860B74` is the **settlement type**, one byte per settlement
-  in records **`0x20` apart** — read directly at `0x00411CA5`
-  (`MOVSX EAX, byte ptr [EAX + 0x860B74]` / `CMP EAX, 5`) and again by
-  `FUN_00410BF0`. `0x00860B80` is the same record, `+0xC` in. **Type 5 = an
-  Indian village, type 6 = a Jesuit mission**, which is what the town menu's
-  index remap keys on.
+- **`0x00860B74` is the settlement's KIND**, one byte, records **`0x20` apart**
+  — read at `0x00411CA5` and by `FUN_00410BF0`:
+
+  | Value | Meaning |
+  |---|---|
+  | 0–4 | a colonial settlement. The value indexes a five-entry letter table at `0x006F5FFC` used to build `tm_%c_menu.nif`, so **these are the five nations**. |
+  | 5 | Indian village (`native_back.dds`) |
+  | 6 | Jesuit mission (`mission_back.dds`) |
+
+- ⚠️ **`0x00860B80` is a DIFFERENT field, and an earlier note here conflated the
+  two.** It sits in the same record (`+0xC`, addressed as `int[city * 8]`) and
+  has been seen holding **5, 6 and 7** — `FUN_004108A0` tests it against `7` to
+  pick `Tm_%c_settlement.dds`. **It is `0x860B80`, not `0x860B74`, that the town
+  menu's index remap keys on**, so the earlier claim that the remap keys on the
+  village/mission kind is *not established*. Both fields take small integers in
+  overlapping ranges, which is exactly how they came to be confused. Treat the
+  meaning of `0x860B80` as open.
+- `0x00860B7C` (`int[city * 8]`) is divided by `0x32` to choose between two
+  suffixes for `Tm_%c_townback_%s.dds`, so it is a population or size figure.
 - The five option sites at `0x00411677`, `0x004116AE`, `0x004116C3`,
   `0x00411729`, `0x004117A0` (strings `0x006F5D78`, `0x6F5CE8`, `0x6F5CD0`,
   `0x6F5CB4`, `0x6F5CA0`) are other menu variants — pirate haven and the
