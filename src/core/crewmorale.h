@@ -40,6 +40,7 @@
 // which were zero in the test and may not always be.
 #pragma once
 #include <windows.h>
+#include <string.h>
 
 #include "log.h"
 #include "game.h"
@@ -69,13 +70,16 @@ inline signed char& Byte() { return *(signed char*)game::addr::MoraleByte; }
 // threshold is the LOWEST value that earns the name.
 struct Tier { int at; const char* name; };
 
+// ⚠️ ZERO MUST BE THE NEUTRAL TIER. A fresh career starts at 0, and the first
+// version put STEADY at +5, so every new captain was told his crew were UNEASY
+// before anything had happened to them. The neutral band straddles zero.
 inline const Tier kTiers[] = {
     { -100, "MUTINOUS"  },
-    {  -60, "SEETHING"  },
-    {  -35, "SULLEN"    },
-    {  -15, "UNEASY"    },
-    {    5, "STEADY"    },
-    {   30, "WILLING"   },
+    {  -70, "SEETHING"  },
+    {  -45, "SULLEN"    },
+    {  -20, "UNEASY"    },
+    {   -8, "STEADY"    },   // <- 0 lands here
+    {   25, "WILLING"   },
     {   60, "DEVOTED"   },
 };
 
@@ -94,11 +98,13 @@ inline const char* Name() { return TierName(g_value); }
 // than that would be a lie about what the player can observe.
 inline int TargetEngineLevel(int v)
 {
-    if (v <= -60) return 0;
-    if (v <= -20) return 1;
-    if (v <=  20) return 2;
-    if (v <=  60) return 3;
-    return 4;
+    // Boundaries follow the tier table above, so the word the player is shown
+    // and the level the engine is driven to never disagree about where they sit.
+    if (v <= -45) return 0;   // SULLEN and worse
+    if (v <= -20) return 1;   // UNEASY
+    if (v <   25) return 2;   // STEADY
+    if (v <   60) return 3;   // WILLING
+    return 4;                 // DEVOTED
 }
 
 // ---------------------------------------------------------------- the solver
@@ -136,16 +142,34 @@ inline int LevelForByte(int b)
 // as little as the target allows.
 inline signed char SolveByte(int want)
 {
-    int bestByte = 0, bestErr = 99;
+    const int cur = (int)Byte();
+    int bestByte = cur, bestErr = 99;
+
+    // Seed with what we are already using, so an equally good answer never
+    // displaces it. See the note on churn below.
+    const int curLvl = LevelForByte(cur);
+    if (curLvl >= 0)
+        bestErr = (curLvl > want) ? (curLvl - want) : (want - curLvl);
 
     for (int b = -128; b <= 127; ++b) {
         const int lvl = LevelForByte(b);
         if (lvl < 0) continue;
         const int err = (lvl > want) ? (lvl - want) : (want - lvl);
-        if (err < bestErr || (err == bestErr && (b < 0 ? -b : b) < (bestByte < 0 ? -bestByte : bestByte))) {
+
+        // STRICTLY better only. An equal answer leaves the byte alone.
+        //
+        // ⚠️ WITHOUT THIS THE HUD ICON FLAPS. The engine's levels are coarse and
+        // the reachable set moves with the player's gold, so the target is
+        // often unreachable and TWO different bytes sit equally far from it --
+        // one above, one below. Re-solving each tick then alternated between
+        // them, and the player watched the morale icon swing between two levels
+        // while PEMF's own number climbed smoothly. Seen in play as
+        // "wants engine level 2, nearest reachable is 3" followed later by
+        // "nearest reachable is 1".
+        if (err < bestErr) {
             bestErr  = err;
             bestByte = b;
-            if (err == 0 && b == 0) break;
+            if (err == 0) break;      // exact; nothing will beat it
         }
     }
     return (signed char)bestByte;
@@ -161,7 +185,9 @@ inline void Clamp()
 // The one way anything changes the crew's temper. Everything -- storms, events,
 // officers, time -- comes through here, so there is a single place to look when
 // morale moved and nobody knows why.
-inline void Nudge(int delta, const char* why)
+// `quiet` suppresses the routine line and keeps the tier-change one --
+// drift happens every fifteen seconds forever and does not need narrating.
+inline void Nudge(int delta, const char* why, bool quiet = false)
 {
     if (delta == 0) return;
     const int before = g_value;
@@ -172,10 +198,12 @@ inline void Nudge(int delta, const char* why)
 
     if (g_value == before) return;
 
-    if (strcmp(wasName, Name()) != 0)
+    const bool tierChanged = strcmp(wasName, Name()) != 0;
+
+    if (tierChanged)
         Log("morale: %d -> %d [%s]  -- the crew are now %s (were %s)",
             before, g_value, why ? why : "?", Name(), wasName);
-    else
+    else if (!quiet)
         Log("morale: %d -> %d [%s]", before, g_value, why ? why : "?");
 }
 
@@ -215,8 +243,8 @@ inline void Tick()
     if (now - g_lastDrift >= kDriftEveryMs) {
         g_lastDrift = now;
         const int rest = RestingPoint();
-        if (g_value < rest)      Nudge(1,  "settling");
-        else if (g_value > rest) Nudge(-1, "settling");
+        if (g_value < rest)      Nudge(1,  "settling", true);
+        else if (g_value > rest) Nudge(-1, "settling", true);
     }
 
     // Push our number into the engine.
@@ -233,7 +261,8 @@ inline void Tick()
                 // and it should not look like a bug when it happens.
                 if (got != want)
                     Log("morale: %s (%d) wants engine level %d, nearest "
-                        "reachable is %d (byte %d)",
+                        "reachable is %d (byte %d) -- the engine's levels are "
+                        "coarser than ours and this is expected",
                         Name(), g_value, want, got, (int)b);
             }
         }

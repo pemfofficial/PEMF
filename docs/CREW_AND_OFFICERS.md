@@ -255,6 +255,28 @@ with the player's gold. It takes the closest level it can actually reach and
 logs when that is not the one asked for, so an expected limitation does not read
 as a bug.
 
+### ⚠️ The two moralities measure different things
+
+Worth stating plainly, because it is a permanent property of the design rather
+than a bug to be fixed. **The engine's morale is pay-per-crew. PEMF's is mood** —
+officers, storms, events, time. They are not the same quantity, so they cannot
+always agree.
+
+Observed in play: at 55 crew and no gold the engine could not be driven to the
+middle of its range at all, so a crew PEMF called STEADY read as level 1. The
+byte has full authority over the *range*, but not over every point in it at
+every wealth.
+
+Two consequences the code handles:
+
+- **The solver keeps the byte it already has when an alternative is only
+  equally good.** Without that, two bytes sitting equidistant either side of an
+  unreachable target alternate on every tick, and the player watches the HUD
+  morale icon flap between two levels while PEMF's own number climbs smoothly.
+  This happened, and hysteresis is the fix.
+- **A mismatch is logged and described as expected**, so nobody debugs it later
+  as a fault.
+
 ---
 
 ## Open questions
