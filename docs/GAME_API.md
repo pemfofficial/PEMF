@@ -2457,6 +2457,113 @@ why the shim must loop rather than return a sentinel.
 
 ---
 
+## Crew morale — how the engine actually models it
+
+> **Confidence: decompiled 2026-08-06 with live Ghidra.** The arithmetic below is
+> read off `FUN_00404810`. What each input *means* is partly inferred and is
+> marked where it is.
+
+### ⚠️ Morale is COMPUTED, not stored
+
+This is the single most important fact for anything built on top of it. There is
+no morale variable to read or raise. `GetMoraleLevel` (`0x00404810`) derives a
+0–4 level every time it is called:
+
+```c
+int GetMoraleLevel(void)
+{
+    int expect = DAT_00869A76 - 4 + DAT_0085A158;
+    expect = expect * expect;                     // squared
+    expect = (expect / 4) - 4 * DAT_00869B27;     // the writable lever
+    if (expect < 1)   expect = 1;
+    if (expect > 999) expect = 999;
+
+    int level = ((DAT_00869AB4 + 500)
+                 / (0x14 + DAT_00869AB0 - ((DAT_00869B34 & 0x80) ? 19 : 0)))
+                / expect;
+
+    if (level < 0) return 0;
+    if (level > 4) level = 4;
+    return level;
+}
+```
+
+Read plainly: **morale is the crew's share measured against what they expect.**
+`0x00869AB4` is the hold's first slot — Gold, i.e. undivided plunder — over a
+crew-sized divisor, divided by an expectation that grows with the square of some
+world term.
+
+| Address | Role | Confidence |
+|---|---|---|
+| `0x00869AB4` | undivided plunder (hold slot 0) | **established** — the hold array is documented above |
+| `0x00869AB0` | the crew-count divisor term | inferred from position and use |
+| `0x00869B27` | **the morale modifier byte** — see below | **established as a lever** |
+| `0x0085A158` | a world term, also read by the town menu's departure path | not established |
+| `0x00869A76` | a world term | not established |
+| `0x00869B34` | flags; bit 7 shifts the divisor by 19 | not established |
+
+### The one lever: `0x00869B27`
+
+It enters as `- 4 * value`, which *lowers* the expectation, which *raises* the
+resulting level. So **writing this byte is how morale is nudged** without
+touching the player's gold or crew. It is a signed byte (`int8`), so the useful
+range is small and it saturates quickly — this is a nudge, not a dial.
+
+Everything else in the formula is either the player's actual wealth and crew, or
+a world term we have not identified. Raising morale by giving the player gold
+would be a lie; raising it through this byte is the honest lever.
+
+### Levels, tiers, and what the engine will render
+
+The engine has **four** morale icons for **five** levels:
+
+```
+0x006FD8D4  moraleIcon_happy.nif
+0x006FD8EC  moraleIcon_content.nif
+0x006FD904  moraleIcon_unhappy.nif
+0x006FD91C  moraleIcon_mutinous.nif
+```
+
+⛔ **The tier NAMES are not in the executable.** Searching the binary for
+`content`, `happy`, `unhappy`, `angry`, `ecstatic` as standalone strings returns
+nothing. They are rendered by the `@HAPPY` token, which resolves out of
+`text.ini` — and `text.ini` is **not** loose-file overridable (see
+[`ASSETS.md`](ASSETS.md); the text system never looks on disk).
+
+Two consequences for anything extending morale:
+
+- **The engine cannot be taught a new tier name.** `@HAPPY` will only ever
+  render the words shipped in the archive, and there is no supported way to add
+  to that list.
+- **So an extended scale must be PEMF's own**, drawn with PEMF's own text. That
+  is not a limitation in practice — PEMF already draws its own cards, notices
+  and menus — but it does mean an extended morale scale is a PEMF concept that
+  happens to *agree* with the engine at the five points the engine knows about,
+  rather than an extension of the engine's own.
+
+### Negative morale
+
+The engine clamps at 0 and will not go below it: `if (level < 0) return 0;`.
+There is no representation for "worse than mutinous" anywhere in the formula or
+the icons. Anything below zero is therefore entirely PEMF's to define, store and
+draw.
+
+### What the engine does with mutinous crews
+
+Real, and worth reusing rather than reinventing:
+
+```
+0x006F5898  "The crew is mutinous after @NUM months of sailing. Roll call
+             reveals that @NUM crewmen have deserted."
+0x006F5900  ... "1 crewman has deserted."
+```
+
+So desertion on long voyages at low morale is already the engine's own
+behaviour, and `0x004125A0` (the mutiny message, already recorded in this file)
+is its presentation.
+
+---
+
 ## Useful Call Sites
 
 Reference points for how the game itself does things.
