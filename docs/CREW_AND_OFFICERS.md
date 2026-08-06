@@ -95,10 +95,13 @@ skill's own reason. These change the real game today.
 **Ring 2 — outcomes PEMF already mediates.** Our events, menus, cargo loss,
 hunters, suspicion. A skill here changes what PEMF does, which is no less real.
 
-**Ring 3 — engine outcomes we intercept.** Loot from combat is the first. Proven
-reachable: `0x0047EBDF` is a fixed `ADD EAX,0x32` loot award, an operand patch of
-exactly the kind `storms.h` ships. **The capture-spoils site is not yet found** —
-see `GAME_API.md`.
+**Ring 3 — engine outcomes we intercept.** Loot is the first, and it is **solved
+without writing any code into the game.** `0x00861FF8` is a running total that
+rises whenever plunder is *earned* and never when it is *spent*, so PEMF samples
+it at the safe point, sees loot of `N` awarded, and adds `(multiplier − 1) × N`
+through the validated layer. That covers every award site at once — combat,
+sacking a town, digging up treasure — with no `.text` write, no DRM risk, and a
+logged reason on every adjustment. Detail in `GAME_API.md`.
 
 ⛔ **Ship stats, player stats and world stats are not mapped.** They are on the
 wish list and not in any ring yet. A skill naming them is **rejected at load with
@@ -175,9 +178,10 @@ is that moment.
 
 ## Order of work
 
-**Phase A — finish the loot hook.** Read the plunder-writing shortlist, find the
-capture award, decide operand patch vs call redirect. Deliverable: a loot
-multiplier PEMF owns, and one verified interception.
+**Phase A — the loot hook. ✅ Researched; the design is settled.** The award site
+is `FUN_004DCF20` at `0x004DD01F`, and the signal to watch is `0x00861FF8`.
+Remaining: build `loot::`, sampling that total at the safe point and applying a
+multiplier PEMF owns.
 
 **Phase B — measure morale.** Log the formula's inputs live and sweep
 `0x869B27` to learn its real authority. A measurement, not a build. Then the

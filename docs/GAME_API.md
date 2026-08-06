@@ -2633,15 +2633,71 @@ kind already shipping in `townmenu.h`. Neither technique is new work.
 (`0x0070851C`) — so surrender and capture resolve in the `0x478xxx` region,
 adjacent to the award site above.
 
-### ⚠️ Still open
+### ✅ The plunder award — found
 
-- **Which site awards the spoils of a captured ship.** That is the one an
-  officer skill would most want to modify, and it is *not* the +50 above. The
-  shortlist is the table; the work is reading them.
-- Whether the award is a single site or several (cargo, gold, and ship value may
-  be awarded separately).
-- Whether the amount is computed before the write, which decides between an
-  operand patch and a call redirect.
+`FUN_004DCF20`, at `0x004DD01F`. Found from the text it eventually shows:
+`"@NUM gold pieces plundered!"` (`0x0070F54C`, displayed by `FUN_004DE1E0`).
+
+```
+004DD01F  MOV EAX,[EDX]              ; the amount being awarded
+004DD021  MOV ECX,[0x00869AB4]       ; current plunder
+004DD027  ADD ECX,EAX
+004DD029  MOV EAX,[0x00861FF8]       ; a running total
+004DD02E  MOV [0x00869AB4],ECX       ; plunder written back
+004DD034  MOV ECX,[EDX]
+004DD036  ADD EAX,ECX
+004DD038  MOV [0x00861FF8],EAX       ; the total updated too
+004DD03D  MOV [EDX],ESI              ; pending amount cleared (ESI = 0)
+```
+
+⚠️ **The amount is read from memory, not an immediate.** So unlike the storm
+scale, this cannot be changed by patching an operand — there is no constant to
+patch. That rules out the technique this section previously assumed would apply.
+
+### 🔑 `0x00861FF8` — plunder EARNED, and nothing else
+
+The better lever, and it needs no code written at all.
+
+`0x00861FF8` is a running total incremented **beside** plunder wherever plunder
+is *awarded* — here, in `FUN_0045D2B0`, and in `FUN_004054A0`, always as the
+same read-add-write pair. Crucially it is **not** touched where plunder is
+*spent*: the payment site at `0x00451910` (`SUB [0x869AB4], EDI`) leaves it
+alone.
+
+So **`0x00861FF8` rises exactly when the player earns loot, and never when they
+spend it.** That is a precise, unambiguous signal for "loot was just awarded",
+and it covers every award site at once rather than one at a time.
+
+### How PEMF should multiply loot
+
+Observe and correct, rather than patch:
+
+1. Sample `0x00861FF8` at the safe point.
+2. When it rises by `N`, loot of `N` was just awarded.
+3. Add `(multiplier − 1) × N` through `state::AddPlunder`, with a reason.
+4. Re-baseline. If it ever *falls*, re-baseline rather than trusting the delta —
+   `FUN_00404220` writes it (`0x0040451C`), plausibly a reset on a new career.
+
+Why this is the right shape here:
+
+- **No `.text` write.** None of the DRM risk, none of the Steam checksum
+  problem, nothing to re-apply after a device reset.
+- **Every award site at once**, including sacking a town and digging up
+  treasure, without finding each one.
+- **Traceable.** The addition goes through the validated layer and is logged
+  with its reason like every other PEMF state change.
+- **It reads well.** The engine's own *"@NUM gold pieces plundered!"* shows the
+  base amount; PEMF's bonus arrives just after, which is exactly how "your
+  quartermaster's eye finds a little more" should feel. The alternative —
+  changing the number in the engine's own message — would require intercepting
+  the amount before it is formatted.
+
+### Still open
+
+- Whether cargo and ship value are awarded separately from gold. `FUN_004DD8F0`
+  and `FUN_004E0700` both read-modify-write plunder nearby and have not been
+  read.
+- What `FUN_00404220` does with `0x00861FF8` (assumed a career reset).
 
 ---
 
