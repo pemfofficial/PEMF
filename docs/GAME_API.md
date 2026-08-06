@@ -2178,25 +2178,63 @@ Our own rows have to be identified by where we put them relative to the game's
 count *at composition time*, and any interception has to happen with the same
 remap applied — or before the remap, on the raw return.
 
-### The dispatch, and what an unrecognised index does
+### The dispatch — and why "out of range" is not a spare slot
 
 ```
 00411999  CMP  ESI, 5
-0041199C  JA   0x00411BF4                  ; out of range -> here
+0041199C  JA   0x00411BF4                  ; anything above 5 -> here
 004119A2  JMP  dword ptr [ESI*4 + 0x4126F4]
 ```
 
 A six-entry jump table at **`0x004126F4`** covers ids `0`–`5`. The comparison is
-**unsigned**, so anything above 5 — and any negative value, `-2` "nothing
-picked" included — lands at **`0x00411BF4`**, a defined destination rather than a
-wild jump.
+**unsigned**, so anything above 5 — and any negative value, the polled form's
+`-2` included — goes to `0x00411BF4`.
 
-That is the good news for safety: **an index the game does not recognise has
-somewhere to go, and does not fall off the end of the table.** It means an
-appended row cannot crash the dispatch on its own.
+⛔ **`0x00411BF4` IS NOT AN ERROR HANDLER, AND LANDING ON IT IS NOT HARMLESS.**
+This was assumed on a first reading and it is wrong. Traced:
+
+- It has **exactly one xref** — the `JA` above. Nothing else reaches it, and it
+  is not a jump-table target.
+- The **last option row the menu composes** (`0x004118A8`) is
+  `" Leave Town\n"` / `" Leave Village\n"` / `" Leave Mission\n"` /
+  `" Leave Pirate Haven\n"` (`0x006F5AEC`, `0x6F5AFC`, `0x6F5B0C`, `0x6F5B1C`),
+  picked by settlement type.
+- `0x00411BF4` is therefore **the departure sequence**: leaving is simply the row
+  whose id is above 5, and the `JA` is how the game routes it — not a bounds
+  check that happens to be safe.
+- That path then offers the tavern recruits:
+  `'Captain, there's a group of @NUM men back at the tavern eager to join our
+  crew.'` (`0x006F5A98`) with `" Let's sign them up.\n No matter, cast off!\n"`
+  (`0x006F5A68`), gated on crew room and a few world checks.
+
+**So an appended row would be read as "leave town".** A PEMF option added after
+the game's own rows takes an id above 5, falls through the `JA`, and the player
+watches themselves walk out of the settlement — a wrong behaviour that is
+visible, plausible-looking, and would be maddening to attribute.
+
+The earlier note in this file said an extra row "cannot crash the dispatch on its
+own". That is still true and is also beside the point: it will not crash, it
+will do something else entirely.
 
 `FUN_00410D30` has two further jump tables: `0x004126BC` (dispatched at
 `0x00411480`) and `0x004126E4` (at `0x0041169D`, deciding which options compose).
+
+### What this means for the hook
+
+PEMF cannot let its own rows reach the dispatch. The index has to be intercepted
+**between `ShowMessage` at `0x0041191E` and the bounds check at `0x00411999`**,
+which is a nine-instruction window that also contains the remap.
+
+The tractable way in is to **redirect the `CALL 0x00410C50` at `0x0041191E`** —
+a single 5-byte call site, the same technique already proven on the storm draw
+at `0x0046377A`. A shim there can compose PEMF's extra rows immediately before
+calling the original, then inspect what the player picked and either handle it
+as ours or hand the game back a value it would have produced itself.
+
+Open: **what the shim should return when the player picked a PEMF row.** It must
+be a value the game treats as "nothing happened, show the menu again" rather than
+any real action, and which of `0`–`5` (or a negative) does that has not been
+established.
 
 ### Where the polled form comes in
 
@@ -2206,16 +2244,18 @@ one. It sits inside a dispatch target, after a float at `0x008CAC44` is set to
 
 ### Still open — answer before writing code
 
-- **What `0x00411BF4` actually does.** It is where every unrecognised index
-  goes, so it is the natural place to intercept a PEMF row — but whether it
-  re-loops the menu, closes it, or something else has **not** been traced.
-  Everything about how we hook this depends on the answer.
-- **What `0x00860B80` and `0x00860B74` are**, and what `5` and `6` mean. They
-  gate both the remap and the form setup, so they are almost certainly a town
-  type or ownership state, but that is an inference and not yet a reading.
-- **Which string each `AddText1` site emits** — needed to know where our rows
-  can be inserted without displacing a game row's meaning.
-- Whether the right hook is before `0x0041191E` (compose) or at the dispatch.
+- **What value the shim returns for a PEMF row** (see above). This is now the
+  one thing genuinely blocking an implementation.
+- **What `0x00860B80` and `0x00860B74` are**, and what `5` and `6` mean. Given
+  the settlement-type strings on the leave row, "settlement type" is now a
+  strong reading rather than a guess — but it is still not a reading, and the
+  remap depends on it.
+- **Which string the other ten `AddText1` sites emit.** Only the last one
+  (`0x004118A8`, the leave row) has been read. Needed before choosing where our
+  rows sit.
+
+**Answered since the first pass:** what `0x00411BF4` does (the departure
+sequence, above), and where to hook (`0x0041191E`, above).
 
 ---
 
