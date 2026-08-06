@@ -92,6 +92,12 @@ target that silently does nothing.
 reputation, nationality, the morale byte. Clamped, career-gated, logged with the
 skill's own reason. These change the real game today.
 
+**The observe-and-correct pattern generalises.** Loot proved it: sample a value
+the engine owns at the safe point, notice it move, and apply PEMF's adjustment
+through `state.h`. Nothing is patched, every award site is covered at once, and
+the change is logged with a reason. **Crew losses are readable the same way**,
+which is what makes a surgeon who saves men a real skill rather than a label.
+
 **Ring 2 — outcomes PEMF already mediates.** Our events, menus, cargo loss,
 hunters, suspicion. A skill here changes what PEMF does, which is no less real.
 
@@ -193,8 +199,25 @@ because `A` and `B` were both zero, so the loop must solve from current inputs
 rather than a baked table. Details in `GAME_API.md`. Remaining: build the wide
 scale, the sidecar field, the tier names and the closed loop.
 
-**Phase C — officers.** Roles, tiers, generation, hiring, the roster, the card.
-Skills land in whichever ring is real by then.
+**Phase C — officers. ✅ BUILT AND PLAYED (2026-08-06).** Six roles, three
+standings, hiring against a roll, an interactive roster where each man has his
+own menu — speak with him, or see what he does for you (rank, tenure, history,
+and each skill with its actual contribution). Content in
+`PEMF\officers\roster.json`.
+
+Two things learned in play and worth keeping:
+
+- ⚠️ **`townmenu` sets the port backdrop for event rows and authored-menu rows,
+  and native-callback rows were missed.** So an event drew against the port and
+  a code-driven row drew against open sea, two rows apart in the same menu. Any
+  new row type must set `game::g_portCardCity` or inherit a branch that does.
+- **Odds are not shown on the tier rows.** Cost is. A captain would know what
+  sending men ashore costs him and would not know his chances; a percentage on
+  the row turns a gamble into arithmetic.
+
+**Still open in Phase C:** officers do not persist — the roster is session-only
+until the sidecar work lands. And a save/reload loses it silently, which is the
+next thing to fix.
 
 ---
 
