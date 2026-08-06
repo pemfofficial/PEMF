@@ -161,7 +161,13 @@ struct Tuning {
     // own intensity and clamps it to 4..20, so 4 is the calm it already gives
     // you and 20 is the hardest the engine will draw. VANILLA behaviour is 0,
     // which leaves whatever the battle chose.
-    int battleIntensity = 18;
+    // ⚠️ DEFAULT 0 -- OFF. Forcing this produced a broken picture rather than a
+    // storm: the rain drew heavy, STATIC, and across only part of the screen.
+    // The battle's rain is built for the 4..20 the battle itself derives, and
+    // driving it to the top of that range from outside is evidently not the
+    // same thing as the battle having chosen it. Kept as a knob for
+    // experimenting; not shipped on until it looks right.
+    int battleIntensity = 0;
 
     int boundFix = 1;
     int boundScalePct = 100;   // MULTIPLIER on the radius the engine computed

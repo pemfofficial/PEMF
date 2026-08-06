@@ -2822,6 +2822,37 @@ it for its own thresholds and the wind uses it too, so a write here is felt
 outside the battle. The battle already overwrites it on entry, which is a point
 in favour, but this wants measuring before it is trusted.
 
+### ⛔ Measured, and it does not work. Turned off.
+
+Driving the intensity up did produce rain — and the wrong rain. It drew
+**heavy, static, and across only part of the screen**, which reads as a broken
+texture rather than weather. Worse than the drizzle it replaced. `storms.ini`
+ships `battleIntensity = 0` and the knob is kept only for experimenting.
+
+Why, as far as it was taken: the rain quads are built in a loop around
+`0x0047BC3C`, indexed off per-instance arrays at `0x008BC468` and `0x008BC474`,
+calling `FUN_004DB210` several times per drop to place each one. The intensity
+scales a term in that placement. So the value is not a simple "how much rain"
+dial — it feeds positioning, and the battle's rain is evidently built for the
+`4..20` the battle derives for itself rather than for a number pushed in from
+outside.
+
+**What would actually be needed**, and none of it is done:
+
+1. What `FUN_004DB210` computes, and which of its results is the animation term.
+   Static rain means something that should advance is not advancing.
+2. What the arrays at `0x008BC468` / `0x008BC474` hold per instance, and how
+   many instances the battle allocates — partial-screen coverage suggests the
+   count or the extent is derived from something the battle set once at entry.
+3. Whether the rain can be re-seeded after the fact at all, or whether intensity
+   is only ever read when the effect is created.
+
+**Recommendation: park the battle-weather VISUALS.** The parts of this that
+work are worth keeping and are unrelated — weather no longer ages while the
+player is off the overworld, so a fight keeps and returns to the storm it began
+in, and a battle is no longer mistaken for the overworld. Those needed no
+graphics work at all.
+
 **Not yet built.** The remaining unknown is whether the storm prefab has
 instances available in the battle scene — it is registered globally and the pool
 allocates on demand, so probably, but "probably" is not "measured".
