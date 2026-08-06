@@ -145,6 +145,19 @@ struct Tuning {
     // Defaults to report-only on purpose. The offsets are derived from the
     // Gamebryo member order rather than read out of this binary, and this file
     // has already spent one round on a layout that looked right and was not.
+    // ---------------------------------------------------- weather in battle
+    // A ship battle draws its own cloud, and it is always the FAIR-weather one
+    // -- so a fight begun in a storm happens under a clear sky. With this on,
+    // the battle gets the storm prefab instead when the player took the fight
+    // in weather.
+    //
+    // 1 = on, 0 = the game's own behaviour.
+    int battleWeather = 1;
+    // How close the system has to be, in map units, for the battle to count as
+    // having been fought in it. The audio uses an intensity threshold; this
+    // uses distance directly because it is a yes/no question asked once.
+    int battleStormDist = 14000;
+
     int boundFix = 1;
     int boundScalePct = 100;   // MULTIPLIER on the radius the engine computed
 
@@ -413,6 +426,101 @@ __declspec(naked) void StormDrawShim()
         pop  ebp
         ret  0x1C
     }
+}
+
+// --------------------------------------------------------- weather in battle
+// A ship battle draws a cloud of its own, and it is ALWAYS the fair-weather
+// one. Found by cross-referencing the two prefabs: the storm (0x008CCB58) is
+// referenced only by its registration and the overworld render, while the fair
+// cloud (0x008CC498) is referenced by both of those AND by 0x0047B3CB inside
+// FUN_0047A040 -- the battle function, the one carrying the in-battle loot
+// pickup. So a fight begun in a storm has always happened under a clear sky.
+//
+// The call site is kinder than the overworld's:
+//
+//     0047B3C7  PUSH 0x64            ; scale
+//     0047B3C9  PUSH EAX             ; position
+//     0047B3CA  PUSH ECX
+//     0047B3CB  PUSH 0x008CC498      ; THE PREFAB, as a stack argument
+//     0047B3D0  MOV  EDX, 0x3E8
+//     0047B3D5  CALL 0x004BBC10      ; a wrapper around FUN_004BBC80
+//
+// The prefab arrives on the STACK rather than in ecx, so which cloud is drawn
+// is one value we can change on the way past.
+//
+// ⛔ REDIRECTED, NOT PATCHED. Rewriting the 0x008CC498 immediate would be two
+// bytes of work and would put a storm over EVERY battle, including the ones
+// fought in clear sky -- which is the opposite of the point. The shim decides
+// per call.
+//
+// ⚠️ And it always calls through. FUN_004BBC80 must never be skipped once
+// entered: the instance pool leaks and every cloud in the game disappears
+// permanently, which cost a release to learn. A shim that only changes an
+// argument cannot make that mistake; one that sometimes returns early can.
+constexpr uintptr_t kBattleCloudCall   = 0x0047B3D5;
+constexpr uintptr_t kBattleCloudTarget = 0x004BBC10;
+constexpr uintptr_t kStormPrefab       = 0x008CCB58;
+
+extern "C" {
+    inline void* g_battleCloudOrig = nullptr;
+    inline int   g_battleWantStorm = 0;   // set from the safe point
+    inline LONG  g_battleSwaps     = 0;
+}
+
+// Naked and a TAIL JUMP, so the arguments, edx, and whatever the callee does
+// about cleaning the stack are all exactly as the game left them. The only
+// difference is one dword.
+__declspec(naked) inline void BattleCloudShim()
+{
+    __asm {
+        pushfd
+        push eax
+
+        mov  eax, dword ptr [g_battleWantStorm]
+        test eax, eax
+        jz   leave_it
+
+        // [esp] = eax, [esp+4] = flags, [esp+8] = return address,
+        // [esp+12] = the prefab argument.
+        mov  dword ptr [esp + 12], 0x008CCB58   // kStormPrefab
+        inc  dword ptr [g_battleSwaps]
+
+    leave_it:
+        pop  eax
+        popfd
+        jmp  dword ptr [g_battleCloudOrig]
+    }
+}
+
+inline bool InstallBattleWeather()
+{
+    if (!g_tune.battleWeather) return false;
+    if (g_battleCloudOrig) return true;
+
+    if (!render::RedirectCall(kBattleCloudCall, (void*)&BattleCloudShim,
+                              &g_battleCloudOrig)) {
+        Log("storms: no call rel32 at 0x%08X -- battles keep the fair sky",
+            (unsigned)kBattleCloudCall);
+        return false;
+    }
+    if ((uintptr_t)g_battleCloudOrig != kBattleCloudTarget) {
+        Log("storms: the battle cloud call at 0x%08X targets 0x%p, expected "
+            "0x%08X -- reverting", (unsigned)kBattleCloudCall,
+            g_battleCloudOrig, (unsigned)kBattleCloudTarget);
+        render::RedirectCall(kBattleCloudCall, g_battleCloudOrig, nullptr);
+        g_battleCloudOrig = nullptr;
+        return false;
+    }
+    Log("storms: battles will now keep the weather they began in");
+    return true;
+}
+
+inline void RestoreBattleWeather()
+{
+    if (!g_battleCloudOrig) return;
+    render::RedirectCall(kBattleCloudCall, g_battleCloudOrig, nullptr);
+    Log("storms: battle weather restored (%ld cloud(s) swapped)", g_battleSwaps);
+    g_battleCloudOrig = nullptr;
 }
 
 // ------------------------------------------------------------- the cull bound
@@ -845,6 +953,8 @@ inline void LoadTuning(const char* gameDir)
         else if (_stricmp(key, "clusterCount")  == 0) { g_tune.clusterCount  = value; ++applied; }
         else if (_stricmp(key, "clusterSpread") == 0) { g_tune.clusterSpread = value; ++applied; }
         else if (_stricmp(key, "clusterScale")  == 0) { g_tune.clusterScale  = value; ++applied; }
+        else if (_stricmp(key, "battleWeather")   == 0) { g_tune.battleWeather   = value; ++applied; }
+        else if (_stricmp(key, "battleStormDist") == 0) { g_tune.battleStormDist = value; ++applied; }
         else if (_stricmp(key, "cargoLoss")       == 0) { g_tune.cargoLossEnabled = value; ++applied; }
         else if (_stricmp(key, "cargoLossRadius") == 0) { g_tune.cargoLossRadius  = value; ++applied; }
         else if (_stricmp(key, "cargoLossIntensity")== 0) { g_tune.cargoLossIntensity = value; ++applied; }
@@ -1017,6 +1127,7 @@ inline void Apply()
         g_clusterSc  = g_tune.stormScale * g_tune.clusterScale / 100;
         if (g_clusterSc < kScaleMin) g_clusterSc = kScaleMin;
         BuildClusterOffsets(g_tune.clusterCount, SpreadForScale());
+        InstallBattleWeather();
         if (render::RedirectCall(kStormCallSite, (void*)&StormDrawShim, &g_stormOrig)) {
             Log("storms: cluster on -- %d extra cloud(s) at spread %d, scale %d "
                 "(%d%% of the storm)", g_clusterN, SpreadForScale(),
@@ -1154,6 +1265,25 @@ inline int OurIntensity()
     return p / (g_sysDist + 4000);
 }
 
+// Was this fight taken in weather? Asked from the safe point rather than from
+// inside the shim, because the shim runs during a draw and this reads the storm
+// system's own state.
+//
+// It works because the weather is FROZEN while the player is off the overworld
+// (see the note on time spent elsewhere above) -- so `g_sysDist` still holds
+// what it held when the fight began. That fix and this feature are the same
+// idea seen twice.
+inline void UpdateBattleWeather()
+{
+    const int want = (g_tune.battleWeather && g_sysUp && g_sysDist >= 0 &&
+                      g_sysDist < g_tune.battleStormDist) ? 1 : 0;
+    if (want != g_battleWantStorm) {
+        g_battleWantStorm = want;
+        Log("storms: a battle fought now would be %s (system %d off)",
+            want ? "IN THE WEATHER" : "under clear sky", g_sysDist);
+    }
+}
+
 inline void TickWeather(bool sailing)
 {
     const int intensity = sailing ? OurIntensity() : -1;
@@ -1234,6 +1364,7 @@ inline void Restore()
 {
     if (g_clusterN > 0 && g_stormOrig) {
         render::RedirectCall(kStormCallSite, g_stormOrig, nullptr);
+        RestoreBattleWeather();
         g_clusterN = 0;
     }
     if (!g_applied) return;
