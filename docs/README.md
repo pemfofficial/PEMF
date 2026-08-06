@@ -18,6 +18,7 @@ The game executable is never modified.
 | **[DEVELOPER.md](DEVELOPER.md)** | Developers | Architecture, build, RE workflow, conventions, roadmap, lessons |
 | **[GAME_API.md](GAME_API.md)** | Developers | Reverse-engineered engine reference: functions, addresses, conventions |
 | **[WINDOWS_SECURITY.md](WINDOWS_SECURITY.md)** | Players | Defender flagged the download, or the game won't start: which one you're looking at, published hashes, and what we've ruled out |
+| **[CREW_AND_OFFICERS.md](CREW_AND_OFFICERS.md)** | Developers | The plan for expanded morale and named officers: what the engine gives us, how our morale reaches the game, and what is still unknown |
 | **[SUSPICION.md](SUSPICION.md)** | Developers | False colours: what raises suspicion, what being unmasked costs, tuning, and the faults playing it exposed |
 | **[ASSETS.md](ASSETS.md)** | Modders | `.FPK` archives, byte-exact round-tripping, and which files the game will read loose from disk (it varies per subsystem — probe, don't assume) |
 | **[WIDESCREEN.md](WIDESCREEN.md)** | Developers | The 16:9 work: why the UI is two fixed 4:3 virtual spaces rather than the real resolution |
