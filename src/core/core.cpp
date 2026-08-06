@@ -500,7 +500,19 @@ static void RunSafePoint()
     // re-entered by the card's own nested loop. They now stand down while an
     // event is in flight (events::Busy), which fixes it at this stage and is the
     // precondition for stage 3 being worth trying at all.
-    if (!render::WantsPresent()) events::Pump();
+    //
+    // ⚠️ AND ONLY WHEN THE OVERWORLD IS ACTUALLY ON SCREEN. A card composites
+    // onto the frame the game last drew, so presenting one while the player is
+    // in a town, a menu or any other screen puts it over a background that was
+    // never rendered -- it comes up on flat colour. events::Suspend() covers
+    // the case where PEMF itself is holding a menu open, but it cannot cover
+    // the moment just after the game's own menu closes and before the overworld
+    // is drawn again, which is exactly where a menu-posted event lands.
+    //
+    // Measured, from a playtest: a row picked in town fired 0.9s later, still
+    // in town, on a blank blue screen. Gating on the same signal the notices
+    // already use fixes it and needs no new machinery.
+    if (!render::WantsPresent() && content::g_worldLive) events::Pump();
 
     // Periodic world sample: confirms what the triggers are seeing, and carries
     // the screen-state candidates we still need to identify.

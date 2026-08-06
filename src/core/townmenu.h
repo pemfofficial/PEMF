@@ -216,6 +216,18 @@ inline int Present(int bg, int flags, int form)
     if (EnabledCount() <= 0)
         return CallOriginal(bg, flags, form);
 
+    // Diagnostics for an unexplained R6025 ("pure virtual function call") seen
+    // minutes after menu use. Nothing here is known to be the cause -- the
+    // point is that the next occurrence should say what shape of menu we were
+    // handed and how many times we re-presented it, because neither is known
+    // today. Cheap: a town menu happens a few times a minute, not per frame.
+    {
+        size_t probe = 0;
+        const int rows = CountOptionLines(snapshot, &probe);
+        Log("townmenu: menu #%ld -- %d game row(s), %u bytes, form %d",
+            g_presents, rows, (unsigned)strlen(snapshot), form);
+    }
+
     const int ourFirst = Compose(snapshot);
     if (ourFirst < 0) {
         // Not a shape we recognise. Put back exactly what the game composed and
@@ -235,8 +247,12 @@ inline int Present(int bg, int flags, int form)
         // Below our block, or above it: the game's own row, untouched. The
         // remap that follows is the game's business and still works, because
         // this is exactly the number it would have seen without us.
-        if (pick < ourFirst || pick >= ourFirst + ourCount)
+        if (pick < ourFirst || pick >= ourFirst + ourCount) {
+            if (guard > 0)
+                Log("townmenu: handing back %d after %d re-present(s)",
+                    pick, guard);
             return pick;
+        }
 
         // One of ours. Find which, counting only enabled rows.
         int want = pick - ourFirst;
@@ -248,7 +264,7 @@ inline int Present(int bg, int flags, int form)
         if (!row) return pick;    // cannot happen; do not invent an index
 
         InterlockedIncrement(&g_picks);
-        Log("townmenu: picked '%s'", row->label);
+        Log("townmenu: picked '%s' (index %d)", row->label, pick);
 
         if (row->fn) {
             row->fn(row->arg);
@@ -258,8 +274,19 @@ inline int Present(int bg, int flags, int form)
             // what keeps this framework stable -- see events.h. The card comes
             // up at the safe point once the player is out of the menu.
             const content::Event* ev = content::Get(row->eventIndex);
-            events::Post([](int idx) { content::Fire(idx); },
-                         row->eventIndex, ev ? ev->id.c_str() : "menu row");
+            const char* name = ev ? ev->id.c_str() : "menu row";
+
+            // The card does not appear until the overworld is back on screen,
+            // so from in here the row looks like it did nothing and gets
+            // clicked again. Playtested exactly that way: two picks a second
+            // apart, two cards, one in town and one after sailing. Asking once
+            // should ask once.
+            if (events::IsQueued(name))
+                Log("townmenu: '%s' is already waiting -- not queued twice",
+                    name);
+            else
+                events::Post([](int idx) { content::Fire(idx); },
+                             row->eventIndex, name);
         }
 
         // Show the menu again. ShowMessage consumed the buffer, so it has to be

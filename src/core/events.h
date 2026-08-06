@@ -96,6 +96,18 @@ inline bool Post(EventFn fn, int arg, const char* name)
 inline bool Busy() { return g_inEvent; }
 inline int  Pending() { return g_count; }
 
+// Is this already waiting to fire? A menu row can be picked repeatedly while
+// its card waits for the overworld to come back, and without this each click
+// queues another copy -- the player sees one card in town and another after
+// they sail, having meant to ask once.
+inline bool IsQueued(const char* name)
+{
+    if (!name) return false;
+    for (int i = 0; i < g_count; ++i)
+        if (strcmp(g_queue[i].name, name) == 0) return true;
+    return g_haveFollowUp && strcmp(g_followUp.name, name) == 0;
+}
+
 // ------------------------------------------------------------------ suspend
 // A menu that runs the game's own nested pump reaches the safe point WITHOUT
 // the world being drawn behind it -- the town menu is the case that found this.
