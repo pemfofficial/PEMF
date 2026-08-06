@@ -2,14 +2,18 @@
 
 *Pirates! Expanded Modding Framework*
 
-A deeper Caribbean. Named officers with their own histories and grudges, a crew
-that has opinions about how you captain them, and a narrative engine that turns
-those opinions into events with real consequences.
+A deeper Caribbean. Today that means **false colours** you can be hunted for,
+**weather** worth steering around, and a narrative engine that turns your
+situation into events with real consequences. In time it means named officers
+with their own histories and grudges, and a crew that has opinions about how you
+captain them.
 
 > **Current state: early development.**
-> The framework is working — custom events render in the game's own style, offer
-> real choices, and change your game state. **Very little content exists yet.**
-> Sections marked *Planned* are design intent, not features you can use today.
+> Three mechanics are real and playable: **False Flag**, **Weather**, and the
+> **event engine** — custom events render in the game's own style, offer real
+> choices, and change your game state. **Very little event content exists yet.**
+> Sections marked *Planned* — officers, crew, mutiny — are design intent, not
+> features you can use today, and nothing in them is built.
 > Everything under [What Works Today](#what-works-today) is real and testable.
 
 ---
@@ -151,6 +155,43 @@ pursue. The file is commented, and reinstalling PEMF will not overwrite one you
 have edited.
 
 If it feels too fast, the three `rise*` values are the ones to lower.
+
+---
+
+## Weather
+
+The Caribbean gets its weather back. Storms are drawn far larger and heavier
+than the game ships them, they **drift across the map** rather than sitting
+still, and they have a sound of their own that comes up as you close on one and
+fades as you leave it behind.
+
+It is on by default. Turn it off with `enabled = 0` in `PEMF\storms.ini`.
+
+### It can cost you
+
+Optionally, sailing inside real weather can put a little cargo over the side.
+This is **off by default** — set `cargoLoss = 1` in `storms.ini` if you want
+storms to be something you avoid rather than something you admire.
+
+Worth being plain about: in the stock game a storm appears to be **purely
+decorative**, as far as we have been able to find. Cargo loss is PEMF's
+addition, not a hidden vanilla rule we switched on.
+
+### Tuning it
+
+Everything is in **`PEMF\storms.ini`**, which is commented throughout. The two
+you will reach for first:
+
+| Setting | What it does |
+|---|---|
+| `stormScale` | How big a storm is drawn. Vanilla is 80; PEMF ships 300. |
+| `stormHeight` | How high it sits. **Raise this when you raise `stormScale`** — a large cloud sitting low swallows the camera and reads as fog. |
+
+Two things the file will stop you doing, both for good reasons: **storms cannot
+fade** (the value that looks like opacity is a timer — an engine limitation, not
+an oversight), and you cannot have **more than three** weather systems at once
+(the game keeps only three slots, and asking for a fourth writes past the end of
+its own array). Your edits survive reinstalling PEMF.
 
 ---
 

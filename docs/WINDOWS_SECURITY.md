@@ -14,17 +14,31 @@ one you're looking at first — the symptoms are not alike.
 Whatever else you do, check the file is the one we published. In PowerShell:
 
 ```powershell
-Get-FileHash .\PEMF-0.2.0.zip -Algorithm SHA256
+Get-FileHash .\PEMF-0.2.3.zip -Algorithm SHA256
 ```
+
+**Every release has its own hashes.** These are **0.2.3**, the current one:
 
 | File | SHA256 |
 |---|---|
-| `PEMF-0.2.0.zip` | `AF66FB5F0581AF8321725C13DC1311C78FBB9756EE69C29E5C78F2E2080AF690` |
-| `pemf_core.dll` | `4997313EA02A4496285A94F82AC17216031CCF7BA7559ED9F97A0625059AE8FE` |
-| `version.dll` | `4A97CF1D1812CF1CEC5C639AB83FB62F2E3AFAF76FD7F284834BAB8208DD8175` |
+| `PEMF-0.2.3.zip` | `1D7B3880B9489F4FB545F7A9384B6CD56AA6DBE5BBCD53BCC5344B5DA8546EC4` |
+| `pemf_core.dll` | `E1A75858F7A37CF728387FC3620D9211E88ECB08697766E788DC2CA7EBFC7E71` |
+| `version.dll` | `FE5687E05AB4B90EFE6FC3FCDAC76E1CEC8EF7F3B98D00687DE69286E1291389` |
 
-If your hash doesn't match one of these, **don't run it** — you didn't get it
-from us. Download again from the
+<details>
+<summary>Older releases</summary>
+
+| Release | File | SHA256 |
+|---|---|---|
+| 0.2.0 | `PEMF-0.2.0.zip` | `AF66FB5F0581AF8321725C13DC1311C78FBB9756EE69C29E5C78F2E2080AF690` |
+| 0.2.0 | `pemf_core.dll` | `4997313EA02A4496285A94F82AC17216031CCF7BA7559ED9F97A0625059AE8FE` |
+| 0.2.0 | `version.dll` | `4A97CF1D1812CF1CEC5C639AB83FB62F2E3AFAF76FD7F284834BAB8208DD8175` |
+
+</details>
+
+If you are on a different release, check its hashes against that release's own
+page rather than this table. If your hash matches nothing we have published,
+**don't run it** — you didn't get it from us. Download again from the
 [releases page](https://github.com/pemfofficial/PEMF/releases).
 
 ## Antivirus false positive

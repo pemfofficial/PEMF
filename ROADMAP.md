@@ -94,21 +94,72 @@ live code inside the game, it can **add** new sounds and play them on cue — ti
 to events, triggers, and game state. As far as we can tell, nobody has done
 event-driven audio here before.
 
+- ✅ **PEMF plays its own audio, and can fade it** — a small mixer of our own
+  (`src/core/audiomix.h`): Media Foundation decodes a file to PCM once, XAudio2
+  loops it with a real gain control. **Shipped and playing** — it is what the
+  storm bed runs on. It mixes *alongside* the game rather than through the
+  game's mixer, so the game's volume slider does not reach it and anything
+  played through it has to be gated on game state by the caller. MCI was tried
+  first and rejected: it reports success for a volume change, reads the value
+  back, and plays at full volume regardless.
 - ✅ **Sound engine mapped** — the game uses Miles Sound System; its whole audio
   import surface and the in-game load/play functions are located.
-- ✅ **Playing a named game sound** — events name a sound and it plays with the
-  card, through the game's own presentation path. Confirmed in-game.
+- 🟡 **The game's own sound path is mapped but never called.** `0x0052F700` is
+  the core play-by-numeric-id routine (four thin wrappers reach it:
+  `0x004A06C0`, `0x004A07C0`, `0x00528E70`, `0x00528EE0`). This was read from
+  decompilation and **has not been run** — PEMF does not call it, and no event
+  names a sound. There is no `sound` field in the event schema yet.
 - ✅ **Positional audio located** — `0x00488A80` plays a sound *at a world
   position*, and it is what the sailing render uses for ship hails. This is the
   entry point for spoken callouts that come from where the thing actually is.
-  (It was misread as a text function for a while; see the note in
+  Located and documented; **not yet called** from PEMF. (It was misread as a
+  text function for a while; see the note in
   [`docs/GAME_API.md`](docs/GAME_API.md).)
-- 📐 **Custom clips added, not just swapped** — drop a new `.wav` in and play it;
-  the game already loads loose `.wav` files by name, which is the groundwork.
-  This is the remaining piece: today we can only play sounds the game ships.
+- 📐 **Custom clips on events** — the decode-and-play half exists and ships; what
+  is missing is a one-shot path (the mixer today drives one looping bed) and a
+  `sound` field in the event/notice JSON to name a clip from content.
 - 📐 **Sound on notices** — pairing a callout with the floating text, so "Land
   ho!" is heard and seen over the ship at once. Both halves now exist; wiring
   them together is next.
+
+## Weather
+
+Shipped in 0.2.1 and refined in 0.2.2. Tunable throughout from
+`PEMF\storms.ini`; the reverse engineering is in `src/core/storms.h`.
+
+- ✅ **Bigger, heavier storms** — how a storm *looks* comes down to three
+  immediates in one stretch of `FUN_004612B0`, so this is operand patching
+  rather than anything clever. Verified at 8.75× scale in game. ⚠️ The storm and
+  the ordinary fair-weather cloud are **different prefabs** (`0x008CCB58` vs
+  `0x008CC498`); the first attempt scaled the wrong one and players correctly
+  reported that the normal clouds had grown while the storms had not.
+- ✅ **Storms that drift** — a storm's *position* is the engine's to own, but the
+  shim owns the **arguments** of the draw, so PEMF draws its own drifting
+  system. Measured, not assumed: they travel **west at ~350 units/sec** with
+  latitude fixed. `param_8` turned out to be a timer rather than an opacity,
+  which is why **storms cannot fade** — that is an engine fact, not a to-do.
+- ✅ **A storm that costs you something** — optional cargo attrition while you
+  are inside real weather (off by default; `cargoLoss` in the ini). The engine's
+  own intensity value decides when you are "in it". Note this is **PEMF's**
+  effect: the engine's own storms are, as far as we have found, purely visual —
+  whether a stock storm does anything to your ship has never been located.
+- ✅ **A storm you can hear** — a music bed with real fades, on PEMF's own mixer,
+  ducking the game's music. See Audio above for why it is our mixer and not the
+  game's.
+- ⛔ **Three weather slots is a hard ceiling.** The loop at `0x0046354A` indexes
+  two parallel position arrays that are **twelve bytes apart** — exactly three
+  dwords. A count of four writes the x array into the y array. This knob looks
+  like "how much weather" and is really "how far past the end of an array shall
+  we go", so it is clamped.
+- 💡 **Weather that changes how the sea behaves** — waves, handling, visibility.
+  Not located, and possibly not there to find.
+
+## Standing
+
+- ✅ **A standing ledger** (`src/core/standing.h`) — reputation treated as an
+  *output* rather than something PEMF stores, so it cannot drift out of step
+  with what the game itself believes. Used by Suspicion to decide which crowns
+  care about a blown disguise.
 
 ## World & map
 
@@ -326,24 +377,31 @@ the published hashes, and the approaches already ruled out.
 
 Rough order, subject to change:
 
-1. **Custom clips** — play a `.wav` we ship, not just a sound the game already
-   has, and name it from an event.
-2. **Callout plus floating text together** — a voice line at the ship's world
-   position paired with the notice above it. Both halves exist now.
-3. **Event cards from inside the frame** (stage 3) — fixes the half-drawn
-   background behind dialogs, which is the one visible rough edge left. The
-   scaffolding exists; the work is that the game's dialog is **modal and
-   blocking**, so presenting it from inside the frame hook re-enters
-   `BeginScene`/`EndScene` from the dialog's own message loop. That needs a
+1. **Event cards from inside the frame** (stage 3). The game's dialog is
+   **modal and blocking**, so presenting it from the frame hook re-enters
+   `BeginScene`/`EndScene` from the dialog's own message loop — that needs a
    re-entrancy guard, not just raising the stage constant.
-4. **Labels on world objects** — the world-text facility takes any map
+   *Note the reason has changed:* this used to be listed as the fix for the
+   half-drawn background behind cards. **That bug is already fixed** — the draw
+   paths lacked an `events::Busy()` guard, and the 250ms overworld gate went
+   stale during a card's nested loop, which was the leak. Stage 3 is now about
+   presenting cards natively, not about repairing a visible artifact.
+2. **Crew, named officers, and relationships** — the headline feature, and the
+   current focus. Data model first. See *Crew & morale* above.
+3. **Labels on world objects** — the world-text facility takes any map
    position, not just the player's ship, so ports, rivals and waypoints can all
    carry our own text.
-5. **Code signing** so the mod loads cleanly on locked-down Windows installs
-   (application submitted, awaiting approval).
-6. **Officer roster** — data model first, then the panel, now that drawing is
-   within reach.
-7. **Version detection** — broaden support beyond GOG and Steam.
+4. **Audio: custom clips and callouts** — a one-shot path on our existing mixer,
+   a `sound` field in the event schema, and a voice line at the ship's position
+   paired with the notice above it. Deliberately parked; the mixer already
+   works, so this is plumbing rather than research whenever we want it.
+5. **Version detection** — broaden support beyond GOG and Steam.
+
+**Code signing is not on this list.** The SignPath Foundation rejected our
+application and paid certificates are out of scope, so PEMF ships unsigned and
+the workarounds in [`docs/WINDOWS_SECURITY.md`](docs/WINDOWS_SECURITY.md) are
+the answer rather than a stopgap. (`build.ps1 -Sign` is kept in case that ever
+changes.)
 
 ---
 

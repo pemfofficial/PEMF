@@ -2044,7 +2044,7 @@ If the manager is not up, the game prints
 | Address | Conv | Role |
 |---|---|---|
 | `0x0052F700` | (custom) | **Core play.** `param_1` = **numeric sound id** (`id*0x40 + 0x008ED4A0` indexes the table), `param_2` = volume (float), `param_3` = pan (`0x3F000000` = 0.5 centre). Loads if needed, applies volume/pan via the manager vtable, starts the sample. |
-| `0x004A06C0`, `0x00528E70` | fastcall | **Game-logic entries.** Thin wrappers: check the manager is initialised, then call `0x0052F700`. |
+| `0x004A06C0`, `0x004A07C0`, `0x00528E70`, `0x00528EE0` | fastcall | **Game-logic entries.** Thin wrappers: check the manager is initialised, then call `0x0052F700`. These are its only callers (confirmed by xref, 2026-08-06). |
 | `0x0052CDC0` | cdecl | **Filename resolver.** `int (char* baseName)` — see below. |
 | `0x0052D6D0` | fastcall | **Sample loader** → `AIL_set_named_sample_file` with a `".wav"` or `".mp3"` format hint. |
 | `0x0052DD30` | thiscall | **Play/stop dispatcher** on the manager. `param_2` = channel (0 = 2D, 1 = 3D, 2/3 = stream), `param_3` = sample index → `AIL_start_sample` / `AIL_start_3D_sample` / `AIL_start_stream`. |

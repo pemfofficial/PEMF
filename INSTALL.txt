@@ -117,6 +117,21 @@ Tuning lives in PEMF\suspicion.ini. It is commented, and a reinstall will not
 overwrite one you have edited.
 
 
+WEATHER
+-------
+
+Storms are drawn far heavier than the game ships them, they drift across the
+map, and they have a sound that comes up as you close on one. This is on by
+default; set enabled = 0 in PEMF\storms.ini to turn it off.
+
+Optionally a storm can cost you a little cargo. That is OFF by default - set
+cargoLoss = 1 if you want weather to be something you avoid.
+
+Tuning lives in PEMF\storms.ini, commented throughout, and a reinstall will not
+overwrite one you have edited. Start with stormScale, and raise stormHeight
+whenever you raise it.
+
+
 REPORTING A PROBLEM
 -------------------
 

@@ -177,7 +177,10 @@ function Copy-Payload([string]$dest) {
     }
     $docs = Join-Path $dest 'PEMF\docs'
     New-Item -ItemType Directory -Force $docs | Out-Null
-    foreach ($d in @('PLAYER_MANUAL.md', 'EVENT_AUTHORING.md')) {
+    # WINDOWS_SECURITY.md ships too: a player whose download was quarantined or
+    # whose game will not start needs it, and pointing them at a web page is no
+    # help when the thing that failed was the download.
+    foreach ($d in @('PLAYER_MANUAL.md', 'EVENT_AUTHORING.md', 'WINDOWS_SECURITY.md')) {
         $src = Join-Path $root "docs\$d"
         if (Test-Path $src) { Copy-Item $src $docs -Force }
     }
@@ -214,4 +217,27 @@ if ($Package) {
     Write-Host "`n  contents:"
     Get-ChildItem $stage -Recurse -File |
         ForEach-Object { "    " + $_.FullName.Substring($stage.Length + 1) }
+
+    # Publish-ready hashes.  docs\WINDOWS_SECURITY.md tells people to check the
+    # download against these, so a release that ships without updating them
+    # hands users numbers that match nothing -- which happened for three
+    # releases running.  Print the table in the form the doc wants, and drop it
+    # next to the zip so it cannot be forgotten between build and publish.
+    $hashRows = @()
+    $hashRows += [pscustomobject]@{ File = "PEMF-$Version.zip"; SHA256 = (Get-FileHash $zip -Algorithm SHA256).Hash }
+    Get-ChildItem $stage -Recurse -File -Filter *.dll | Sort-Object Name | ForEach-Object {
+        $hashRows += [pscustomobject]@{ File = $_.Name; SHA256 = (Get-FileHash $_.FullName -Algorithm SHA256).Hash }
+    }
+
+    $table  = "**Every release has its own hashes.** These are **$Version**:`r`n`r`n"
+    $table += "| File | SHA256 |`r`n|---|---|`r`n"
+    foreach ($r in $hashRows) { $table += "| ``$($r.File)`` | ``$($r.SHA256)`` |`r`n" }
+
+    $hashFile = Join-Path $dist "PEMF-$Version.sha256.md"
+    Set-Content -Path $hashFile -Value $table -Encoding utf8
+
+    Write-Host "`n=== hashes ===" -ForegroundColor Green
+    foreach ($r in $hashRows) { Write-Host ("    {0,-20} {1}" -f $r.File, $r.SHA256) }
+    Write-Host "`n  markdown table written to $hashFile"
+    Write-Host "  PASTE IT INTO docs\WINDOWS_SECURITY.md AND README.md BEFORE PUBLISHING." -ForegroundColor Yellow
 }

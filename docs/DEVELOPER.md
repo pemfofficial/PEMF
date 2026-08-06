@@ -10,7 +10,8 @@ For the reverse-engineered engine functions themselves, see
 ## Architecture
 
 ```
-Pirates!.exe                     stock GOG binary, never modified on disk
+Pirates!.exe                     stock binary, never modified on disk.
+│                                GOG or Steam -- one codebase, one offset map.
 │
 └── version.dll                  proxy loader (ours)
     │  forwards all 17 exports to C:\Windows\System32\version.dll
@@ -19,15 +20,24 @@ Pirates!.exe                     stock GOG binary, never modified on disk
         ├── game.h               raw addresses + calling shims
         ├── state.h              VALIDATED access to live game state
         ├── nations.h            relations, standing, the crown you serve
+        ├── standing.h           the reputation ledger (an output, not storage)
         ├── session.h            career lifecycle, save/load, our persistence
         ├── events.h             deferred dispatch (the queue)
         ├── content.h            JSON event loading + validation
         ├── triggers.h           when events fire (world sampling)
         ├── suspicion.h          false colours, hunters, the panel
+        ├── storms.h             weather: operand patches, drift, cargo loss
+        ├── stormaudio.h         the storm bed and its fades
+        ├── audiomix.h           our own mixer (Media Foundation + XAudio2)
         ├── render.h             the render phase (where things are shown)
         ├── d3d9hook.h           the device vtable hook
+        ├── log.h                the log
         └── core.cpp             hooks and wiring
 ```
+
+`storms.h` is the one place PEMF writes to the game's **code** rather than its
+data, and it does so only from the first safe point — writing earlier races the
+Steam build's DRM checksum and the game refuses to start. See the lessons below.
 
 `nations.h` **only reads**. The relations matrix is the engine's to maintain, and
 a framework that edited it would be rewriting the world rather than reacting to
@@ -379,11 +389,18 @@ whether that trigger was a keypress or a port entry is the caller's business.
 
 ### Next: stage 3 — cards from inside the frame
 
-The one visible rough edge left. Event cards are presented from the safe point,
-before the world has been drawn that frame, so the background behind a card is
-stale or half-drawn.
+Event cards are presented from the safe point, before the world has been drawn
+that frame. Presenting from inside the frame instead is the more native path.
 
-The fix is presenting from inside the frame hook, and the scaffolding exists
+⚠️ **This used to be listed as the fix for the half-drawn card background. That
+bug is already fixed and is no longer a reason to do stage 3.** The cause was
+elsewhere: the draw paths had no `events::Busy()` guard, and the overworld gate
+goes stale on a 250ms timer refreshed from the safe point — which a card's
+nested loop displaces — so for the first quarter-second of every card the gate
+still answered "yes". That window was the leak. See `PemfOnEndScene` in
+`core.cpp`.
+
+The scaffolding for stage 3 exists
 (`PEMF_D3D9_STAGE 3`). **It is not a matter of raising the constant:** the
 game's dialog is modal and blocking, so its own message loop would re-enter
 `BeginScene`/`EndScene` from inside our hook. That needs a re-entrancy guard
@@ -444,12 +461,27 @@ Each of these cost real debugging time. Do not relearn them.
 ## Releasing
 
 ```powershell
-.\build.ps1 -Package -Version 0.2.0
+.\build.ps1 -Package -Version 0.2.4
 ```
 
 Produces `dist\PEMF-<version>.zip` with no wrapping folder, so a player extracts
 it straight into the game directory. Contents: both DLLs, `INSTALL.txt`, the
-events, `suspicion.ini`, `KeyMap_WASD.ini` and the player-facing docs.
+events, `suspicion.ini`, `storms.ini`, `KeyMap_WASD.ini`, `PEMF\audio\` and the
+player-facing docs.
+
+### Release checklist
+
+`-Package` also prints the SHA256 of the zip and both DLLs, and writes the same
+table to `dist\PEMF-<version>.sha256.md`. **Paste it into both places before
+publishing:**
+
+- `README.md` — the download table
+- `docs/WINDOWS_SECURITY.md` — the verify-what-you-downloaded table
+
+This is mechanical and it has been missed before: `WINDOWS_SECURITY.md` shipped
+0.2.0's hashes for three releases running, which is worse than publishing none —
+it tells a player with a good download that they have a bad one. Also check the
+README names the **current** zip; it advertised `0.2.0` for two releases.
 
 **Extract it into a clean folder and check it before linking anyone to it.** The
 packager has silently skipped a missing `INSTALL.txt` for most of this project's

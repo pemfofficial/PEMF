@@ -16,7 +16,10 @@ The game executable is never modified.
 | **[EVENT_AUTHORING.md](EVENT_AUTHORING.md)** | Players & modders | Writing events for `PEMF\events\` — schema, tokens, effects, error messages |
 | **[DEVELOPER.md](DEVELOPER.md)** | Developers | Architecture, build, RE workflow, conventions, roadmap, lessons |
 | **[GAME_API.md](GAME_API.md)** | Developers | Reverse-engineered engine reference: functions, addresses, conventions |
+| **[WINDOWS_SECURITY.md](WINDOWS_SECURITY.md)** | Players | Defender flagged the download, or the game won't start: which one you're looking at, published hashes, and what we've ruled out |
 | **[SUSPICION.md](SUSPICION.md)** | Developers | False colours: what raises suspicion, what being unmasked costs, tuning, and the faults playing it exposed |
+| **[ASSETS.md](ASSETS.md)** | Modders | `.FPK` archives, byte-exact round-tripping, and which files the game will read loose from disk (it varies per subsystem — probe, don't assume) |
+| **[WIDESCREEN.md](WIDESCREEN.md)** | Developers | The 16:9 work: why the UI is two fixed 4:3 virtual spaces rather than the real resolution |
 | **[ARCHITECTURE_REVIEW.md](ARCHITECTURE_REVIEW.md)** | Developers | Nine passes: hazards found, fixed, and the invariants they establish |
 | **[RELEASE_NOTES_0.2.3.md](RELEASE_NOTES_0.2.3.md)** | Everyone | Launch fix: the Steam "Application corrupt." race, and mixed-install detection |
 | **[RELEASE_NOTES_0.2.2.md](RELEASE_NOTES_0.2.2.md)** | Everyone | Fixes: the profile folder that broke WASD on GOG, notice wrapping, storms clearing behind cards |
@@ -36,9 +39,17 @@ The game executable is never modified.
 └── PEMF/
     ├── events/
     │   └── core_events.json
-    ├── suspicion.ini
-    └── docs/
+    ├── audio/
+    │   └── storm.mp3        the storm bed, on PEMF's own mixer
+    ├── KeyMap_WASD.ini
+    ├── suspicion.ini        false colours, hunters, standing
+    ├── storms.ini           everything about weather
+    └── docs/                player manual, event authoring, Windows security
 ```
+
+The two `.ini` files are **never overwritten** by an install if they are already
+there — a player's balance pass survives an update. Everything else is ours and
+is replaced.
 
 **Every `.json` in `PEMF\events\` is loaded.** Add-ons ship their own file and sit
 side by side; a broken one is skipped with a reason rather than taking the others

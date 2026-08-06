@@ -2,8 +2,14 @@
 
 PEMF is a modding framework for **Sid Meier's Pirates! (2004)**. It adds a
 data-driven **narrative event engine** — branching events with real choices and
-consequences, authored as JSON — plus expanded crew and morale systems, on top
-of the original game.
+consequences, authored as JSON — along with **false colours and suspicion**
+(fly another nation's flag and be hunted for it) and **weather** you can see,
+hear, and lose cargo to.
+
+Events can read and change live game values — crew, gold, morale, months at sea
+— and fire on them. **Expanded crew and named officers are the next major
+feature and are not built yet**; see [`ROADMAP.md`](ROADMAP.md), which is honest
+about what does and does not work.
 
 It loads through a `version.dll` proxy and reaches the game through **IAT
 hooks**, which is how everything the framework does is driven. Some features —
