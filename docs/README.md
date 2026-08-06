@@ -45,7 +45,9 @@ The game executable is never modified.
     ├── KeyMap_WASD.ini
     ├── suspicion.ini        false colours, hunters, standing
     ├── storms.ini           everything about weather
-    └── docs/                player manual, event authoring, Windows security
+    ├── plugins/             third-party plugin DLLs go here
+    ├── sdk/                 pemf_sdk.h, so a plugin can be written from the release
+    └── docs/                player manual, event authoring, plugins, security
 ```
 
 The two `.ini` files are **never overwritten** by an install if they are already
@@ -84,6 +86,8 @@ PiratesMod/
 │   │   ├── suspicion.h    false colours, hunters, the panel
 │   │   └── core.cpp       hooks and wiring
 │   └── vendor/            nlohmann/json
+├── sdk/
+│   └── pemf_sdk.h         the plugin ABI -- ships inside the release
 └── re/
     ├── bin/               staged copies of the target binaries
     ├── scripts/           Python RE tooling + Ghidra Java scripts

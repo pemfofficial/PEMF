@@ -294,6 +294,33 @@ Findings in [`re/experiments/flags/`](re/experiments/flags/README.md).
   `bone_flag_*_pivot` and are ordinary named scene nodes, so driving the node
   transform from the frame hook is the plausible route. Unproven.
 
+## The modding surface itself
+
+PEMF is a framework as much as a mod, and this is the part that makes that
+true rather than aspirational.
+
+- ✅ **JSON content engine** — events, notices, triggers, effects, placeholders,
+  all validated at load with the offending field named. Documented in
+  [`docs/EVENT_AUTHORING.md`](docs/EVENT_AUTHORING.md).
+- ✅ **Rows in the game's own town menu** — a mod adds its own option to the
+  port menu, placed above the row that leaves, so every one of the game's own
+  options keeps its position. Limitable to one port or one crown.
+- ✅ **Menus of our own, authored as a tree** — a title, options, and each
+  option opens another menu, fires an event, or ends on a card. Drawn with the
+  engine's own renderer against the port you are standing in.
+- ✅ **A plugin ABI for code mods** — a 32-bit DLL in `PEMF\plugins\` exporting
+  `PemfPluginInit`, handed a table of function pointers. A **C ABI**, so a
+  plugin built with another compiler keeps working and a PEMF rebuild does not
+  break every plugin in the wild. Faults are contained: a plugin that crashes
+  is disabled for the session with its name in the log and the game carries on.
+  One header, `sdk/pemf_sdk.h`, which ships inside the release.
+  See [`docs/PLUGINS.md`](docs/PLUGINS.md).
+- 📐 **Plugin hooks beyond menu rows** — per-frame, on entering a port, on a
+  battle ending. Menu rows are the only entry point today; the ABI is built to
+  grow.
+- 📐 **Plugin persistence** — PEMF's own state travels in a sidecar beside each
+  save; a plugin has nowhere to put anything yet.
+
 ## Crew & morale
 
 - ✅ **Morale model understood** — the game's own crew-happiness math is mapped

@@ -26,6 +26,8 @@ Pirates!.exe                     stock binary, never modified on disk.
         ├── content.h            JSON event loading + validation
         ├── triggers.h           when events fire (world sampling)
         ├── suspicion.h          false colours, hunters, the panel
+        ├── townmenu.h           our rows in the game's menu, and our own menus
+        ├── plugin.h             loading other people's DLLs (the C ABI host)
         ├── storms.h             weather: operand patches, drift, cargo loss
         ├── stormaudio.h         the storm bed and its fades
         ├── audiomix.h           our own mixer (Media Foundation + XAudio2)
@@ -34,6 +36,12 @@ Pirates!.exe                     stock binary, never modified on disk.
         ├── log.h                the log
         └── core.cpp             hooks and wiring
 ```
+
+`plugin.h` is the only place PEMF runs code it did not write. Everything a
+plugin can reach goes through the layers above it -- `state.h` for anything that
+changes the game, `content.h` for events -- so a plugin gets the same clamping
+and logging PEMF holds itself to, and a plugin that faults is disabled for the
+session rather than taking the game with it. The public half is `sdk/pemf_sdk.h`.
 
 `storms.h` is the one place PEMF writes to the game's **code** rather than its
 data, and it does so only from the first safe point — writing earlier races the
