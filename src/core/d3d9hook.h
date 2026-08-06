@@ -117,6 +117,48 @@ volatile LONG  g_pemfDeviceLost     = 0;   // non-zero: do not draw
 volatile LONG  g_pemfBeginOk        = 0;   // this pass's BeginScene succeeded
 volatile LONG  g_pemfSkippedDraws   = 0;   // draws declined for the above
 
+// ----------------------------------------------------- is the game rendering?
+// g_pemfDeviceLost only covers the Reset CALL. It says nothing about the far
+// longer window before it: alt-tab away and the game sits on a lost device for
+// as long as the player is gone -- ten minutes, in the session this was found
+// in -- calling Present ~8,000 times a second and never reaching BeginScene.
+//
+// PEMF could not see that. The safe point is the main loop, so it ran at that
+// same 8,000/s, doing full ship-array scans, suspicion ticks, storm updates and
+// flag work whose results nobody could see, on a machine whose owner had
+// alt-tabbed away precisely because they wanted to do something else with it.
+//
+// So the pulse is measured directly: EndScene advancing means the game is
+// drawing. It stops, and PEMF goes dormant until it starts again.
+volatile LONG  g_pemfNotRendering   = 0;   // non-zero: game is not drawing
+
+// ------------------------------------------------------ settling after a reset
+// A SUCCESSFUL RESET IS NOT THE ALL-CLEAR. The device is usable again the
+// instant Reset returns, but the ENGINE's own objects are not: the game rebuilds
+// its render state over the frames that follow, and everything PEMF draws goes
+// through the game's routines, which walk those objects.
+//
+// Clearing g_pemfDeviceLost on return therefore let PEMF draw into a half-rebuilt
+// scene graph on the very next frame. That is the R6025 "pure virtual function
+// call" testers hit on alt-tabbing back -- a virtual called on an object that has
+// been destructed and not yet replaced. Reported three times, always on the way
+// back into the game, and the log always showed a Reset just before it.
+//
+// So we wait. Not for a fixed count of frames -- a game that is still stuttering
+// its way back would burn through those while nothing was really ready -- but for
+// a stretch of wall clock after the last reset, which covers a slow recovery and
+// a fast one alike.
+volatile LONG  g_pemfSettleFrom     = 0;   // GetTickCount at the last reset
+#define PEMF_RESET_SETTLE_MS 750
+
+// Unsigned subtraction, so this stays correct across GetTickCount's 49-day wrap.
+__inline int PemfSettlingAfterReset(void)
+{
+    const LONG from = g_pemfSettleFrom;
+    if (!from) return 0;
+    return ((DWORD)GetTickCount() - (DWORD)from) < PEMF_RESET_SETTLE_MS;
+}
+
 // Both implemented in core.cpp.
 //
 // The two phases are NOT interchangeable, and which one a draw belongs in is
@@ -149,7 +191,10 @@ HRESULT WINAPI PemfBeginSceneHook(void* device)
     }
     InterlockedExchange(&g_pemfBeginOk, 1);
 
-    if (pass == 0 && !g_pemfDeviceLost) PemfOnBeginScene(device);
+    if (pass == 0 && !g_pemfDeviceLost && !PemfSettlingAfterReset())
+        PemfOnBeginScene(device);
+    else if (pass == 0)
+        InterlockedIncrement(&g_pemfSkippedDraws);
     return hr;
 }
 
@@ -184,7 +229,11 @@ HRESULT WINAPI PemfEndSceneHook(void* device)
     // in flight. Either check alone is not enough: the counter says which pass
     // we are in, not whether the device survived it.
     if (g_pemfPassThisFrame == 1) {
-        if (g_pemfBeginOk && !g_pemfDeviceLost) PemfOnEndScene(device);
+        // The settle check is the third condition and the newest: the other two
+        // both read "clear" the instant Reset returns, which is exactly when the
+        // engine's own objects are still being rebuilt. See the settle note.
+        if (g_pemfBeginOk && !g_pemfDeviceLost && !PemfSettlingAfterReset())
+            PemfOnEndScene(device);
         else InterlockedIncrement(&g_pemfSkippedDraws);
     }
 
@@ -210,8 +259,11 @@ HRESULT WINAPI PemfResetHook(void* device, void* params)
 
     if (SUCCEEDED(hr)) {
         InterlockedExchange(&g_pemfDeviceLost, 0);
-        Log("d3d9: device Reset #%ld succeeded -- drawing again (%ld draw(s) "
-            "declined meanwhile)", g_pemfResetCount, g_pemfSkippedDraws);
+        // Not "drawing again" -- drawing again SHORTLY. See the settle note.
+        InterlockedExchange(&g_pemfSettleFrom, (LONG)GetTickCount());
+        Log("d3d9: device Reset #%ld succeeded -- settling for %d ms before "
+            "PEMF draws again (%ld draw(s) declined meanwhile)",
+            g_pemfResetCount, PEMF_RESET_SETTLE_MS, g_pemfSkippedDraws);
     } else {
         // Still lost. The game will call Reset again; we stay down until one
         // of them succeeds rather than guessing that this was the last.
@@ -342,6 +394,59 @@ inline void Uninstall()
     }
     g_installed = false;
     g_pemfDeviceVTable = nullptr;
+}
+
+// ------------------------------------------------------------- the pulse
+// Called from the safe point, before anything else decides to do work.
+//
+// ⚠️ IT MUST ARM ITSELF FIRST. EndScene is not advancing during startup either
+// -- the device does not exist yet -- and a naive "has it moved lately?" would
+// declare PEMF dormant before the game ever drew a frame, which would stop the
+// framework dead on every launch. So the pulse only begins judging once it has
+// seen EndScene advance at least once.
+//
+// The threshold is deliberately generous. A game alt-tabbed away is quiet for
+// minutes; a game that is merely slow, or sitting on a loading screen, must not
+// be mistaken for one. A second of no frames at all is far outside anything the
+// game does while someone is looking at it.
+inline void SamplePulse()
+{
+    static LONG  armedAt   = 0;      // EndScene count when we first saw motion
+    static LONG  lastCalls = 0;
+    static DWORD lastMoved = 0;
+
+    const LONG  calls = g_pemfEndSceneCalls;
+    const DWORD now   = GetTickCount();
+
+    if (!armedAt) {
+        if (calls <= 0) return;      // never drawn yet -- nothing to judge
+        armedAt = calls; lastCalls = calls; lastMoved = now;
+        return;
+    }
+
+    if (calls != lastCalls) {        // drawing: awake
+        lastCalls = calls;
+        lastMoved = now;
+        if (g_pemfNotRendering) {
+            InterlockedExchange(&g_pemfNotRendering, 0);
+            Log("d3d9: frames are back -- PEMF is awake again");
+        }
+        return;
+    }
+
+    if (!g_pemfNotRendering && (now - lastMoved) >= 1000) {
+        InterlockedExchange(&g_pemfNotRendering, 1);
+        Log("d3d9: no frames for 1s -- PEMF going dormant until they return");
+    }
+}
+
+// True when there is no point doing any work: either a Reset is in flight, or
+// the game has stopped drawing entirely.
+inline bool Dormant()
+{
+    return g_pemfDeviceLost != 0
+        || g_pemfNotRendering != 0
+        || PemfSettlingAfterReset() != 0;
 }
 
 // Called from the safe point -- the top of the game's main loop, once per

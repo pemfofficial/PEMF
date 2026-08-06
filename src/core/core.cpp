@@ -327,6 +327,9 @@ extern bool g_haveTrueFlag;
 // ------------------------------------------------------- the safe point
 // Everything that touches the game or presents UI happens here, and nowhere
 // else. Called from the top of the main loop.
+// Suspicion's tick baseline. See the note where it is read.
+static DWORD g_lastSusAt = 0;
+
 static void RunSafePoint()
 {
     ++g_safePointHits;
@@ -356,6 +359,51 @@ static void RunSafePoint()
             townmenu::Install();
             render::Install();
         }
+    }
+
+    // ------------------------------------------------ nothing to do right now
+    // ⛔ DO NOT MOVE THIS BELOW THE WORLD WORK. The whole point is that none of
+    // it runs.
+    //
+    // Alt-tab out of a fullscreen D3D9 game and the device is lost until you
+    // come back. The game does not idle in that state -- it spins, calling
+    // Present about 8,000 times a second and never reaching BeginScene. The
+    // safe point is that same loop, so PEMF ran at 8,000/s too: scanning the
+    // ship array, ticking suspicion, spawning pirate-hunters, updating storms
+    // and sampling the world into the log, for as long as the player was away.
+    //
+    // A tester sat in that state for stretches of ten minutes at a time, on a
+    // machine that was also copying a large file, and PEMF was burning a core
+    // for the whole of it. It also wrote ~4,000 lines of "world:" samples
+    // nobody could ever want, which is most of why their log was half a
+    // megabyte.
+    //
+    // None of that work can be seen, and none of it needs doing: the player
+    // cannot act on a game that is not drawing. So PEMF stands down until
+    // frames come back, and yields the CPU instead of eating it -- which is
+    // what the machine's owner alt-tabbed away to get.
+    d3d9hook::SamplePulse();
+    if (d3d9hook::Dormant()) {
+        // ⛔ THIS ONE STILL HAS TO RUN. A reset is the likeliest moment for the
+        // engine to rebuild its vtable, which sheds our hooks -- and the pulse
+        // that decides we are dormant is EndScene, which is one of them. Skip
+        // the re-hook here and a shed vtable means EndScene never counts again,
+        // so PEMF concludes the game has stopped drawing and stays dormant for
+        // the rest of the session. Dormancy has to keep the door it came in by.
+        if (g_targetOK) d3d9hook::TryInstall();
+
+        d3d9hook::MarkFrameBoundary();
+        d3d9hook::ReportFromSafePoint();   // heartbeat/warning still runs
+
+        // Every clock PEMF keeps is a delta against GetTickCount, and the wall
+        // clock does not stop while we are dormant. Clearing the baselines here
+        // means the first tick after waking is a small one instead of however
+        // long the player was away -- otherwise suspicion ages every trail to
+        // nothing and the storm jumps across the map the instant you come back.
+        g_lastSusAt = 0;
+
+        Sleep(1);
+        return;
     }
 
     // A career starting, ending, or being loaded invalidates all trigger
@@ -419,10 +467,13 @@ static void RunSafePoint()
     // Evaluated here, never in the render hook: it reads the ship array and the
     // city table, and it can decide to build a ship.
     {
-        static DWORD lastSusAt = 0;
+        // File-scope, not a local static, because going dormant has to be able
+        // to clear it -- see RunSafePoint's dormant path. Waking after ten
+        // minutes alt-tabbed would otherwise hand suspicion a 600-second tick
+        // and age every trail to nothing in a single frame.
         const DWORD now = GetTickCount();
-        const DWORD dt  = lastSusAt ? (now - lastSusAt) : 0;
-        lastSusAt = now;
+        const DWORD dt  = g_lastSusAt ? (now - g_lastSusAt) : 0;
+        g_lastSusAt = now;
 
         suspicion::Tick(dt);
         suspicion::RefreshPanel();
