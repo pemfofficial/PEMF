@@ -14,6 +14,7 @@ The game executable is never modified.
 |---|---|---|
 | **[PLAYER_MANUAL.md](PLAYER_MANUAL.md)** | Players | Install, uninstall, what works today, what is planned, troubleshooting |
 | **[EVENT_AUTHORING.md](EVENT_AUTHORING.md)** | Players & modders | Writing events for `PEMF\events\` — schema, tokens, effects, error messages |
+| **[PLUGINS.md](PLUGINS.md)** | Modders | Writing a mod in **code**: the plugin ABI, what a plugin may do, and the rules it lives under |
 | **[DEVELOPER.md](DEVELOPER.md)** | Developers | Architecture, build, RE workflow, conventions, roadmap, lessons |
 | **[GAME_API.md](GAME_API.md)** | Developers | Reverse-engineered engine reference: functions, addresses, conventions |
 | **[WINDOWS_SECURITY.md](WINDOWS_SECURITY.md)** | Players | Defender flagged the download, or the game won't start: which one you're looking at, published hashes, and what we've ruled out |

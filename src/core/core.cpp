@@ -44,6 +44,7 @@
 #include "render.h"
 #include "storms.h"
 #include "townmenu.h"
+#include "plugin.h"
 #include "d3d9hook.h"
 
 #pragma intrinsic(_ReturnAddress)
@@ -2494,6 +2495,9 @@ static DWORD WINAPI Init(LPVOID)
                 "%s\\PEMF\\events", dir);
     content::LoadFolder(contentDir);
     townmenu::LoadFromContent();   // resolves ids, so it must follow the load
+    // Plugins last: LoadFromContent clears the row list, and a plugin may want
+    // to name an event that JSON defined.
+    plugin::LoadAll(dir);
     triggers::Reset("startup");
 
     // The render-phase hook also writes to the game's code, so it waits for the

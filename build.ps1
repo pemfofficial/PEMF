@@ -175,12 +175,43 @@ function Copy-Payload([string]$dest) {
             Copy-Item $iniSrc $iniDst -Force
         }
     }
+    # Somewhere for plugins to go, with a note so an empty folder is not
+    # mistaken for a broken install.
+    $plugins = Join-Path $dest 'PEMF\plugins'
+    New-Item -ItemType Directory -Force $plugins | Out-Null
+    $readme = Join-Path $plugins 'README.txt'
+    if (-not (Test-Path $readme)) {
+        Set-Content -Path $readme -Encoding utf8 -Value @(
+            'Drop PEMF plugins (.dll) in this folder.',
+            '',
+            'They must be 32-bit -- the game is x86. A plugin that will not load',
+            'says so in pemf.log rather than failing silently.',
+            '',
+            'To write one, see PEMF\sdk\pemf_sdk.h and the worked example beside',
+            'it. One header, no linking, and any compiler that can produce a',
+            '32-bit Windows DLL will do.'
+        )
+    }
+
+    # The SDK ships with the game, so anyone who downloaded PEMF already has
+    # everything they need to write a plugin -- no repository clone required.
+    $sdk = Join-Path $dest 'PEMF\sdk'
+    New-Item -ItemType Directory -Force $sdk | Out-Null
+    Copy-Item (Join-Path $root 'sdk\pemf_sdk.h') $sdk -Force -ErrorAction SilentlyContinue
+    $exampleSrc = Join-Path $root 'sdk\example'
+    if (Test-Path $exampleSrc) {
+        $exampleDst = Join-Path $sdk 'example'
+        New-Item -ItemType Directory -Force $exampleDst | Out-Null
+        Copy-Item (Join-Path $exampleSrc '*.c') $exampleDst -Force -ErrorAction SilentlyContinue
+    }
+
     $docs = Join-Path $dest 'PEMF\docs'
     New-Item -ItemType Directory -Force $docs | Out-Null
     # WINDOWS_SECURITY.md ships too: a player whose download was quarantined or
     # whose game will not start needs it, and pointing them at a web page is no
     # help when the thing that failed was the download.
-    foreach ($d in @('PLAYER_MANUAL.md', 'EVENT_AUTHORING.md', 'WINDOWS_SECURITY.md')) {
+    foreach ($d in @('PLAYER_MANUAL.md', 'EVENT_AUTHORING.md', 'WINDOWS_SECURITY.md',
+                     'PLUGINS.md')) {
         $src = Join-Path $root "docs\$d"
         if (Test-Path $src) { Copy-Item $src $docs -Force }
     }

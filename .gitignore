@@ -42,3 +42,7 @@ __pycache__/
 *.user
 Thumbs.db
 desktop.ini
+sdk/example/*.dll
+sdk/example/*.obj
+sdk/example/*.lib
+sdk/example/*.exp
