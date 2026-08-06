@@ -1282,6 +1282,17 @@ inline void UpdateBattleWeather()
         Log("storms: a battle fought now would be %s (system %d off)",
             want ? "IN THE WEATHER" : "under clear sky", g_sysDist);
     }
+
+    // Say when the shim actually fires. Without this there was no way to tell
+    // "the swap never ran" from "it ran and drew something invisible" -- and a
+    // playtest reported no cloud with nothing in the log either way, which is
+    // the state a diagnostic exists to prevent.
+    static LONG s_reported = 0;
+    if (g_battleSwaps != s_reported) {
+        s_reported = g_battleSwaps;
+        Log("storms: battle cloud swapped to the storm prefab (%ld so far) -- "
+            "intensity now %d", g_battleSwaps, *(const int*)0x0085A0F8);
+    }
 }
 
 inline void TickWeather(bool sailing)

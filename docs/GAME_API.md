@@ -2789,6 +2789,39 @@ and every cloud in the game disappears permanently. A redirect that decides
 *which* prefab, and always calls through, does not have that problem; one that
 sometimes returns early does.
 
+### ⚠️ The battle sets its OWN weather intensity
+
+Found while chasing "the battle is slightly darker but there is no rain and no
+cloud". `FUN_0047A040` **writes** the weather-intensity global at `0x0047EE97`:
+
+```
+0047EE6E  CALL ESI
+0047EE71  MOV  ECX, 3
+0047EE76  IDIV ECX
+0047EE78  MOV  EAX, [0x0085A0F8]     ; the weather intensity
+0047EE7D  LEA  EAX, [EDX + EAX - 1]
+0047EE81  CMP  EAX, 4
+0047EE86  MOV  EAX, 4                ; floored at 4
+0047EE8D  CMP  EAX, 0x14
+0047EE92  MOV  EAX, 0x14             ; and capped at 20
+0047EE97  MOV  [0x0085A0F8], EAX     ; written back
+```
+
+So a battle **always has weather**, between 4 and 20, whatever the sea outside
+was doing. That explains the "slightly darker" — the battle is deriving its own
+modest weather and nothing to do with our cloud.
+
+It also names the lever. The global rain multiply this file already documents
+(`0x0047BC3C`, `imul eax, [0x0085A0F8]`) is **inside this same function**, so the
+rain a battle draws is scaled by the value written above. Raising
+`0x0085A0F8` toward 20 when the fight began in a storm is the route to rain and
+darkness in battle — and it needs no new hook, only a write at the right moment.
+
+⚠️ Not free: `0x0085A0F8` is the **shared** weather intensity. `storms.h` reads
+it for its own thresholds and the wind uses it too, so a write here is felt
+outside the battle. The battle already overwrites it on entry, which is a point
+in favour, but this wants measuring before it is trusted.
+
 **Not yet built.** The remaining unknown is whether the storm prefab has
 instances available in the battle scene — it is registered globally and the pool
 allocates on demand, so probably, but "probably" is not "measured".
