@@ -1352,9 +1352,12 @@ static void ShowTierMenu(int roleIndex)
         int n = 0;
         for (size_t t = 0; t < officers::g_tiers.size() && n < 4; ++t) {
             const officers::Tier& tier = officers::g_tiers[t];
+            // The COST is shown; the odds are not. A captain sending men
+            // ashore to ask around would know what it costs him and would not
+            // know his chances, and showing a percentage turns a gamble into
+            // arithmetic.
             _snprintf_s(labels[n], sizeof(labels[n]), _TRUNCATE,
-                        "%s (%d gold, %d in 100)",
-                        tier.name.c_str(), tier.cost, tier.chance);
+                        "%s (%d gold)", tier.name.c_str(), tier.cost);
             opts[n] = labels[n];
             ++n;
         }

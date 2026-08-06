@@ -76,6 +76,7 @@ struct Officer {
     int tierIndex = -1;
     int skills[kMaxSkillsPerOfficer] = { -1, -1, -1 };
     int skillCount = 0;
+    int hiredMonth = 0;      // months at sea when he signed; tenure is derived
 };
 
 inline Officer g_roster[kMaxRoster];
@@ -415,6 +416,7 @@ inline void Search(int roleIndex, int tierIndex)
         return;
     }
 
+    found.hiredMonth    = state::Months();
     g_roster[roleIndex] = found;
     g_hired[roleIndex]  = true;
     ApplyEffects("officer hired");
@@ -429,33 +431,163 @@ inline void Search(int roleIndex, int tierIndex)
     game::ShowModalTextN(msg, nullptr, 0);
 }
 
-// What the roster looks like, for the menu.
-inline void ShowRoster()
+// ------------------------------------------------------------- the roster
+// One card per man rather than a list, because an officer the player cannot
+// look at is a line of text, not a person.
+
+inline int Tenure(const Officer& o)
 {
+    const int now = state::Months();
+    return now > o.hiredMonth ? now - o.hiredMonth : 0;
+}
+
+// What he actually does for you. Contributions are read from the same totals
+// the systems use, so this card cannot claim something the game is not doing.
+inline void ShowOfficerDetail(int roleIndex)
+{
+    if (!RosterHas(roleIndex)) return;
+    const Officer& o = g_roster[roleIndex];
+
     char card[1024];
     int n = _snprintf_s(card, sizeof(card), _TRUNCATE,
-                        "Your officers.\n");
+                        "%s, %s %s.\n",
+                        o.name.c_str(),
+                        g_tiers[(size_t)o.tierIndex].name.c_str(),
+                        g_roles[(size_t)o.roleIndex].name.c_str());
 
-    bool any = false;
-    for (int i = 0; i < kMaxRoster && i < (int)g_roles.size(); ++i) {
-        if (!g_hired[i]) continue;
-        any = true;
-        const Officer& o = g_roster[i];
-        const int w = _snprintf_s(card + n, sizeof(card) - n, _TRUNCATE,
-                                  "\n%s, %s %s",
-                                  o.name.c_str(),
-                                  g_tiers[(size_t)o.tierIndex].name.c_str(),
-                                  g_roles[(size_t)o.roleIndex].name.c_str());
-        if (w < 0) break;
-        n += w;
+    const int months = Tenure(o);
+    n += _snprintf_s(card + n, sizeof(card) - n, _TRUNCATE,
+                     "%s\n",
+                     months <= 0 ? "Signed on this month."
+                                 : (months == 1 ? "One month aboard."
+                                                : "@NUM months aboard."));
+
+    if (!o.bio.empty())
+        n += _snprintf_s(card + n, sizeof(card) - n, _TRUNCATE,
+                         "%s\n", o.bio.c_str());
+
+    if (o.skillCount == 0) {
+        _snprintf_s(card + n, sizeof(card) - n, _TRUNCATE,
+                    "\nHe has no particular talent to speak of.");
+    } else {
+        for (int i = 0; i < o.skillCount; ++i) {
+            const Skill& sk = g_skills[(size_t)o.skills[i]];
+            const char* what = (sk.target == "loot")   ? "of what we take"
+                             : (sk.target == "morale") ? "to the men's temper"
+                                                       : "";
+            const int w = _snprintf_s(card + n, sizeof(card) - n, _TRUNCATE,
+                                      "\n%s -- %s (+%d %s)",
+                                      sk.name.c_str(), sk.text.c_str(),
+                                      sk.value, what);
+            if (w < 0) break;
+            n += w;
+        }
     }
 
-    if (!any)
-        _snprintf_s(card, sizeof(card), _TRUNCATE,
-                    "You keep no officers. The ship is run by whoever is "
-                    "nearest and willing.");
+    int args[1] = { months };
+    game::ShowModalTextN(card, args, months > 1 ? 1 : 0);
+}
 
-    game::ShowModalTextN(card, nullptr, 0);
+// Talking to him is how the crew is managed -- through the man whose job it is,
+// rather than from a menu the captain has no business having.
+inline void SpeakWith(int roleIndex)
+{
+    if (!RosterHas(roleIndex)) return;
+    const Officer& o = g_roster[roleIndex];
+
+    char card[512];
+    _snprintf_s(card, sizeof(card), _TRUNCATE,
+                "%s knuckles his forehead. \"Crew of @NUM, captain, and they "
+                "stand @HAPPY. What would you have of them?\"",
+                o.name.c_str());
+
+    int args[2] = { state::Crew(), state::Morale() };
+    const char* opts[3] = {
+        "\"How do the men find the voyage?\"",
+        "\"Nothing for now.\"",
+        nullptr
+    };
+    const int pick = game::AskChoiceN(card, opts, 2, args, 2);
+    if (pick != 0) return;
+
+    // Honest about its own limits: this reports what the engine actually says
+    // rather than inventing a crew system that does not exist yet. The morale
+    // work is what turns this into orders that mean something.
+    const int m = state::Morale();
+    const char* answer =
+        (m >= 4) ? "\"Well enough that they'd follow you into a lee shore, and "
+                   "say so where you can hear it.\""
+      : (m == 3) ? "\"No complaints worth carrying to you, captain.\""
+      : (m == 2) ? "\"They've had worse. They've had better, too, and they "
+                   "remember which.\""
+      : (m == 1) ? "\"Poorly, captain. There's talk, and I'll not pretend "
+                   "otherwise.\""
+                 : "\"Badly. Divide the plunder before somebody else divides "
+                   "it for you.\"";
+
+    game::ShowModalTextN(answer, nullptr, 0);
+}
+
+inline void ShowOfficer(int roleIndex)
+{
+    for (int guard = 0; guard < 16; ++guard) {
+        if (!RosterHas(roleIndex)) return;
+        const Officer& o = g_roster[roleIndex];
+
+        char title[256];
+        _snprintf_s(title, sizeof(title), _TRUNCATE, "%s, %s %s.",
+                    o.name.c_str(),
+                    g_tiers[(size_t)o.tierIndex].name.c_str(),
+                    g_roles[(size_t)o.roleIndex].name.c_str());
+
+        const char* opts[3] = {
+            "Speak with him",
+            "What he does for you",
+            "Never mind."
+        };
+        const int pick = game::AskChoiceN(title, opts, 3, nullptr, 0);
+
+        if (pick == 0)      SpeakWith(roleIndex);
+        else if (pick == 1) ShowOfficerDetail(roleIndex);
+        else                return;
+    }
+}
+
+// The roster: one selectable row per officer.
+inline void ShowRoster()
+{
+    for (int guard = 0; guard < 16; ++guard) {
+        char labels[5][96];
+        int  idx[5];
+        const char* opts[6] = { nullptr };
+        int n = 0;
+
+        for (int i = 0; i < kMaxRoster && i < (int)g_roles.size() && n < 5; ++i) {
+            if (!g_hired[i]) continue;
+            const Officer& o = g_roster[i];
+            _snprintf_s(labels[n], sizeof(labels[n]), _TRUNCATE, "%s, %s %s",
+                        o.name.c_str(),
+                        g_tiers[(size_t)o.tierIndex].name.c_str(),
+                        g_roles[(size_t)o.roleIndex].name.c_str());
+            opts[n] = labels[n];
+            idx[n]  = i;
+            ++n;
+        }
+
+        if (n == 0) {
+            game::ShowModalTextN("You keep no officers. The ship is run by "
+                                 "whoever is nearest and willing.", nullptr, 0);
+            return;
+        }
+
+        const int backRow = n;
+        opts[n++] = "Never mind.";
+
+        const int pick = game::AskChoiceN("Your officers.", opts, n, nullptr, 0);
+        if (pick < 0 || pick >= n || pick == backRow) return;
+
+        ShowOfficer(idx[pick]);
+    }
 }
 
 } // namespace officers

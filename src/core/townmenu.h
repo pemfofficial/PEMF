@@ -395,7 +395,19 @@ inline int Present(int bg, int flags, int form)
         Log("townmenu: picked '%s' (index %d)", row->label, pick);
 
         if (row->fn) {
+            // A native row gets the same treatment as an authored one. This
+            // branch used to skip it, so anything driven by code drew against
+            // the sea while the JSON rows beside it drew against the port --
+            // which is exactly how it looked in game.
+            events::EnterDirect();
+            game::g_portCardCity  = bg;
+            game::g_portCardFlags = 0;
+
             row->fn(row->arg);
+
+            game::g_portCardCity  = -1;
+            game::g_portCardFlags = 0;
+            events::LeaveDirect();
         } else if (row->menuIndex >= 0) {
             // A menu row that opens a PEMF menu. Same presentation rules as a
             // card: in place, against this port, and back to the town menu
