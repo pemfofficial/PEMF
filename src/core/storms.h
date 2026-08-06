@@ -669,6 +669,30 @@ extern "C" int __cdecl PemfStormScale(int gameScale)
     const int dt = g_sysLastMs ? (int)(now - g_sysLastMs) : 0;
     g_sysLastMs = now;
 
+    // ---------------------------------------------- time spent somewhere else
+    // A LONG GAP MEANS THE PLAYER WAS NOT AT SEA. This function runs from the
+    // overworld's own draw, so it simply is not called during a ship battle, a
+    // town, or the map -- and the gap when it resumes is exactly how long the
+    // player was away.
+    //
+    // The drift below was already protected by its `dt < 1000` guard, but the
+    // storm's AGE was not, and neither was the rest timer. So a three-minute
+    // boarding action retired a seven-minute storm without it moving an inch:
+    // the player came out of the fight into clear sky, having been in weather
+    // when it started. Reported as the storm music never coming back after a
+    // battle, which is the same thing heard rather than seen -- the drums had
+    // nothing left to play for.
+    //
+    // Same reasoning as the events::Busy() hold above, and the same treatment:
+    // hand the missing time back to whichever clock was running. Weather is now
+    // continuous across anything that takes the player off the overworld.
+    if (dt >= 1000 && dt < 600000) {
+        g_sysBorn += (DWORD)dt;
+        g_sysNext += (DWORD)dt;
+        Log("storms: %d s spent off the overworld -- the weather waited",
+            dt / 1000);
+    }
+
     if (!g_sysUp) {
         g_sysDist = -1;
 

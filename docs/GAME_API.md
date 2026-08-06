@@ -2727,6 +2727,45 @@ Why this is the right shape here:
 
 ---
 
+## Weather during a ship battle — a lead
+
+Asked: can a battle keep the weather it started in?
+
+**Half of it is done and needs no engine work.** The storm system is PEMF's own,
+and it no longer ages while the player is off the overworld — see the note in
+`storms.h`. A battle no longer retires the storm you were fighting in, so you
+come out into the same weather you went in with. That was also the real cause of
+"the storm music never comes back after a fight": the drums had nothing left to
+play for, because the storm had been retired mid-battle without moving an inch.
+
+**Drawing a cloud INSIDE the battle scene is unproven.** What is known:
+
+- PEMF draws storms by redirecting `call FUN_004BBC80` at `0x0046377A`, which is
+  in the **overworld** draw. That call site does not run in a battle.
+- `FUN_004BBC80` itself has **many** callers, several in `0x484xxx`–`0x487xxx`.
+  The capture and surrender handler is `FUN_00478730`, so that region is battle
+  code, and it looks as though **the battle scene draws prefabs through the same
+  routine**.
+
+If that holds, the mechanism PEMF already uses would transfer: redirect one of
+those calls and draw the storm prefab (`0x008CCB58`) with a fixed position, so
+the cloud sits overhead and does not drift.
+
+**What has to be established first**, none of it yet done:
+
+1. Which of those callers is actually the battle render.
+2. Whether the storm prefab is alive in the battle scene at all — a prefab keeps
+   its instances on a list at `+0x10`, and a scene that never registered it has
+   nothing to draw from.
+3. Whether the battle camera would even show it. The battle view sits low and
+   close; a cloud at overworld scale and altitude may be entirely off screen.
+
+⚠️ Worth remembering `FUN_004BBC80` must never be skipped once entered — the
+instance pool leaks and every cloud in the game disappears permanently. Any
+experiment here inherits that.
+
+---
+
 ## Useful Call Sites
 
 Reference points for how the game itself does things.
