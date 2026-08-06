@@ -21,6 +21,7 @@
 #include <string.h>
 
 #include "log.h"
+#include "state.h"
 #include "game.h"
 #include "audiomix.h"
 
@@ -33,6 +34,9 @@ struct Tuning {
     int  stopAt      = 5;      // ...and the lower one that takes it away
     int  fadeMs      = 2500;
     int  settleMs    = 15000;  // overworld must be up this long first
+    // How long the drums are HELD when the overworld goes off screen --
+    // a pause menu, a glance at the map. Past this they fade for real.
+    int  holdMs      = 20000;
     int  duckGameMusic = 1;    // silence the ship's own theme while ours plays
     char file[128]   = "storm.mp3";
 };
@@ -146,9 +150,37 @@ inline void Tick(int intensity, bool sailing)
     // track -- it reads as the mod playing music at you rather than the
     // weather having a sound. So the overworld has to have been up for a
     // little while before the music is allowed in at all.
+    // ------------------------------------------------------------- pausing
+    // A PAUSE IS NOT LEAVING THE STORM. Opening the pause menu takes the
+    // overworld off screen, so `sailing` goes false and everything below would
+    // fade the drums out and stop them -- and the player comes back to silence
+    // in the middle of the weather they are still sitting in. Reported exactly
+    // that way.
+    //
+    // Same problem the notices had, and the same answer: HOLD, do not kill.
+    // While a career is loaded and the track is already playing, a spell of
+    // not-sailing freezes the ramp where it is. Come back and the drums are
+    // where you left them.
+    //
+    // Bounded, because "not sailing" also covers genuinely leaving -- a town, a
+    // battle, the map. Past the grace period it fades out properly.
+    static DWORD s_heldSince = 0;
+    if (!sailing && state::InGame() && audiomix::Playing(g_track)) {
+        if (s_heldSince == 0) {
+            s_heldSince = now;
+            Log("storm audio: held -- the overworld is off screen but the "
+                "storm has not been left");
+        }
+        if (now - s_heldSince < (DWORD)g_tune.holdMs) return;   // frozen
+    } else if (s_heldSince != 0) {
+        s_heldSince = 0;
+    }
+
     static DWORD s_sailingSince = 0;
-    if (!sailing) s_sailingSince = 0;
-    else if (s_sailingSince == 0) s_sailingSince = now;
+    // A HELD track keeps its settle credit. Zeroing this on every pause meant
+    // the music had to earn its way back in from silence each time.
+    if (!sailing && s_heldSince == 0) s_sailingSince = 0;
+    else if (sailing && s_sailingSince == 0) s_sailingSince = now;
     const bool settled = sailing && s_sailingSince != 0 &&
                          (int)(now - s_sailingSince) >= g_tune.settleMs;
 

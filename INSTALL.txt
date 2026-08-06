@@ -23,7 +23,7 @@ INSTALLING
    creates a SUBFOLDER named after the zip and puts them in there, so you end
    up with:
 
-       Sid Meier's Pirates!\PEMF-0.2.3\version.dll        <- wrong, does nothing
+       Sid Meier's Pirates!\PEMF-0.2.4\version.dll        <- wrong, does nothing
 
    instead of:
 

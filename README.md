@@ -6,10 +6,12 @@ consequences, authored as JSON — along with **false colours and suspicion**
 (fly another nation's flag and be hunted for it) and **weather** you can see,
 hear, and lose cargo to.
 
-Events can read and change live game values — crew, gold, morale, months at sea
-— and fire on them. **Expanded crew and named officers are the next major
-feature and are not built yet**; see [`ROADMAP.md`](ROADMAP.md), which is honest
-about what does and does not work.
+It hires **named officers** with talents and flaws, keeps its own **crew
+morale** that drives the game's own, adds **its own rows and menus to the town
+menu**, and takes **plugins** — other people's DLLs, against a documented C ABI.
+
+See [`ROADMAP.md`](ROADMAP.md), which is honest about what does and does not
+work, and [`docs/PLUGINS.md`](docs/PLUGINS.md) to write a mod in code.
 
 It loads through a `version.dll` proxy and reaches the game through **IAT
 hooks**, which is how everything the framework does is driven. Some features —
@@ -25,7 +27,7 @@ dialog routines, so they look native.
 
 ### **[Get the latest release →](https://github.com/pemfofficial/PEMF/releases/latest)**
 
-Grab **`PEMF-0.2.3.zip`** from that page — it's the file under **Assets**.
+Grab **`PEMF-0.2.4.zip`** from that page — it's the file under **Assets**.
 Unzip it into your game folder, the one with `Pirates!.exe` in it, and launch the
 game. That's the whole install; nothing else is needed and the game executable is
 never modified.
@@ -41,14 +43,14 @@ and the `PEMF` folder.
 ### Check what you downloaded
 
 ```powershell
-Get-FileHash .\PEMF-0.2.3.zip -Algorithm SHA256
+Get-FileHash .\PEMF-0.2.4.zip -Algorithm SHA256
 ```
 
 | File | SHA256 |
 |---|---|
-| `PEMF-0.2.3.zip` | `1D7B3880B9489F4FB545F7A9384B6CD56AA6DBE5BBCD53BCC5344B5DA8546EC4` |
-| `pemf_core.dll` | `E1A75858F7A37CF728387FC3620D9211E88ECB08697766E788DC2CA7EBFC7E71` |
-| `version.dll` | `FE5687E05AB4B90EFE6FC3FCDAC76E1CEC8EF7F3B98D00687DE69286E1291389` |
+| `PEMF-0.2.4.zip` | `D0C961D197C58A30CDC6940E69A6827176EADF65BC6062459E636FCF266F3A5A` |
+| `pemf_core.dll` | `A095B7471D282ED905844A53B85A2B2143C195938072DFA55C4AD3F5E5AC3519` |
+| `version.dll` | `B0AB5F2B0AD88625C9B2FC239AD0DE808CB48406977753A793122E7F429A2E12` |
 
 PEMF is unsigned, so this hash is your integrity check. If it doesn't match,
 you didn't get the file from us.
@@ -87,7 +89,8 @@ time into the DLL. Same code, different bytes.)
 |---|---|
 | `src/proxy/` | `version.dll` proxy — forwards every real export, loads the core |
 | `src/core/` | the framework: hooks, state, session/save, event + trigger engine |
-| `content/` | example JSON events |
+| `content/` | authored content — events, menus, officers, tuning |
+| `sdk/` | `pemf_sdk.h`, the plugin ABI — ships inside the release |
 | `docs/` | player manual, event-authoring guide, developer + API notes |
 | `re/scripts/` | the reverse-engineering tools used to map the game (Python + Ghidra) |
 | `re/out/offsets.json` | the derived address map (facts about the binary) |
