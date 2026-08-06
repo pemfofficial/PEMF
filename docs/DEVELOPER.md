@@ -502,6 +502,34 @@ This is mechanical and it has been missed before: `WINDOWS_SECURITY.md` shipped
 it tells a player with a good download that they have a bad one. Also check the
 README names the **current** zip; it advertised `0.2.0` for two releases.
 
+### Then actually publish it
+
+⚠️ **A TAG IS NOT A RELEASE.** `git push --tags` puts the tag on GitHub and
+changes nothing a player can see: the releases page still shows the previous
+version as Latest, with no zip attached. This was missed on 0.2.4 and the
+release sat invisible until someone went looking for it.
+
+```powershell
+gh release create v<version> dist\PEMF-<version>.zip `
+    --title "PEMF <version> -- <name>" `
+    --notes-file docs\RELEASE_NOTES_<version>.md
+```
+
+**Check the zip's hash against the one you just published** before uploading. A
+release whose bytes disagree with the table in `README.md` tells every player
+with a good download that they have a bad one:
+
+```powershell
+(Get-FileHash dist\PEMF-<version>.zip -Algorithm SHA256).Hash
+```
+
+Then confirm it took:
+
+```powershell
+gh release list                     # the new one should say Latest
+gh release view v<version> --json assets
+```
+
 **Extract it into a clean folder and check it before linking anyone to it.** The
 packager has silently skipped a missing `INSTALL.txt` for most of this project's
 life; nobody noticed because nobody looked in the archive.
