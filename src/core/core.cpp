@@ -43,6 +43,8 @@
 #include "triggers.h"
 #include "render.h"
 #include "storms.h"
+#include "loot.h"
+#include "morale.h"
 #include "townmenu.h"
 #include "plugin.h"
 #include "d3d9hook.h"
@@ -358,6 +360,9 @@ static void RunSafePoint()
     // the career they were earned in.
     if (session::Tick()) {
         triggers::Reset("career context changed");
+        // The earned-total belongs to the career. A baseline carried across
+        // would read as one enormous award the moment the new one is sampled.
+        loot::Rebase("career context changed");
         // Anything still on screen belongs to the career that just ended. A
         // lookout's call from the last captain's voyage has no business
         // hanging over this one's ship.
@@ -494,6 +499,10 @@ static void RunSafePoint()
     // the game's own news, so "is it free" has to be asked once per frame at a
     // point where the answer cannot change under us.
     if (g_targetOK && state::InGame()) content::PumpNoticeStrip();
+
+    // PEMF's share of what the crew took. A read and a compare in the common
+    // case; see loot.h for why this is sampled rather than hooked.
+    if (g_targetOK) loot::Tick();
 
     // Presenting only moves to the render phase once stage 3 is reached; until
     // then it happens here. The half-drawn background this used to leave behind
@@ -1987,8 +1996,10 @@ static DWORD WINAPI Hook_timeGetTime(void)
     bool kU = mods && (GetAsyncKeyState('U') & 0x8000);
     bool kP = mods && (GetAsyncKeyState('P') & 0x8000);
     bool kY = mods && (GetAsyncKeyState('Y') & 0x8000);
+    bool kM = mods && (GetAsyncKeyState('M') & 0x8000);   // morale probe
+    bool kB = mods && (GetAsyncKeyState('B') & 0x8000);   // morale sweep
     bool down = k1 || k2 || k3 || k4 || k5 || k6 || k7 || k8 || k9 || k0 ||
-                kN || kH || kJ || kK || kL || kO || kU || kP || kY;
+                kN || kH || kJ || kK || kL || kO || kU || kP || kY || kM || kB;
 
     bool rising = down && !g_prevKeyDown;
     g_prevKeyDown = down;
@@ -2001,7 +2012,8 @@ static DWORD WINAPI Hook_timeGetTime(void)
     // Nothing is compiled out. A release build has the whole toolkit in it,
     // one file away, which is what makes a player's bug report useful.
     const bool devKey = k1 || k2 || k3 || k4 || k5 || k6 || k7 || kN ||
-                        kH || kJ || kK || kL || kO || kU || kP || kY;
+                        kH || kJ || kK || kL || kO || kU || kP || kY ||
+                        kM || kB;
     if (devKey && !g_devTools) {
         static bool told = false;
         if (!told) {
@@ -2010,6 +2022,27 @@ static DWORD WINAPI Hook_timeGetTime(void)
                 "named PEMF\\dev.on next to the exe to enable them. The flag "
                 "keys (Ctrl+Shift+8/9/0) do not need it.");
         }
+        return r;
+    }
+
+    // Ctrl+Shift+M reads the morale formula's inputs and checks our reading of
+    // it against what the engine actually returns. If PREDICTED and ACTUAL ever
+    // disagree, the formula in morale.h is wrong and everything resting on it
+    // is suspect -- which is worth finding out from a log line rather than from
+    // a system that behaves oddly months later.
+    if (kM) {
+        morale::LogState("probe");
+        loot::Report();
+        content::PostDebugNotice("Morale + loot written to pemf.log.", 6);
+        return r;
+    }
+    // Ctrl+Shift+B sweeps the morale byte across its range and reports how far
+    // it can actually move morale. This is the measurement the extended-morale
+    // design is waiting on. The byte is restored afterwards, fault path
+    // included.
+    if (kB) {
+        morale::Sweep();
+        content::PostDebugNotice("Morale sweep written to pemf.log.", 6);
         return r;
     }
 
@@ -2424,6 +2457,7 @@ static DWORD WINAPI Init(LPVOID)
     ScanFlags();
     suspicion::LoadTuning(dir);
     storms::LoadTuning(dir);
+    loot::LoadTuning(dir);
     InstallWasdKeymap(dir);
 
     Log("false colours: Ctrl+Shift+8 changes your flag, 9 runs your own back "

@@ -168,7 +168,7 @@ function Copy-Payload([string]$dest) {
         New-Item -ItemType Directory -Force $audioDst | Out-Null
         Copy-Item (Join-Path $audioSrc '*') $audioDst -Force
     }
-    foreach ($ini in @('suspicion.ini', 'storms.ini')) {
+    foreach ($ini in @('suspicion.ini', 'storms.ini', 'crew.ini')) {
         $iniSrc = Join-Path $root "content\PEMF\$ini"
         $iniDst = Join-Path $dest "PEMF\$ini"
         if ((Test-Path $iniSrc) -and -not (Test-Path $iniDst)) {
