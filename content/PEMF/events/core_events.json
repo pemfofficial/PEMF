@@ -162,10 +162,6 @@
     {
       "label": "Ask after the harbourmaster",
       "event": "harbourmaster_word"
-    },
-    {
-      "label": "Manage yer crew!",
-      "menu": "crew_root"
     }
   ],
 

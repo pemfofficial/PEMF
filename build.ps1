@@ -156,6 +156,14 @@ function Copy-Payload([string]$dest) {
     Copy-Item (Join-Path $build 'version.dll')   $dest -Force
     Copy-Item (Join-Path $build 'pemf_core.dll') $dest -Force
     Copy-Item (Join-Path $root 'content\PEMF\events\*.json') (Join-Path $dest 'PEMF\events') -Force
+    # Officer content. Replaced on update like the events are -- it is ours,
+    # and a player who has rewritten it should keep their copy elsewhere.
+    $offSrc = Join-Path $root 'content\PEMF\officers'
+    if (Test-Path $offSrc) {
+        $offDst = Join-Path $dest 'PEMF\officers'
+        New-Item -ItemType Directory -Force $offDst | Out-Null
+        Copy-Item (Join-Path $offSrc '*.json') $offDst -Force
+    }
     # Tuning files are edited in place by players, so never overwrite one that
     # is already there -- a rebuild must not discard someone's balance pass.
     $kmSrc = Join-Path $root 'content\PEMF\KeyMap_WASD.ini'

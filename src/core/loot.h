@@ -59,7 +59,16 @@ constexpr uintptr_t kEarnedTotal = 0x00861FF8;
 // Percent ADDED to what the game awarded. 0 means PEMF takes no part, which is
 // the default and what a stock install does. 25 means a hundred pieces of
 // plunder becomes a hundred and twenty five.
-inline int  g_bonusPercent = 0;
+//
+// TWO CONTRIBUTIONS, KEPT APART. The ini is the player's baseline and the
+// officers are what they have earned, and they are stored separately so that
+// re-computing one never has to guess at the other. An earlier version had
+// officers adjust a single figure by subtracting their own last contribution,
+// which works right up until anything else touches it.
+inline int  g_basePercent    = 0;   // from crew.ini
+inline int  g_officerPercent = 0;   // from the roster
+
+inline int BonusPercent() { return g_basePercent + g_officerPercent; }
 
 // Anything above this is refused as a typo rather than applied. Ten times the
 // loot is not a balance choice, it is a mistake in an ini file.
@@ -85,17 +94,33 @@ inline void Rebase(const char* why)
     Log("loot: baseline %d (%s)", g_lastTotal, why);
 }
 
+inline void Clamp(int* pct)
+{
+    if (*pct < 0) *pct = 0;
+    if (*pct > kMaxBonusPercent) {
+        Log("loot: %d%% refused as a mistake -- clamped to %d%%",
+            *pct, kMaxBonusPercent);
+        *pct = kMaxBonusPercent;
+    }
+}
+
 inline void SetBonusPercent(int pct, const char* why)
 {
-    if (pct < 0) pct = 0;
-    if (pct > kMaxBonusPercent) {
-        Log("loot: %d%% refused as a mistake -- clamped to %d%%",
-            pct, kMaxBonusPercent);
-        pct = kMaxBonusPercent;
-    }
-    if (pct == g_bonusPercent) return;
-    g_bonusPercent = pct;
-    Log("loot: share is now +%d%% (%s)", pct, why ? why : "set");
+    Clamp(&pct);
+    if (pct == g_basePercent) return;
+    g_basePercent = pct;
+    Log("loot: share is now +%d%% (%s)", BonusPercent(), why ? why : "set");
+}
+
+// What the roster contributes. Recomputed by officers.h from the hired list
+// rather than accumulated, so it cannot drift.
+inline void SetOfficerPercent(int pct, const char* why)
+{
+    Clamp(&pct);
+    if (pct == g_officerPercent) return;
+    g_officerPercent = pct;
+    Log("loot: officers contribute +%d%% -- share is now +%d%% (%s)",
+        pct, BonusPercent(), why ? why : "roster changed");
 }
 
 // Sampled once per safe point. Cheap: one read and a compare in the common case.
@@ -127,12 +152,13 @@ inline void Tick()
     g_lastTotal = now;
     InterlockedIncrement(&g_awards);
 
-    if (g_bonusPercent <= 0) return;
+    const int pct = BonusPercent();
+    if (pct <= 0) return;
 
     // Integer maths, deliberately: a percentage of an int award, rounded down.
     // Small awards can round to nothing, which is correct -- a 5% share of 10
     // pieces is not a piece.
-    const int bonus = (int)(((long long)awarded * g_bonusPercent) / 100);
+    const int bonus = (int)(((long long)awarded * pct) / 100);
     if (bonus <= 0) return;
 
     __try {
@@ -146,7 +172,7 @@ inline void Tick()
     }
 
     InterlockedExchangeAdd(&g_granted, bonus);
-    Log("loot: %d plundered -> +%d (%d%%)", awarded, bonus, g_bonusPercent);
+    Log("loot: %d plundered -> +%d (%d%%)", awarded, bonus, pct);
 }
 
 // Read from <game>\PEMF\crew.ini. Takes the GAME directory and appends the
@@ -176,7 +202,8 @@ inline void LoadTuning(const char* gameDir)
 inline void Report()
 {
     Log("loot: %ld award(s) seen this session, %ld granted as PEMF's share "
-        "(+%d%%)", g_awards, g_granted, g_bonusPercent);
+        "(+%d%% = %d base + %d officers)", g_awards, g_granted,
+        BonusPercent(), g_basePercent, g_officerPercent);
 }
 
 } // namespace loot

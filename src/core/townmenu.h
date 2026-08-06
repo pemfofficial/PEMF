@@ -95,6 +95,15 @@ struct Row {
     bool enabled = true;   // recomputed per menu from the two above
 };
 
+// A row may declare itself unavailable right now. Used by the crew menu, which
+// has nothing to say without a crew.
+//
+// ⚠️ Gated on CREW, deliberately, and never on morale. Morale reads 0 whenever
+// the crew's share is under what they expect, which is ordinary for a poor
+// captain with a loyal crew -- greying the menu out there would hide it exactly
+// when the player most wants it.
+inline bool (*g_gate[kMaxRows])() = { nullptr };
+
 inline Row  g_rows[kMaxRows];
 inline int  g_rowCount = 0;
 inline bool g_installed = false;
@@ -141,7 +150,8 @@ inline void ApplyContext(int port, int nation)
     for (int i = 0; i < g_rowCount; ++i) {
         Row& r = g_rows[i];
         r.enabled = (r.port   < 0 || r.port   == port)
-                 && (r.nation < 0 || r.nation == nation);
+                 && (r.nation < 0 || r.nation == nation)
+                 && (g_gate[i] == nullptr || g_gate[i]());
     }
 }
 

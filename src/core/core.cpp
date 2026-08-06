@@ -45,6 +45,7 @@
 #include "storms.h"
 #include "loot.h"
 #include "morale.h"
+#include "officers.h"
 #include "townmenu.h"
 #include "plugin.h"
 #include "d3d9hook.h"
@@ -1327,6 +1328,124 @@ static void InstallWasdKeymap(const char* gameDir)
             "up)", target);
 }
 
+// ------------------------------------------------------------- the crew menu
+// Built in code rather than JSON because the rows are generated from the roles
+// and tiers a player authored -- six roles times three tiers is not something
+// to write out by hand, and it has to follow whatever they put in the file.
+//
+// Six roles do not fit one card: the renderer shows six selectable lines and
+// townmenu adds "Never mind." itself, so a menu holds five. They are split by
+// duty, which fits and reads like something the game would have written.
+static void ShowTierMenu(int roleIndex)
+{
+    if (roleIndex < 0 || roleIndex >= (int)officers::g_roles.size()) return;
+    const officers::Role& role = officers::g_roles[(size_t)roleIndex];
+
+    for (int guard = 0; guard < 16; ++guard) {
+        char title[256];
+        _snprintf_s(title, sizeof(title), _TRUNCATE,
+                    "Ask after a %s -- %s. What standing of man?",
+                    role.name.c_str(), role.blurb.c_str());
+
+        const char* opts[8] = { nullptr };
+        char labels[4][96];
+        int n = 0;
+        for (size_t t = 0; t < officers::g_tiers.size() && n < 4; ++t) {
+            const officers::Tier& tier = officers::g_tiers[t];
+            _snprintf_s(labels[n], sizeof(labels[n]), _TRUNCATE,
+                        "%s (%d gold, %d in 100)",
+                        tier.name.c_str(), tier.cost, tier.chance);
+            opts[n] = labels[n];
+            ++n;
+        }
+        const int backRow = n;
+        opts[n++] = "Never mind.";
+
+        const int pick = game::AskChoiceN(title, opts, n, nullptr, 0);
+        if (pick < 0 || pick >= n || pick == backRow) return;
+
+        officers::Search(roleIndex, pick);
+        // and round again, so the player can try a second time
+    }
+}
+
+static void ShowRoleMenu(const char* title, const char* const* roleIds,
+                         int roleCount)
+{
+    for (int guard = 0; guard < 16; ++guard) {
+        const char* opts[8] = { nullptr };
+        char labels[6][96];
+        int idx[6];
+        int n = 0;
+
+        for (int i = 0; i < roleCount && n < 5; ++i) {
+            const int r = officers::FindRole(roleIds[i]);
+            if (r < 0) continue;
+            const officers::Role& role = officers::g_roles[(size_t)r];
+            _snprintf_s(labels[n], sizeof(labels[n]), _TRUNCATE,
+                        "Find a %s%s", role.name.c_str(),
+                        officers::RosterHas(r) ? "  (you have one)" : "");
+            opts[n] = labels[n];
+            idx[n]  = r;
+            ++n;
+        }
+        const int backRow = n;
+        opts[n++] = "Never mind.";
+
+        const int pick = game::AskChoiceN(title, opts, n, nullptr, 0);
+        if (pick < 0 || pick >= n || pick == backRow) return;
+
+        ShowTierMenu(idx[pick]);
+    }
+}
+
+static void CrewMenu(int)
+{
+    static const char* kShip[]    = { "sailing_master", "bosun", "carpenter" };
+    static const char* kCaptain[] = { "quartermaster", "master_gunner", "surgeon" };
+
+    for (int guard = 0; guard < 16; ++guard) {
+        char title[256];
+        _snprintf_s(title, sizeof(title), _TRUNCATE,
+                    "Your crew of @NUM stands @HAPPY. Do you...");
+        int args[2] = { state::Crew(), state::Morale() };
+
+        const char* opts[5] = {
+            "Ask after ship's officers",
+            "Ask after the captain's men",
+            "Look over the roster",
+            "Never mind."
+        };
+        const int pick = game::AskChoiceN(title, opts, 4, args, 2);
+
+        switch (pick) {
+            case 0: ShowRoleMenu("Ship's officers. Who do you want found?",
+                                 kShip, 3); break;
+            case 1: ShowRoleMenu("The captain's men. Who do you want found?",
+                                 kCaptain, 3); break;
+            case 2: officers::ShowRoster(); break;
+            default: return;
+        }
+    }
+}
+
+// No crew, no crew to manage. See the note on townmenu::g_gate -- this is
+// deliberately NOT gated on morale.
+static bool CrewMenuAvailable() { return state::InGame() && state::Crew() > 0; }
+
+static void InstallCrewMenu()
+{
+    if (!officers::g_loaded) {
+        Log("officers: not loaded -- 'Manage yer crew!' will not be offered");
+        return;
+    }
+    const int slot = townmenu::g_rowCount;
+    if (townmenu::Add("Manage yer crew!", -1, -1, &CrewMenu, 0)) {
+        townmenu::g_gate[slot] = &CrewMenuAvailable;
+        Log("officers: 'Manage yer crew!' added to the town menu");
+    }
+}
+
 // ---------------------------------------------------- the shipyard experiment
 // Ask the engine to build a ship, and find out whether it works.
 //
@@ -2570,7 +2689,9 @@ static DWORD WINAPI Init(LPVOID)
     _snprintf_s(contentDir, sizeof(contentDir), _TRUNCATE,
                 "%s\\PEMF\\events", dir);
     content::LoadFolder(contentDir);
+    officers::Load(dir);
     townmenu::LoadFromContent();   // resolves ids, so it must follow the load
+    InstallCrewMenu();
     // Plugins last: LoadFromContent clears the row list, and a plugin may want
     // to name an event that JSON defined.
     plugin::LoadAll(dir);

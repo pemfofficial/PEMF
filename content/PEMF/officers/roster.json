@@ -1,0 +1,146 @@
+{
+  "_comment": [
+    "PEMF -- officers.",
+    "",
+    "Everything about hiring officers lives here and is meant to be edited.",
+    "Add names, write bios, invent skills, change what a search costs. A file",
+    "that breaks a rule is rejected at load with the reason in pemf.log, and",
+    "the rest still loads.",
+    "",
+    "FOUR LISTS:",
+    "  names   -- the pool officers are named from",
+    "  bios    -- one line of flavour, picked at random",
+    "  skills  -- what an officer can be good at",
+    "  roles   -- the six posts, what they cost, and which skills they can have",
+    "",
+    "TIERS: novice (1 skill), journeyman (2), master (3). Paying searches for",
+    "an officer of that standing -- it does NOT buy one. Finding somebody is a",
+    "roll, and a dearer search is a better roll, not a certainty."
+  ],
+
+  "names": [
+    "Abel Hawkins", "Amos Quill", "Bartholomew Creed", "Caleb Rook",
+    "Cyrus Vane", "Diego Herrera", "Edmund Slade", "Elias Marsh",
+    "Ezekiel Crow", "Gideon Pike", "Hugh Tarrant", "Ignatius Bell",
+    "Jasper Wrenn", "Jonas Ketch", "Josiah Flint", "Lazarus Boyd",
+    "Lucien Marchand", "Malachi Doone", "Mathias Storr", "Nathaniel Frost",
+    "Obadiah Gale", "Percival Dunn", "Rafael Ortiz", "Reuben Stark",
+    "Samuel Thresher", "Silas Bream", "Simon Ashgrove", "Thaddeus Vaughn",
+    "Tobias Lark", "Uriah Penn", "Willem de Vries", "Zachariah Coates"
+  ],
+
+  "bios": [
+    "Sailed nine years under a captain he will not name, and does not care to be asked.",
+    "Lost a brother off Campeche and has been looking for the ship that did it ever since.",
+    "Was a merchant's clerk once. Says the sea is honester work, and means it.",
+    "Came ashore with a pardon in his pocket and drank the value of it in a week.",
+    "Keeps a psalter he cannot read and a knife he plainly can use.",
+    "Was pressed into a King's ship at fifteen and has had opinions about kings since.",
+    "Has buried two wives and three captains, and speaks better of the wives.",
+    "Talks little, works steadily, and has never once been found where he should not be.",
+    "Swears he has seen the Maelstrom. Nobody argues, which he takes for agreement.",
+    "Carries a Spanish coin with a hole through it and will not say what stopped it.",
+    "Learned his trade in the Mediterranean and thinks little of Caribbean weather.",
+    "Was quartermaster on a ship that voted itself to pieces, and learned from it.",
+    "Deserted a plantation and would rather hang than see one again.",
+    "Can read a sky better than most men read a chart.",
+    "Owes money in four ports and remembers exactly which four."
+  ],
+
+  "skills": [
+    {
+      "id": "sharp_eye",
+      "name": "A Sharp Eye",
+      "text": "He counts a prize's worth before the smoke clears, and little goes astray.",
+      "target": "loot",
+      "value": 10
+    },
+    {
+      "id": "fair_share",
+      "name": "A Fair Share",
+      "text": "The men trust his arithmetic, which is worth more than the arithmetic.",
+      "target": "morale",
+      "value": 4
+    },
+    {
+      "id": "hard_bargain",
+      "name": "A Hard Bargain",
+      "text": "He has never paid an asking price in his life.",
+      "target": "loot",
+      "value": 6
+    },
+    {
+      "id": "steady_hand",
+      "name": "A Steady Hand",
+      "text": "Nothing aboard hurries him, and nothing aboard goes wrong twice.",
+      "target": "morale",
+      "value": 3
+    },
+    {
+      "id": "old_salt",
+      "name": "An Old Salt",
+      "text": "He has weathered worse, says so, and the crew believe him.",
+      "target": "morale",
+      "value": 2
+    },
+    {
+      "id": "prize_master",
+      "name": "Prize Master",
+      "text": "He knows which hull is worth taking and which is worth burning.",
+      "target": "loot",
+      "value": 15
+    },
+    {
+      "id": "well_liked",
+      "name": "Well Liked",
+      "text": "The hands work the harder for him, and none of them could tell you why.",
+      "target": "morale",
+      "value": 5
+    }
+  ],
+
+  "roles": [
+    {
+      "id": "quartermaster",
+      "name": "Quartermaster",
+      "blurb": "a fairer share, and a crew that knows it",
+      "skills": [ "fair_share", "sharp_eye", "well_liked", "hard_bargain" ]
+    },
+    {
+      "id": "sailing_master",
+      "name": "Sailing Master",
+      "blurb": "she handles better in a blow",
+      "skills": [ "old_salt", "steady_hand", "well_liked" ]
+    },
+    {
+      "id": "bosun",
+      "name": "Bosun",
+      "blurb": "the hands work faster and grumble less",
+      "skills": [ "well_liked", "steady_hand", "old_salt" ]
+    },
+    {
+      "id": "master_gunner",
+      "name": "Master Gunner",
+      "blurb": "the broadsides tell",
+      "skills": [ "prize_master", "sharp_eye", "steady_hand" ]
+    },
+    {
+      "id": "carpenter",
+      "name": "Carpenter",
+      "blurb": "repairs at sea, and fewer of them needed",
+      "skills": [ "steady_hand", "old_salt", "hard_bargain" ]
+    },
+    {
+      "id": "surgeon",
+      "name": "Surgeon",
+      "blurb": "fewer die of their wounds",
+      "skills": [ "well_liked", "steady_hand", "fair_share" ]
+    }
+  ],
+
+  "tiers": [
+    { "id": "novice",     "name": "Novice",     "skills": 1, "cost": 200, "chance": 70 },
+    { "id": "journeyman", "name": "Journeyman", "skills": 2, "cost": 500, "chance": 45 },
+    { "id": "master",     "name": "Master",     "skills": 3, "cost": 1200, "chance": 25 }
+  ]
+}
