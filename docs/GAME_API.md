@@ -2584,6 +2584,67 @@ is its presentation.
 
 ---
 
+## Loot — where plunder is awarded
+
+> **Confidence: cross-references and one disassembled site, 2026-08-06.** Partial
+> on purpose. The shortlist below is real; which entry is the *capture* award is
+> not yet established, and is written here as open rather than guessed.
+
+Undivided plunder is hold slot 0, `0x00869AB4`. It has **60 cross references**,
+so "where does loot come from" is not one site but a family. The functions that
+**write** it:
+
+| Function | Notes |
+|---|---|
+| `FUN_0047A040` | writes at `0x0047EBE2` — **disassembled, see below** |
+| `FUN_0045D2B0` | three writes (`0x45DCA9`, `0x45DDA9`, `0x45E066`) |
+| `FUN_00406F60` | several; reached from the town menu (`0x00411D9E`) |
+| `FUN_0040C730` | reached from the town menu (`0x0041203C`) |
+| `FUN_004054A0` | reached from the town menu (`0x00410E26`) |
+| `FUN_004102A0` | writes at `0x410852`, `0x410873` — this is **Divide the Plunder** (menu id 4), i.e. the *spend*, not the award |
+| `FUN_00460480` | writes at `0x00460822`; `0x0046xxxx` is the sailing/overworld region |
+| `FUN_004517B0`, `FUN_004741B0`, `FUN_00401000`, `FUN_004Dxxxx` | not examined |
+
+### One award site, read in full
+
+`0x0047EBD7`–`0x0047EBE2`:
+
+```
+0047EBD2  CALL 0x00488A80          ; positional audio -- a sound at a world position
+0047EBD7  MOV  EAX,[0x00869AB4]    ; read plunder
+0047EBDF  ADD  EAX,0x32            ; + 50
+0047EBE2  MOV  [0x00869AB4],EAX    ; write it back
+```
+
+A **fixed +50** with a world-positioned sound immediately before it — the shape
+of picking something up during a ship battle rather than the spoils of taking
+her. Small, but it is a genuine, isolated, hookable loot award: read-add-write
+against a known address, with the amount as a single `ADD` immediate.
+
+**Why this matters for the officer system.** It is proof that loot is
+interceptable at all. `0x0047EBDF` is an operand patch of exactly the kind
+already shipping in `storms.h`, and a redirect of the surrounding call is the
+kind already shipping in `townmenu.h`. Neither technique is new work.
+
+### The capture handler
+
+`FUN_00478730` carries *"As your ship approaches, the enemy strikes her colors."*
+(`0x00708B90`), alongside *"The demoralized crew quickly surrenders."*
+(`0x0070851C`) — so surrender and capture resolve in the `0x478xxx` region,
+adjacent to the award site above.
+
+### ⚠️ Still open
+
+- **Which site awards the spoils of a captured ship.** That is the one an
+  officer skill would most want to modify, and it is *not* the +50 above. The
+  shortlist is the table; the work is reading them.
+- Whether the award is a single site or several (cargo, gold, and ship value may
+  be awarded separately).
+- Whether the amount is computed before the write, which decides between an
+  operand patch and a call redirect.
+
+---
+
 ## Useful Call Sites
 
 Reference points for how the game itself does things.
