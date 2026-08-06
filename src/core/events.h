@@ -172,6 +172,27 @@ inline void Pump()
     g_lastFired = GetTickCount();   // measure the gap from when the card CLOSED
 }
 
+// ------------------------------------------------------- presenting in place
+// Almost nothing may present where it fires -- see the note at the top of this
+// file. A GAME MENU IS THE EXCEPTION, and it is a real one rather than a
+// loophole: the town menu's own options present modal dialogs from exactly that
+// point, so PEMF doing the same is doing what the engine does, in the place the
+// engine does it.
+//
+// It also produces a better card than the queue can. An event presented from
+// the safe point composites onto whatever the last frame happened to contain,
+// which is why a card fired on leaving port came up over half-drawn sea. One
+// presented from inside the menu has the town behind it, correct port art and
+// all, because that is genuinely what is on screen.
+//
+// These mark the guard the draw hooks watch, so they stand down exactly as they
+// would for a queued event.
+inline void EnterDirect() { g_inEvent = true; }
+inline void LeaveDirect() { g_inEvent = false; g_lastFired = GetTickCount(); }
+
+// An outcome shown in place must not also be waiting in the queue.
+inline void ClearFollowUp() { g_haveFollowUp = false; }
+
 inline void Clear(const char* reason)
 {
     if (g_count || g_haveFollowUp)

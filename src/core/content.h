@@ -548,6 +548,8 @@ inline int Count() { return (int)g_events.size(); }
 struct MenuRowDef {
     std::string label;
     std::string eventId;
+    int         port   = -1;   // settlement index, -1 = anywhere
+    int         nation = -1;   // owning nation, -1 = any
 };
 
 inline std::vector<MenuRowDef> g_menuRows;
@@ -565,6 +567,8 @@ inline int ParseMenuRows(const json& root, const char* path)
         MenuRowDef r;
         r.label   = jr.value("label", "");
         r.eventId = jr.value("event", "");
+        r.port    = jr.value("port",   -1);
+        r.nation  = jr.value("nation", -1);
 
         if (r.label.empty()) {
             Log("content: REJECTED menu row -- missing 'label'");
@@ -585,6 +589,9 @@ inline int ParseMenuRows(const json& root, const char* path)
         }
         g_menuRows.push_back(r);
         ++added;
+        if (r.port >= 0 || r.nation >= 0)
+            Log("content: menu row '%s' is limited to port %d / nation %d",
+                r.label.c_str(), r.port, r.nation);
     }
     return added;
 }

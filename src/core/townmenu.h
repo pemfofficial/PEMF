@@ -80,7 +80,18 @@ struct Row {
     int  eventIndex = -1;
     void (*fn)(int) = nullptr;
     int  arg = 0;
-    bool enabled = true;
+
+    // Where this row is offered. -1 means "anywhere".
+    //
+    // `port` is the settlement's own index in the game's 128-slot table, which
+    // is the only identifier that is stable AND unique -- names are not, since
+    // several maps rename or move towns. It is not a friendly thing to author
+    // by hand, so every menu logs the index it is showing for; enter the port
+    // once, read pemf.log, put the number in the JSON.
+    int  port   = -1;
+    int  nation = -1;
+
+    bool enabled = true;   // recomputed per menu from the two above
 };
 
 inline Row  g_rows[kMaxRows];
@@ -95,7 +106,8 @@ inline bool g_faulted = false;          // latched off after a fault
 
 inline void Clear() { g_rowCount = 0; }
 
-inline bool Add(const char* label, int eventIndex, void (*fn)(int), int arg)
+inline bool Add(const char* label, int eventIndex, void (*fn)(int), int arg,
+                int port = -1, int nation = -1)
 {
     if (!label || !*label) return false;
     if (g_rowCount >= kMaxRows) {
@@ -113,8 +125,22 @@ inline bool Add(const char* label, int eventIndex, void (*fn)(int), int arg)
     r.eventIndex = eventIndex;
     r.fn = fn;
     r.arg = arg;
+    r.port = port;
+    r.nation = nation;
     r.enabled = true;
     return true;
+}
+
+// Decide which rows this settlement gets. Called once per menu, before the
+// buffer is composed, so a row that does not belong here never reaches the
+// screen and never occupies an index.
+inline void ApplyContext(int port, int nation)
+{
+    for (int i = 0; i < g_rowCount; ++i) {
+        Row& r = g_rows[i];
+        r.enabled = (r.port   < 0 || r.port   == port)
+                 && (r.nation < 0 || r.nation == nation);
+    }
 }
 
 inline int EnabledCount()
@@ -213,8 +239,17 @@ inline int Present(int bg, int flags, int form)
     strncpy_s(snapshot, sizeof(snapshot),
               (const char*)game::addr::MessageText, _TRUNCATE);
 
-    if (EnabledCount() <= 0)
+    // Which settlement is this? In town the ship is at the port, so the
+    // nearest-city lookup is the port -- the same resolution {port} already
+    // uses in authored text, and it named Nevis correctly in playtest.
+    const int city   = game::NearestCity(content::kCityNameScanRadius);
+    const int nation = city >= 0 ? game::CityNation(city) : -1;
+    ApplyContext(city, nation);
+
+    if (EnabledCount() <= 0) {
+        Log("townmenu: port %d -- no PEMF rows offered here", city);
         return CallOriginal(bg, flags, form);
+    }
 
     // Diagnostics for an unexplained R6025 ("pure virtual function call") seen
     // minutes after menu use. Nothing here is known to be the cause -- the
@@ -224,8 +259,10 @@ inline int Present(int bg, int flags, int form)
     {
         size_t probe = 0;
         const int rows = CountOptionLines(snapshot, &probe);
-        Log("townmenu: menu #%ld -- %d game row(s), %u bytes, form %d",
-            g_presents, rows, (unsigned)strlen(snapshot), form);
+        Log("townmenu: menu #%ld -- port %d (nation %d), %d game row(s), "
+            "%u bytes, form %d -- %d PEMF row(s) offered here",
+            g_presents, city, nation, rows, (unsigned)strlen(snapshot), form,
+            EnabledCount());
     }
 
     const int ourFirst = Compose(snapshot);
@@ -269,24 +306,31 @@ inline int Present(int bg, int flags, int form)
         if (row->fn) {
             row->fn(row->arg);
         } else if (row->eventIndex >= 0) {
-            // Posted, not presented. A menu row is a trigger like any other,
-            // and the invariant that nothing presents from where it fires is
-            // what keeps this framework stable -- see events.h. The card comes
-            // up at the safe point once the player is out of the menu.
-            const content::Event* ev = content::Get(row->eventIndex);
-            const char* name = ev ? ev->id.c_str() : "menu row";
+            // PRESENTED HERE, NOT POSTED. The first build queued it, and that
+            // was the wrong call twice over. The card waited for the overworld,
+            // so from inside the town the row looked like it had done nothing
+            // -- players click it again. And when the card did arrive it was
+            // over the sea rather than the port the row belonged to.
+            //
+            // The game's own menu options present modal dialogs from exactly
+            // this point. Ours doing the same is doing what the engine does,
+            // where the engine does it, and the town is behind the card because
+            // that is genuinely what is on screen.
+            events::EnterDirect();
 
-            // The card does not appear until the overworld is back on screen,
-            // so from in here the row looks like it did nothing and gets
-            // clicked again. Playtested exactly that way: two picks a second
-            // apart, two cards, one in town and one after sailing. Asking once
-            // should ask once.
-            if (events::IsQueued(name))
-                Log("townmenu: '%s' is already waiting -- not queued twice",
-                    name);
-            else
-                events::Post([](int idx) { content::Fire(idx); },
-                             row->eventIndex, name);
+            content::Fire(row->eventIndex);
+
+            // The outcome immediately after, rather than through the queue.
+            // The usual reason for deferring it -- two dialogs in one frame
+            // leaves the second compositing over a stale backbuffer -- does not
+            // apply here: the card above ran the game's own pump until the
+            // player dismissed it, so frames were drawn in between. Deferring
+            // it is what put the half-drawn "Fifty pieces lighter" card over
+            // open water in the second playtest.
+            content::ShowPendingOutcome(0);
+            events::ClearFollowUp();
+
+            events::LeaveDirect();
         }
 
         // Show the menu again. ShowMessage consumed the buffer, so it has to be
@@ -383,7 +427,7 @@ inline int LoadFromContent()
                 d.label.c_str(), d.eventId.c_str());
             continue;
         }
-        if (Add(d.label.c_str(), idx, nullptr, 0)) ++added;
+        if (Add(d.label.c_str(), idx, nullptr, 0, d.port, d.nation)) ++added;
     }
     if (added) Log("townmenu: %d authored row(s)", added);
     return added;

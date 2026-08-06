@@ -441,13 +441,42 @@ at are defined elsewhere.
 own options keeps the position it has always had, and leaving stays at the
 bottom where players reach for it.
 
-**When the event happens.** The row **posts** the event rather than showing it
-on the spot, so the card comes up **once you have left the menu**, not while it
-is still open. That is how every other PEMF trigger behaves, and it is
-deliberate twice over: the framework's rule is that nothing presents from the
-place it was triggered, *and* a card shown while a game menu is up composites
-onto a background the game never drew that frame — it appears over a flat
-colour. Picking your row will look like nothing happened until you sail.
+**When the event happens.** Immediately, in the port, exactly like the game's
+own menu options — the town is behind the card, and you are returned to the
+menu afterwards. Its outcome follows straight away rather than waiting.
+
+*(This changed. Menu rows used to queue the event for later, which meant the
+card appeared over open sea after you sailed, and picking the row looked like it
+had done nothing. Rows present in place now.)*
+
+### Limiting a row to one port
+
+Add `port`, `nation`, or both. A row with neither is offered everywhere.
+
+```json
+{ "label": "Ask after the harbourmaster",
+  "event": "harbourmaster_word",
+  "port": 19 }
+```
+
+| Field | Meaning |
+|---|---|
+| `port` | the settlement's index in the game's table. Offered only there. |
+| `nation` | the owning nation's index. Offered only in that crown's ports. |
+
+**Finding a port's number:** enter it once and read `pemf.log`. Every menu
+prints what it is looking at before it does anything:
+
+```
+townmenu: menu #1 -- port 19 (nation 1), 7 game row(s), 245 bytes, form -1 -- 1 PEMF row(s) offered here
+```
+
+The index is used rather than the name because names are not unique or stable —
+map mods rename and move settlements, and two can share a name. The number is
+the settlement.
+
+A row that is filtered out never reaches the screen and never takes up a
+position, so the rest of the menu is unaffected.
 
 **Six rows maximum**, across all files. A menu that runs past the bottom of the
 screen is not a feature.
