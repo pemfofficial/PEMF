@@ -1171,6 +1171,24 @@ static void ReportColours(const char* when)
 // INSTALLED ONCE. The original is backed up, a marker line goes in the footer,
 // and PEMF never touches the file again -- so a player who rebinds something
 // afterwards keeps it. Deleting the marker line asks for the layout back.
+//
+// ⚠️ THE MARKER IS APPENDED HERE, NOT SHIPPED IN KeyMap_WASD.ini. It used to
+// live in the source file, and that was wrong twice over.
+//
+// It put the words "delete this line to let PEMF install the layout again" in
+// `<game>\PEMF\KeyMap_WASD.ini` -- the file sitting where the player extracted
+// the mod, and so the one they find. The marker that actually decides anything
+// is in Documents\My Games\...\KeyMap.ini, which they have no reason to look
+// in. Reported from play as "I deleted the marker line and nothing changed",
+// and they were right: they had deleted the other copy.
+//
+// And it made the install-once guarantee depend on a line in a file we invite
+// people to edit. Delete it from the source and every future install writes a
+// KeyMap.ini with no marker, so PEMF reinstalls on every launch from then on,
+// quietly discarding whatever the player rebound.
+//
+// Appending it at write time means the target always has it, whatever the
+// source says, and the source carries no instruction aimed at the wrong file.
 static void InstallWasdKeymap(const char* gameDir)
 {
     if (!g_profileDir[0]) {
@@ -1205,8 +1223,8 @@ static void InstallWasdKeymap(const char* gameDir)
                     free(buf);
                     if (found) {
                         fclose(f);
-                        Log("keymap: WASD already installed -- the player's "
-                            "KeyMap.ini is left alone");
+                        Log("keymap: WASD already installed in %s -- left "
+                            "alone so your own rebinds survive", target);
                         return;
                     }
                 }
@@ -1266,6 +1284,23 @@ static void InstallWasdKeymap(const char* gameDir)
         const unsigned char pair[2] = { (unsigned char)ascii[i], 0 };
         fwrite(pair, 1, 2, out);
     }
+
+    // The marker, written by us rather than copied, and naming the file it is
+    // actually in so nobody goes hunting for it in the game folder.
+    char marker[512];
+    const int mlen = _snprintf_s(marker, sizeof(marker), _TRUNCATE,
+        "\r\n; PEMF-WASD-INSTALLED\r\n"
+        "; PEMF wrote the layout above into this file, once, and will not touch\r\n"
+        "; it again -- so anything you rebind from here on is yours and stays.\r\n"
+        "; Delete the PEMF-WASD-INSTALLED line IN THIS FILE to have the layout\r\n"
+        "; put back on the next launch. (The copy in the game folder under\r\n"
+        "; PEMF\\KeyMap_WASD.ini is only the template and deleting anything\r\n"
+        "; there changes nothing.)\r\n");
+    for (int i = 0; i < mlen; ++i) {
+        const unsigned char pair[2] = { (unsigned char)marker[i], 0 };
+        fwrite(pair, 1, 2, out);
+    }
+
     fclose(out);
     free(ascii);
 
