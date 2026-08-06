@@ -491,6 +491,88 @@ townmenu: REJECTED row 'Ask after the harbourmaster' -- no event with id 'harbou
 
 ---
 
+## Menus — your own screens
+
+A menu row can open a **menu** instead of firing an event, and a menu's options
+can open further menus. That is enough to build a whole feature out of data.
+
+```json
+{
+  "menuRows": [
+    { "label": "Manage yer crew!", "menu": "crew_root" }
+  ],
+
+  "menus": [
+    {
+      "id": "crew_root",
+      "title": "Your crew of {crew} stands {morale}. Do you...",
+      "options": [
+        { "text": "Look over the roster", "menu":    "crew_roster" },
+        { "text": "Speak to the bosun",   "event":   "bosun_asks_for_rum" },
+        { "text": "Count the shares",     "outcome": "There is {gold} undivided." }
+      ]
+    },
+    {
+      "id": "crew_roster",
+      "title": "The roster.",
+      "options": [
+        { "text": "Close the book", "outcome": "You close the book." }
+      ]
+    }
+  ]
+}
+```
+
+### A menu
+
+| Field | Meaning |
+|---|---|
+| `id` | unique name, used by rows and other menus to point at it |
+| `title` | the prose at the top. [Placeholders](#placeholders--the-easy-way) work. |
+| `options` | 1–5 of them |
+
+### An option
+
+Each option does **exactly one** of three things — not none, not two:
+
+| Field | What happens |
+|---|---|
+| `menu` | opens that menu. Returning from it brings you back to this one. |
+| `event` | fires that event, card and outcome, then closes the menu. |
+| `outcome` | shows a closing card with that text. Placeholders work. |
+
+`text` is the selectable line, and like an event's option text it is plain —
+placeholders are not substituted there.
+
+### Things that are handled for you
+
+- **A way out.** `Never mind.` is added as the last row of every menu. You do
+  not write it, and you cannot lose it — which is why the limit is five options
+  rather than six.
+- **Going back.** `Never mind.` in a submenu returns to the menu above it, one
+  level at a time. From the top menu it returns to the town.
+- **The backdrop.** Every screen is drawn against the port you are standing in,
+  through the game's own card renderer.
+- **Depth.** Six levels. A cycle in your data — A opens B opens A — is walkable
+  by the player as long as they like; it just cannot recurse past six.
+
+### When something is wrong
+
+Everything is checked at load, and reported by name:
+
+```
+content: REJECTED menu 'crew_root' -- needs an 'options' array
+content: REJECTED menu 'crew_root' option 'Look over the roster' -- needs exactly one of 'menu', 'event' or 'outcome' (found 2)
+content: menu 'crew_root' option 'Speak to the bosun' -- no event with id 'bosun_asks_for_rm'
+townmenu: REJECTED row 'Manage yer crew!' -- no menu with id 'crew_rot'
+```
+
+Menu titles and outcomes go through the **same** token and ASCII validation as
+event text, for the same reason: the engine reads arguments positionally, and
+one `@` token too many reads stack garbage.
+
+---
+
 ## Effects
 
 What an option does to the game.

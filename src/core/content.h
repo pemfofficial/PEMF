@@ -540,6 +540,188 @@ inline int Count() { return (int)g_events.size(); }
 // Load and validate ONE file, APPENDING to the library. Returns how many events
 // it contributed. A malformed file never throws into the game: it is reported
 // and skipped, so one bad mod cannot take the others down with it.
+// ----------------------------------------------------------------- menus
+// PEMF's own menus: a tree of them, authored as data. A menu is a title and a
+// list of options, and each option either opens another menu, fires an event,
+// or shows a closing card. That is enough to express a whole feature -- "Manage
+// yer crew!" leading to a roster, leading to one man, leading to what you do
+// with him -- without a line of C++ per screen.
+//
+// They are drawn with the engine's own card renderer against the port's own
+// backdrop, so they look like the game's menus because they are made of the
+// same call. See townmenu.h.
+// FIVE, not six. The card renders at most kMaxOptions (6) selectable lines and
+// we add "Never mind." ourselves, so six authored options would make seven and
+// the way out would be the row that fell off the end -- stranding the player in
+// a menu with no way back.
+constexpr int kMaxMenuOptions = 5;
+constexpr int kMaxMenuDepth   = 6;    // a cycle in authored data must still end
+
+struct MenuOption {
+    std::string text;
+    std::string menuId;     // opens this menu
+    std::string eventId;    // fires this event
+    std::string outcome;    // or just says this and closes
+    std::vector<Arg> outcomeArgs;
+
+    int menuIndex  = -1;    // resolved once every file is loaded
+    int eventIndex = -1;
+};
+
+struct MenuDef {
+    std::string id;
+    std::string title;
+    std::vector<Arg> titleArgs;
+    std::vector<MenuOption> options;
+};
+
+inline std::vector<MenuDef> g_menus;
+
+inline int FindMenuIndex(const std::string& id)
+{
+    for (size_t i = 0; i < g_menus.size(); ++i)
+        if (g_menus[i].id == id) return (int)i;
+    return -1;
+}
+
+inline const MenuDef* GetMenu(int index)
+{
+    if (index < 0 || index >= (int)g_menus.size()) return nullptr;
+    return &g_menus[(size_t)index];
+}
+
+inline int ParseMenus(const json& root, const char* path)
+{
+    if (!root.contains("menus")) return 0;
+    if (!root["menus"].is_array()) {
+        Log("content: %s has 'menus' but it is not an array -- ignored", path);
+        return 0;
+    }
+
+    int added = 0;
+    for (const auto& jm : root["menus"]) {
+        MenuDef m;
+        m.id    = jm.value("id", "");
+        m.title = jm.value("title", "");
+
+        if (m.id.empty()) {
+            Log("content: REJECTED menu -- missing 'id'");
+            continue;
+        }
+        if (FindMenuIndex(m.id) >= 0) {
+            Log("content: REJECTED menu '%s' -- duplicate id", m.id.c_str());
+            continue;
+        }
+        if (m.title.empty()) {
+            Log("content: REJECTED menu '%s' -- missing 'title'", m.id.c_str());
+            continue;
+        }
+
+        // Placeholders and token validation are the same here as on an event,
+        // and for the same reason: the engine formatter reads varargs
+        // positionally, so a title carrying one @ token too many reads stack
+        // garbage. Menus are authored text like any other and get the identical
+        // treatment rather than a lighter one.
+        std::string err;
+        if (!ExpandPlaceholders("menu title", &m.title, &m.titleArgs, &err)) {
+            Log("content: REJECTED menu '%s' -- %s", m.id.c_str(), err.c_str());
+            continue;
+        }
+        if (!ValidateText("menu title", m.title, ArgSlots(m.titleArgs), &err)) {
+            Log("content: REJECTED menu '%s' -- %s", m.id.c_str(), err.c_str());
+            continue;
+        }
+        if (!jm.contains("options") || !jm["options"].is_array() ||
+            jm["options"].empty()) {
+            Log("content: REJECTED menu '%s' -- needs an 'options' array",
+                m.id.c_str());
+            continue;
+        }
+
+        bool ok = true;
+        for (const auto& jo : jm["options"]) {
+            if ((int)m.options.size() >= kMaxMenuOptions) {
+                Log("content: menu '%s' -- more than %d options, rest dropped",
+                    m.id.c_str(), kMaxMenuOptions);
+                break;
+            }
+            MenuOption o;
+            o.text    = jo.value("text", "");
+            o.menuId  = jo.value("menu", "");
+            o.eventId = jo.value("event", "");
+            o.outcome = jo.value("outcome", "");
+
+            if (o.text.empty()) {
+                Log("content: REJECTED menu '%s' -- an option has no 'text'",
+                    m.id.c_str());
+                ok = false;
+                break;
+            }
+            // Option text is plain, as on an event card -- tokens are not
+            // substituted in a selectable line.
+            if (!ValidateText("menu option text", o.text, 0, &err)) {
+                Log("content: REJECTED menu '%s' option '%s' -- %s",
+                    m.id.c_str(), o.text.c_str(), err.c_str());
+                ok = false;
+                break;
+            }
+            if (!o.outcome.empty()) {
+                if (!ExpandPlaceholders("menu outcome", &o.outcome,
+                                        &o.outcomeArgs, &err) ||
+                    !ValidateText("menu outcome", o.outcome,
+                                  ArgSlots(o.outcomeArgs), &err)) {
+                    Log("content: REJECTED menu '%s' option '%s' -- %s",
+                        m.id.c_str(), o.text.c_str(), err.c_str());
+                    ok = false;
+                    break;
+                }
+            }
+            // Exactly one destination. Two would be ambiguous, and none is a
+            // row the player can select and watch do nothing.
+            const int dests = (o.menuId.empty()  ? 0 : 1)
+                            + (o.eventId.empty() ? 0 : 1)
+                            + (o.outcome.empty() ? 0 : 1);
+            if (dests != 1) {
+                Log("content: REJECTED menu '%s' option '%s' -- needs exactly one "
+                    "of 'menu', 'event' or 'outcome' (found %d)",
+                    m.id.c_str(), o.text.c_str(), dests);
+                ok = false;
+                break;
+            }
+            m.options.push_back(o);
+        }
+        if (!ok || m.options.empty()) continue;
+
+        g_menus.push_back(m);
+        ++added;
+    }
+    return added;
+}
+
+// Turn authored ids into indices, once every file is loaded, so a menu may
+// point at one defined in a file that loads later. An option pointing nowhere
+// is reported by name rather than left to do nothing when it is picked.
+inline void ResolveMenus()
+{
+    for (MenuDef& m : g_menus) {
+        for (MenuOption& o : m.options) {
+            if (!o.menuId.empty()) {
+                o.menuIndex = FindMenuIndex(o.menuId);
+                if (o.menuIndex < 0)
+                    Log("content: menu '%s' option '%s' -- no menu with id '%s'",
+                        m.id.c_str(), o.text.c_str(), o.menuId.c_str());
+            }
+            if (!o.eventId.empty()) {
+                o.eventIndex = FindByIdIndex(o.eventId);
+                if (o.eventIndex < 0)
+                    Log("content: menu '%s' option '%s' -- no event with id '%s'",
+                        m.id.c_str(), o.text.c_str(), o.eventId.c_str());
+            }
+        }
+    }
+    if (!g_menus.empty()) Log("content: %d menu(s)", (int)g_menus.size());
+}
+
 // ------------------------------------------------------------- menu rows
 // A row PEMF adds to the game's town menu, authored alongside events in the
 // same file. Held as the id the author wrote rather than an index, because a
@@ -548,6 +730,7 @@ inline int Count() { return (int)g_events.size(); }
 struct MenuRowDef {
     std::string label;
     std::string eventId;
+    std::string menuId;    // a row may open a menu instead of firing an event
     int         port   = -1;   // settlement index, -1 = anywhere
     int         nation = -1;   // owning nation, -1 = any
 };
@@ -567,6 +750,7 @@ inline int ParseMenuRows(const json& root, const char* path)
         MenuRowDef r;
         r.label   = jr.value("label", "");
         r.eventId = jr.value("event", "");
+        r.menuId  = jr.value("menu",  "");
         r.port    = jr.value("port",   -1);
         r.nation  = jr.value("nation", -1);
 
@@ -574,9 +758,9 @@ inline int ParseMenuRows(const json& root, const char* path)
             Log("content: REJECTED menu row -- missing 'label'");
             continue;
         }
-        if (r.eventId.empty()) {
-            Log("content: REJECTED menu row '%s' -- missing 'event'",
-                r.label.c_str());
+        if (r.eventId.empty() == r.menuId.empty()) {
+            Log("content: REJECTED menu row '%s' -- needs exactly one of "
+                "'event' or 'menu'", r.label.c_str());
             continue;
         }
         // The row is drawn through the game's own text system, which is not
@@ -620,12 +804,13 @@ inline int LoadFile(const char* path)
         return 0;
     }
 
+    ParseMenus(root, path);
     ParseMenuRows(root, path);
 
     if (!root.contains("events") || !root["events"].is_array()) {
         // A file may legitimately carry only menu rows, so this is only worth
         // saying when the file turned out to carry nothing at all.
-        if (!root.contains("menuRows"))
+        if (!root.contains("menuRows") && !root.contains("menus"))
             Log("content: %s has no top-level 'events' array", path);
         return 0;
     }
@@ -751,6 +936,7 @@ inline int LoadFolder(const char* dir)
 {
     g_events.clear();
     g_menuRows.clear();
+    g_menus.clear();
 
     char pattern[MAX_PATH];
     _snprintf_s(pattern, sizeof(pattern), _TRUNCATE, "%s\\*.json", dir);

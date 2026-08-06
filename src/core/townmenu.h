@@ -78,6 +78,7 @@ constexpr size_t kMsgMax     = 1024;
 struct Row {
     char label[kLabelLen] = {0};
     int  eventIndex = -1;
+    int  menuIndex  = -1;   // opens a PEMF menu instead of firing an event
     void (*fn)(int) = nullptr;
     int  arg = 0;
 
@@ -106,8 +107,8 @@ inline bool g_faulted = false;          // latched off after a fault
 
 inline void Clear() { g_rowCount = 0; }
 
-inline bool Add(const char* label, int eventIndex, void (*fn)(int), int arg,
-                int port = -1, int nation = -1)
+inline bool Add(const char* label, int eventIndex, int menuIndex,
+                void (*fn)(int), int arg, int port = -1, int nation = -1)
 {
     if (!label || !*label) return false;
     if (g_rowCount >= kMaxRows) {
@@ -123,6 +124,7 @@ inline bool Add(const char* label, int eventIndex, void (*fn)(int), int arg,
     else
         _snprintf_s(r.label, sizeof(r.label), _TRUNCATE, " %s", label);
     r.eventIndex = eventIndex;
+    r.menuIndex  = menuIndex;
     r.fn = fn;
     r.arg = arg;
     r.port = port;
@@ -228,6 +230,81 @@ __declspec(naked) inline int CallOriginal(int /*ecx*/, int /*edx*/, int /*eax*/)
     }
 }
 
+// ------------------------------------------------------------- our own menus
+// A PEMF menu is drawn with the engine's own card renderer, against the port's
+// backdrop, and returns the option the player picked. None of the town menu's
+// index arithmetic applies here: every row is ours, the game never sees the
+// result, and there is no leave row to work around. This is a plain modal.
+//
+// The one thing it must not do is run forever. Authored data can contain a
+// cycle -- menu A offering menu B offering menu A -- and a player can walk it
+// as long as they like, which is fine; what must not happen is unbounded
+// RECURSION, so depth is capped and a menu too deep says so rather than
+// growing the stack until the game dies.
+inline void RunMenu(int menuIndex, int depth)
+{
+    const content::MenuDef* m = content::GetMenu(menuIndex);
+    if (!m) return;
+
+    if (depth >= content::kMaxMenuDepth) {
+        Log("townmenu: menu '%s' is deeper than %d -- stopping here",
+            m->id.c_str(), content::kMaxMenuDepth);
+        return;
+    }
+
+    for (int guard = 0; guard < kMaxLoops; ++guard) {
+        // Rebuilt every time round: an option's text may depend on state that
+        // the last choice changed.
+        const char* opts[content::kMaxMenuOptions + 1] = {nullptr};
+        int n = 0;
+        for (const content::MenuOption& o : m->options) {
+            if (n >= content::kMaxMenuOptions) break;
+            opts[n++] = o.text.c_str();
+        }
+        // Always a way out, and always last, where the town menu puts its own.
+        const int backRow = n;
+        opts[n++] = "Never mind.";
+
+        // Resolve the title's arguments fresh each turn, so a value shown in
+        // the title reflects whatever the last choice just changed.
+        int targs[content::kMaxArgs] = {0};
+        const int targc = content::ResolveArgs(m->titleArgs, targs,
+                                               content::kMaxArgs);
+
+        const int pick = game::AskChoiceN(m->title.c_str(), opts, n,
+                                          targs, targc);
+
+        if (pick < 0 || pick >= n || pick == backRow) return;
+
+        const content::MenuOption& o = m->options[(size_t)pick];
+        Log("townmenu: menu '%s' -> '%s'", m->id.c_str(), o.text.c_str());
+
+        if (o.menuIndex >= 0) {
+            RunMenu(o.menuIndex, depth + 1);
+        } else if (o.eventIndex >= 0) {
+            content::Fire(o.eventIndex);
+            content::ShowPendingOutcome(0);
+            events::ClearFollowUp();
+            return;                       // an event ends the walk
+        } else if (!o.outcome.empty()) {
+            int oargs[content::kMaxArgs] = {0};
+            const int oargc = content::ResolveArgs(o.outcomeArgs, oargs,
+                                                   content::kMaxArgs);
+            game::ShowModalTextN(o.outcome.c_str(), oargs, oargc);
+            return;                       // so does a closing card
+        } else {
+            // Authored to go somewhere that does not exist. Reported at load;
+            // say so again here rather than appear to ignore the click.
+            Log("townmenu: menu '%s' option '%s' has no destination",
+                m->id.c_str(), o.text.c_str());
+            return;
+        }
+        // A submenu returned: fall round and show this one again.
+    }
+    Log("townmenu: menu '%s' -- %d turns without leaving, closing it",
+        m->id.c_str(), kMaxLoops);
+}
+
 // ------------------------------------------------------------------ the logic
 // Runs with the menu composed and about to be shown. Returns the index the
 // game should act on -- always one the game itself produced.
@@ -309,6 +386,19 @@ inline int Present(int bg, int flags, int form)
 
         if (row->fn) {
             row->fn(row->arg);
+        } else if (row->menuIndex >= 0) {
+            // A menu row that opens a PEMF menu. Same presentation rules as a
+            // card: in place, against this port, and back to the town menu
+            // afterwards.
+            events::EnterDirect();
+            game::g_portCardCity  = bg;
+            game::g_portCardFlags = 0;
+
+            RunMenu(row->menuIndex, 0);
+
+            game::g_portCardCity  = -1;
+            game::g_portCardFlags = 0;
+            events::LeaveDirect();
         } else if (row->eventIndex >= 0) {
             // PRESENTED HERE, NOT POSTED. The first build queued it, and that
             // was the wrong call twice over. The card waited for the overworld,
@@ -449,15 +539,28 @@ __declspec(naked) inline int MenuShim()
 inline int LoadFromContent()
 {
     Clear();
+    content::ResolveMenus();
+
     int added = 0;
     for (const content::MenuRowDef& d : content::g_menuRows) {
-        const int idx = content::FindByIdIndex(d.eventId);
-        if (idx < 0) {
-            Log("townmenu: REJECTED row '%s' -- no event with id '%s'",
-                d.label.c_str(), d.eventId.c_str());
-            continue;
+        int ev = -1, mn = -1;
+
+        if (!d.menuId.empty()) {
+            mn = content::FindMenuIndex(d.menuId);
+            if (mn < 0) {
+                Log("townmenu: REJECTED row '%s' -- no menu with id '%s'",
+                    d.label.c_str(), d.menuId.c_str());
+                continue;
+            }
+        } else {
+            ev = content::FindByIdIndex(d.eventId);
+            if (ev < 0) {
+                Log("townmenu: REJECTED row '%s' -- no event with id '%s'",
+                    d.label.c_str(), d.eventId.c_str());
+                continue;
+            }
         }
-        if (Add(d.label.c_str(), idx, nullptr, 0, d.port, d.nation)) ++added;
+        if (Add(d.label.c_str(), ev, mn, nullptr, 0, d.port, d.nation)) ++added;
     }
     if (added) Log("townmenu: %d authored row(s)", added);
     return added;

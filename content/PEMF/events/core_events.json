@@ -162,6 +162,53 @@
     {
       "label": "Ask after the harbourmaster",
       "event": "harbourmaster_word"
+    },
+    {
+      "label": "Manage yer crew!",
+      "menu": "crew_root"
+    }
+  ],
+
+  "_menusComment": [
+    "menus are PEMF's own screens. Each has an id, a title, and options.",
+    "",
+    "An option does exactly one of three things:",
+    "  \"menu\":    opens another menu (nest as deep as you like, up to 6)",
+    "  \"event\":   fires an event by id, then closes",
+    "  \"outcome\": shows a closing card with that text",
+    "",
+    "A 'Never mind.' row is added for you and is always last. Menus are drawn",
+    "with the game's own card renderer against the port you are standing in.",
+    "",
+    "The crew menu below is a SCAFFOLD for the expanded crew system -- the",
+    "options are deliberately named Test 1..5 and do nothing of consequence."
+  ],
+  "menus": [
+    {
+      "id": "crew_root",
+      "title": "Manage yer crew!",
+      "options": [
+        { "text": "Test 1 -- the roster",     "menu": "crew_test_roster" },
+        { "text": "Test 2 -- morale",         "outcome": "Test 2. Your crew of {crew} stands {morale}." },
+        { "text": "Test 3 -- shares",         "outcome": "Test 3. There is {gold} in undivided plunder." },
+        { "text": "Test 4 -- time at sea",    "outcome": "Test 4. You have been at sea {months} months." },
+        { "text": "Test 5 -- an event",       "event": "harbourmaster_word" }
+      ]
+    },
+    {
+      "id": "crew_test_roster",
+      "title": "Test 1. A menu opened from a menu, to prove nesting works.",
+      "options": [
+        { "text": "Go deeper",       "menu": "crew_test_deep" },
+        { "text": "Say something",   "outcome": "Test 1a. This card closes the whole thing." }
+      ]
+    },
+    {
+      "id": "crew_test_deep",
+      "title": "Test 1b. Two levels down. 'Never mind.' should walk back up one at a time.",
+      "options": [
+        { "text": "Confirm we got here", "outcome": "Test 1c. Three screens deep and back out cleanly." }
+      ]
     }
   ]
 }
