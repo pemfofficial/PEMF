@@ -46,6 +46,7 @@
 #include <string.h>
 
 #include "log.h"
+#include "officerfx.h"
 #include "game.h"
 #include "render.h"   // RedirectCall
 #include "events.h"   // Busy -- a card freezes the world, and the weather with it
@@ -1165,6 +1166,18 @@ inline void TickCargoLoss()
     if (slot < 0) return;                  // nothing loose to lose
 
     int lost = 1 + (int)(now % (DWORD)g_tune.cargoLossMax);
+
+    // A carpenter who stows well saves some of it; a careless one loses more.
+    // Applied here rather than to the tunable, so the player's own
+    // cargoLossMax keeps meaning what they set it to.
+    if (officerfx::g_cargoGuard != 0) {
+        const int before = lost;
+        lost = officerfx::ApplyPercent(lost, -officerfx::g_cargoGuard);
+        if (lost != before)
+            Log("storms: cargo loss %d -> %d (carpenter %+d%%)",
+                before, lost, officerfx::g_cargoGuard);
+        if (lost <= 0) return;      // nothing went over the side
+    }
     if (lost > have) lost = have;
 
     __try {

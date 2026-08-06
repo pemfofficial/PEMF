@@ -45,6 +45,7 @@
 #include "storms.h"
 #include "loot.h"
 #include "morale.h"
+#include "crewwatch.h"
 #include "officers.h"
 #include "townmenu.h"
 #include "plugin.h"
@@ -364,6 +365,7 @@ static void RunSafePoint()
         // The earned-total belongs to the career. A baseline carried across
         // would read as one enormous award the moment the new one is sampled.
         loot::Rebase("career context changed");
+        crewwatch::Rebase("career context changed");
         // Anything still on screen belongs to the career that just ended. A
         // lookout's call from the last captain's voyage has no business
         // hanging over this one's ship.
@@ -503,7 +505,7 @@ static void RunSafePoint()
 
     // PEMF's share of what the crew took. A read and a compare in the common
     // case; see loot.h for why this is sampled rather than hooked.
-    if (g_targetOK) loot::Tick();
+    if (g_targetOK) { loot::Tick(); crewwatch::Tick(); }
 
     // Presenting only moves to the render phase once stage 3 is reached; until
     // then it happens here. The half-drawn background this used to leave behind
@@ -2162,6 +2164,7 @@ static DWORD WINAPI Hook_timeGetTime(void)
     if (kM) {
         morale::LogState("probe");
         loot::Report();
+        crewwatch::Report();
         content::PostDebugNotice("Morale + loot written to pemf.log.", 6);
         return r;
     }

@@ -3,19 +3,30 @@
     "PEMF -- officers.",
     "",
     "Everything about hiring officers lives here and is meant to be edited.",
-    "Add names, write bios, invent skills, change what a search costs. A file",
-    "that breaks a rule is rejected at load with the reason in pemf.log, and",
-    "the rest still loads.",
+    "A file that breaks a rule is rejected at load with the reason in pemf.log,",
+    "and the rest still loads.",
     "",
-    "FOUR LISTS:",
-    "  names   -- the pool officers are named from",
-    "  bios    -- one line of flavour, picked at random",
-    "  skills  -- what an officer can be good at",
-    "  roles   -- the six posts, what they cost, and which skills they can have",
+    "TRAITS: every officer has talents, and may also have a FLAW. Both are",
+    "rolled at random, so two Master Bosuns are not the same man. A flaw is",
+    "just a trait with a negative value -- the schema does not treat it",
+    "specially, and neither should you when writing one.",
     "",
-    "TIERS: novice (1 skill), journeyman (2), master (3). Paying searches for",
-    "an officer of that standing -- it does NOT buy one. Finding somebody is a",
-    "roll, and a dearer search is a better roll, not a certainty."
+    "TARGETS -- what a trait may change. ONLY these five. Anything else is",
+    "rejected at load, because PEMF will not pretend to change something it",
+    "cannot:",
+    "",
+    "  loot        percent added to everything the crew plunders.",
+    "              Negative loses you part of the take.",
+    "  morale      points on the crew's temper.",
+    "  cargoGuard  percent of storm cargo losses prevented.",
+    "              Negative and more goes over the side.",
+    "  discretion  percent slower suspicion under false colours.",
+    "              Negative and they see through you sooner.",
+    "  surgeon     percent of crew losses recovered -- men who would have",
+    "              died and did not. Negative is a butcher.",
+    "",
+    "Write the text so a player knows what it DOES. 'He counts a prize twice'",
+    "is flavour; the number after it is the promise."
   ],
 
   "names": [
@@ -37,7 +48,7 @@
     "Keeps a psalter he cannot read and a knife he plainly can use.",
     "Was pressed into a King's ship at fifteen and has had opinions about kings since.",
     "Has buried two wives and three captains, and speaks better of the wives.",
-    "Talks little, works steadily, and has never once been found where he should not be.",
+    "Talks little, works steadily, and has never been found where he should not be.",
     "Swears he has seen the Maelstrom. Nobody argues, which he takes for agreement.",
     "Carries a Spanish coin with a hole through it and will not say what stopped it.",
     "Learned his trade in the Mediterranean and thinks little of Caribbean weather.",
@@ -50,52 +61,130 @@
   "skills": [
     {
       "id": "sharp_eye",
-      "name": "A Sharp Eye",
-      "text": "He counts a prize's worth before the smoke clears, and little goes astray.",
+      "name": "A Sharp Eye for Plunder",
+      "text": "Counts a prize's worth before the smoke clears, and little goes astray",
       "target": "loot",
       "value": 10
     },
     {
-      "id": "fair_share",
-      "name": "A Fair Share",
-      "text": "The men trust his arithmetic, which is worth more than the arithmetic.",
-      "target": "morale",
-      "value": 4
+      "id": "prize_master",
+      "name": "Prize Master",
+      "text": "Knows which hull is worth taking and which is worth burning",
+      "target": "loot",
+      "value": 18
     },
     {
       "id": "hard_bargain",
       "name": "A Hard Bargain",
-      "text": "He has never paid an asking price in his life.",
+      "text": "Has never paid an asking price in his life, and sells dearer than you would",
       "target": "loot",
-      "value": 6
+      "value": 7
     },
     {
-      "id": "steady_hand",
-      "name": "A Steady Hand",
-      "text": "Nothing aboard hurries him, and nothing aboard goes wrong twice.",
+      "id": "fair_share",
+      "name": "A Fair Share",
+      "text": "The men trust his arithmetic, which is worth more than the arithmetic",
       "target": "morale",
-      "value": 3
-    },
-    {
-      "id": "old_salt",
-      "name": "An Old Salt",
-      "text": "He has weathered worse, says so, and the crew believe him.",
-      "target": "morale",
-      "value": 2
-    },
-    {
-      "id": "prize_master",
-      "name": "Prize Master",
-      "text": "He knows which hull is worth taking and which is worth burning.",
-      "target": "loot",
-      "value": 15
+      "value": 4
     },
     {
       "id": "well_liked",
       "name": "Well Liked",
-      "text": "The hands work the harder for him, and none of them could tell you why.",
+      "text": "The hands work the harder for him and none of them could tell you why",
       "target": "morale",
       "value": 5
+    },
+    {
+      "id": "old_salt",
+      "name": "An Old Salt",
+      "text": "Has weathered worse, says so, and the crew believe him",
+      "target": "morale",
+      "value": 3
+    },
+    {
+      "id": "well_stowed",
+      "name": "Stows Her Well",
+      "text": "Cargo lashed his way stays aboard when the sea comes over the rail",
+      "target": "cargoGuard",
+      "value": 25
+    },
+    {
+      "id": "ready_pumps",
+      "name": "Ready at the Pumps",
+      "text": "Has the hatches battened before the first squall reaches you",
+      "target": "cargoGuard",
+      "value": 15
+    },
+    {
+      "id": "close_mouthed",
+      "name": "Close-Mouthed Ashore",
+      "text": "Drinks in port without ever once saying whose ship he sails",
+      "target": "discretion",
+      "value": 20
+    },
+    {
+      "id": "false_papers",
+      "name": "A Way With Papers",
+      "text": "Produces a manifest for any flag you care to fly, and it reads true",
+      "target": "discretion",
+      "value": 30
+    },
+    {
+      "id": "steady_hand",
+      "name": "A Steady Hand With a Needle",
+      "text": "Men who would have died of their wounds get up and walk instead",
+      "target": "surgeon",
+      "value": 25
+    },
+    {
+      "id": "ships_physic",
+      "name": "Ship's Physic",
+      "text": "Keeps the fever off the lower deck, which no one thanks him for",
+      "target": "surgeon",
+      "value": 15
+    },
+
+    {
+      "id": "flaw_drinker",
+      "name": "FLAW: Drinks",
+      "text": "Found insensible at the change of watch more often than not",
+      "target": "morale",
+      "value": -4
+    },
+    {
+      "id": "flaw_light_fingers",
+      "name": "FLAW: Light Fingers",
+      "text": "Somehow the count never quite matches what came aboard",
+      "target": "loot",
+      "value": -9
+    },
+    {
+      "id": "flaw_loud",
+      "name": "FLAW: A Loose Tongue",
+      "text": "Tells the whole tavern whose ship he sails and what she carries",
+      "target": "discretion",
+      "value": -25
+    },
+    {
+      "id": "flaw_careless",
+      "name": "FLAW: Careless With Cargo",
+      "text": "Stows in a hurry, and the sea finds every rope he did not pull tight",
+      "target": "cargoGuard",
+      "value": -20
+    },
+    {
+      "id": "flaw_butcher",
+      "name": "FLAW: More Butcher Than Surgeon",
+      "text": "Men carried below to him do not often come back up",
+      "target": "surgeon",
+      "value": -20
+    },
+    {
+      "id": "flaw_hated",
+      "name": "FLAW: Hated Forward",
+      "text": "The hands work slower when he is watching, and stop when he is not",
+      "target": "morale",
+      "value": -5
     }
   ],
 
@@ -104,43 +193,49 @@
       "id": "quartermaster",
       "name": "Quartermaster",
       "blurb": "a fairer share, and a crew that knows it",
-      "skills": [ "fair_share", "sharp_eye", "well_liked", "hard_bargain" ]
+      "skills": [ "fair_share", "sharp_eye", "well_liked", "hard_bargain" ],
+      "flaws":  [ "flaw_light_fingers", "flaw_drinker", "flaw_hated" ]
     },
     {
       "id": "sailing_master",
       "name": "Sailing Master",
-      "blurb": "she handles better in a blow",
-      "skills": [ "old_salt", "steady_hand", "well_liked" ]
+      "blurb": "she weathers a blow better",
+      "skills": [ "old_salt", "ready_pumps", "well_liked" ],
+      "flaws":  [ "flaw_drinker", "flaw_careless" ]
     },
     {
       "id": "bosun",
       "name": "Bosun",
       "blurb": "the hands work faster and grumble less",
-      "skills": [ "well_liked", "steady_hand", "old_salt" ]
+      "skills": [ "well_liked", "old_salt", "well_stowed" ],
+      "flaws":  [ "flaw_hated", "flaw_drinker", "flaw_careless" ]
     },
     {
       "id": "master_gunner",
       "name": "Master Gunner",
-      "blurb": "the broadsides tell",
-      "skills": [ "prize_master", "sharp_eye", "steady_hand" ]
+      "blurb": "the broadsides tell, and the prizes are richer",
+      "skills": [ "prize_master", "sharp_eye", "old_salt" ],
+      "flaws":  [ "flaw_light_fingers", "flaw_drinker" ]
     },
     {
       "id": "carpenter",
       "name": "Carpenter",
-      "blurb": "repairs at sea, and fewer of them needed",
-      "skills": [ "steady_hand", "old_salt", "hard_bargain" ]
+      "blurb": "less goes over the side in heavy weather",
+      "skills": [ "well_stowed", "ready_pumps", "hard_bargain" ],
+      "flaws":  [ "flaw_careless", "flaw_drinker" ]
     },
     {
       "id": "surgeon",
       "name": "Surgeon",
       "blurb": "fewer die of their wounds",
-      "skills": [ "well_liked", "steady_hand", "fair_share" ]
+      "skills": [ "steady_hand", "ships_physic", "well_liked" ],
+      "flaws":  [ "flaw_butcher", "flaw_drinker" ]
     }
   ],
 
   "tiers": [
-    { "id": "novice",     "name": "Novice",     "skills": 1, "cost": 200, "chance": 70 },
-    { "id": "journeyman", "name": "Journeyman", "skills": 2, "cost": 500, "chance": 45 },
-    { "id": "master",     "name": "Master",     "skills": 3, "cost": 1200, "chance": 25 }
+    { "id": "novice",     "name": "Novice",     "skills": 1, "cost": 200,  "chance": 70, "flawChance": 45 },
+    { "id": "journeyman", "name": "Journeyman", "skills": 2, "cost": 500,  "chance": 45, "flawChance": 25 },
+    { "id": "master",     "name": "Master",     "skills": 3, "cost": 1200, "chance": 25, "flawChance": 10 }
   ]
 }

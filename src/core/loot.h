@@ -49,6 +49,7 @@
 #include "game.h"
 #include "state.h"
 #include "content.h"
+#include "officerfx.h"
 
 namespace loot {
 
@@ -65,10 +66,11 @@ constexpr uintptr_t kEarnedTotal = 0x00861FF8;
 // re-computing one never has to guess at the other. An earlier version had
 // officers adjust a single figure by subtracting their own last contribution,
 // which works right up until anything else touches it.
-inline int  g_basePercent    = 0;   // from crew.ini
-inline int  g_officerPercent = 0;   // from the roster
+inline int  g_basePercent = 0;   // from crew.ini
 
-inline int BonusPercent() { return g_basePercent + g_officerPercent; }
+// The roster's contribution lives in officerfx, recomputed from the hired list.
+// It may be NEGATIVE -- a careless quartermaster loses you some of the take.
+inline int BonusPercent() { return g_basePercent + officerfx::g_loot; }
 
 // Anything above this is refused as a typo rather than applied. Ten times the
 // loot is not a balance choice, it is a mistake in an ini file.
@@ -112,16 +114,7 @@ inline void SetBonusPercent(int pct, const char* why)
     Log("loot: share is now +%d%% (%s)", BonusPercent(), why ? why : "set");
 }
 
-// What the roster contributes. Recomputed by officers.h from the hired list
-// rather than accumulated, so it cannot drift.
-inline void SetOfficerPercent(int pct, const char* why)
-{
-    Clamp(&pct);
-    if (pct == g_officerPercent) return;
-    g_officerPercent = pct;
-    Log("loot: officers contribute +%d%% -- share is now +%d%% (%s)",
-        pct, BonusPercent(), why ? why : "roster changed");
-}
+
 
 // Sampled once per safe point. Cheap: one read and a compare in the common case.
 inline void Tick()
@@ -153,13 +146,15 @@ inline void Tick()
     InterlockedIncrement(&g_awards);
 
     const int pct = BonusPercent();
-    if (pct <= 0) return;
+    if (pct == 0) return;
 
     // Integer maths, deliberately: a percentage of an int award, rounded down.
     // Small awards can round to nothing, which is correct -- a 5% share of 10
     // pieces is not a piece.
-    const int bonus = (int)(((long long)awarded * pct) / 100);
-    if (bonus <= 0) return;
+    int bonus = (int)(((long long)awarded * pct) / 100);
+    if (bonus == 0) return;
+    // A negative share takes from the award, never more than the award itself.
+    if (bonus < 0 && -bonus > awarded) bonus = -awarded;
 
     __try {
         state::AddPlunder(bonus, "loot share");
@@ -172,7 +167,7 @@ inline void Tick()
     }
 
     InterlockedExchangeAdd(&g_granted, bonus);
-    Log("loot: %d plundered -> +%d (%d%%)", awarded, bonus, pct);
+    Log("loot: %d plundered -> %+d (%+d%%)", awarded, bonus, pct);
 }
 
 // Read from <game>\PEMF\crew.ini. Takes the GAME directory and appends the
@@ -202,8 +197,8 @@ inline void LoadTuning(const char* gameDir)
 inline void Report()
 {
     Log("loot: %ld award(s) seen this session, %ld granted as PEMF's share "
-        "(+%d%% = %d base + %d officers)", g_awards, g_granted,
-        BonusPercent(), g_basePercent, g_officerPercent);
+        "(%+d%% = %d base %+d officers)", g_awards, g_granted,
+        BonusPercent(), g_basePercent, officerfx::g_loot);
 }
 
 } // namespace loot

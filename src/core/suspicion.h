@@ -38,6 +38,7 @@
 #include <string.h>
 
 #include "log.h"
+#include "officerfx.h"
 #include "game.h"
 #include "state.h"
 #include "nations.h"
@@ -299,6 +300,11 @@ inline int RateFor(int nation, const Look& look)
     int rate = 0;
     rate += look.ships * g_tune.riseNearShip;
     rate += look.close * g_tune.riseCloseRange;
+
+    // An officer who keeps his mouth shut ashore buys you time under false
+    // colours; one who cannot costs you it.
+    if (officerfx::g_discretion != 0)
+        rate = officerfx::ApplyPercent(rate, -officerfx::g_discretion);
     if (look.port >= 0) rate += g_tune.riseNearPort;
 
     // A captain they already have reason to know is harder to pass off. Uses

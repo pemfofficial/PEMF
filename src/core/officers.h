@@ -36,12 +36,13 @@
 #include "state.h"
 #include "content.h"
 #include "loot.h"
+#include "officerfx.h"
 
 namespace officers {
 
 using json = nlohmann::json;
 
-constexpr int kMaxSkillsPerOfficer = 3;
+constexpr int kMaxSkillsPerOfficer = 4;   // up to 3 talents plus one flaw
 constexpr int kMaxRoster           = 6;    // one of each role
 constexpr int kMaxBioChars         = 160;  // fits a card beside name and skills
 
@@ -54,12 +55,18 @@ struct Skill {
 struct Role {
     std::string id, name, blurb;
     std::vector<int> skillIndices;         // resolved after load
+    std::vector<int> flawIndices;
     std::vector<std::string> skillIds;
+    std::vector<std::string> flawIds;
 };
 
 struct Tier {
     std::string id, name;
     int skills = 1, cost = 0, chance = 50;
+    // How often a man of this standing carries a flaw. A Novice is cheap and
+    // often shabby; a Master is dear and usually not. This is what makes the
+    // expensive search worth making rather than merely likelier to succeed.
+    int flawChance = 0;
 };
 
 inline std::vector<std::string> g_names;
@@ -74,7 +81,7 @@ struct Officer {
     std::string name, bio;
     int roleIndex = -1;
     int tierIndex = -1;
-    int skills[kMaxSkillsPerOfficer] = { -1, -1, -1 };
+    int skills[kMaxSkillsPerOfficer] = { -1, -1, -1, -1 };
     int skillCount = 0;
     int hiredMonth = 0;      // months at sea when he signed; tenure is derived
 };
@@ -101,10 +108,14 @@ inline int FindRole(const std::string& id)
 // the validator can never disagree about what is supported.
 inline bool TargetSupported(const std::string& t)
 {
-    return t == "loot" || t == "morale";
+    return t == "loot"       || t == "morale"     || t == "cargoGuard"
+        || t == "discretion" || t == "surgeon";
 }
 
-inline const char* SupportedTargets() { return "loot, morale"; }
+inline const char* SupportedTargets()
+{
+    return "loot, morale, cargoGuard, discretion, surgeon";
+}
 
 // ------------------------------------------------------------------ loading
 inline bool Load(const char* gameDir)
@@ -213,6 +224,8 @@ inline bool Load(const char* gameDir)
         }
         for (const auto& sj : j.value("skills", json::array()))
             r.skillIds.push_back(sj.get<std::string>());
+        for (const auto& fj : j.value("flaws", json::array()))
+            r.flawIds.push_back(fj.get<std::string>());
         g_roles.push_back(r);
     }
 
@@ -224,6 +237,7 @@ inline bool Load(const char* gameDir)
         t.skills = j.value("skills", 1);
         t.cost   = j.value("cost", 0);
         t.chance = j.value("chance", 50);
+        t.flawChance = j.value("flawChance", 0);
         if (t.id.empty() || t.name.empty()) {
             Log("officers: REJECTED tier -- needs 'id' and 'name'");
             continue;
@@ -232,6 +246,8 @@ inline bool Load(const char* gameDir)
         if (t.skills > kMaxSkillsPerOfficer) t.skills = kMaxSkillsPerOfficer;
         if (t.chance < 1)   t.chance = 1;
         if (t.chance > 100) t.chance = 100;
+        if (t.flawChance < 0)   t.flawChance = 0;
+        if (t.flawChance > 100) t.flawChance = 100;
         if (t.cost < 0)     t.cost = 0;
         g_tiers.push_back(t);
     }
@@ -248,6 +264,15 @@ inline bool Load(const char* gameDir)
                 continue;
             }
             r.skillIndices.push_back(idx);
+        }
+        for (const std::string& id : r.flawIds) {
+            const int idx = FindSkill(id);
+            if (idx < 0) {
+                Log("officers: role '%s' names flaw '%s', which does not exist "
+                    "(or was rejected above)", r.id.c_str(), id.c_str());
+                continue;
+            }
+            r.flawIndices.push_back(idx);
         }
         if (r.skillIndices.empty())
             Log("officers: role '%s' has no usable skills -- officers of that "
@@ -286,6 +311,16 @@ inline void Generate(Officer* out, int roleIndex, int tierIndex)
         out->skills[out->skillCount++] = pool[(size_t)pick];
         pool.erase(pool.begin() + pick);
     }
+
+    // ...and he may carry a flaw, which is what makes two men of the same
+    // standing different men. Rolled AFTER the talents so it is always the
+    // last line on his card, where a player will read it as the catch.
+    if (!role.flawIndices.empty() &&
+        out->skillCount < kMaxSkillsPerOfficer &&
+        Roll(100) < tier.flawChance) {
+        out->skills[out->skillCount++] =
+            role.flawIndices[(size_t)Roll((int)role.flawIndices.size())];
+    }
 }
 
 // ------------------------------------------------------------- the totals
@@ -311,10 +346,16 @@ inline int TotalFor(const char* target)
 // consequences.
 inline void ApplyEffects(const char* why)
 {
-    loot::SetOfficerPercent(TotalFor("loot"), why);
-    // `morale` totals are read by the morale system when it exists. Nothing to
-    // push yet, and inventing a sink for it now would be a guess at an
-    // interface that has not been designed.
+    officerfx::g_loot       = TotalFor("loot");
+    officerfx::g_morale     = TotalFor("morale");
+    officerfx::g_cargoGuard = TotalFor("cargoGuard");
+    officerfx::g_discretion = TotalFor("discretion");
+    officerfx::g_surgeon    = TotalFor("surgeon");
+
+    Log("officers: effects (%s) -- loot %+d%%, morale %+d, cargo %+d%%, "
+        "discretion %+d%%, surgeon %+d%%", why ? why : "roster changed",
+        officerfx::g_loot, officerfx::g_morale, officerfx::g_cargoGuard,
+        officerfx::g_discretion, officerfx::g_surgeon);
 }
 
 // ------------------------------------------------------------- the hiring
@@ -472,9 +513,13 @@ inline void ShowOfficerDetail(int roleIndex)
     } else {
         for (int i = 0; i < o.skillCount; ++i) {
             const Skill& sk = g_skills[(size_t)o.skills[i]];
-            const char* what = (sk.target == "loot")   ? "of what we take"
-                             : (sk.target == "morale") ? "to the men's temper"
-                                                       : "";
+            const char* what =
+                  (sk.target == "loot")       ? "to what we take"
+                : (sk.target == "morale")     ? "to the men's temper"
+                : (sk.target == "cargoGuard") ? "of the cargo saved in a blow"
+                : (sk.target == "discretion") ? "to how long false colours hold"
+                : (sk.target == "surgeon")    ? "of the wounded who live"
+                                              : "";
             const int w = _snprintf_s(card + n, sizeof(card) - n, _TRUNCATE,
                                       "\n%s -- %s (+%d %s)",
                                       sk.name.c_str(), sk.text.c_str(),

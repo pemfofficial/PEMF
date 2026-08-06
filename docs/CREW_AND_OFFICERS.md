@@ -109,10 +109,37 @@ through the validated layer. That covers every award site at once — combat,
 sacking a town, digging up treasure — with no `.text` write, no DRM risk, and a
 logged reason on every adjustment. Detail in `GAME_API.md`.
 
-⛔ **Ship stats, player stats and world stats are not mapped.** They are on the
-wish list and not in any ring yet. A skill naming them is **rejected at load with
-the reason**, exactly like every other invalid field. The target list grows as
-sites are mapped, and never advertises reach it does not have.
+### The five targets, and what each really does
+
+Every one is delivered by something already built and tested. A trait's value
+may be **negative**, and each system handles that as readily as a positive.
+
+| Target | What it changes | Delivered by |
+|---|---|---|
+| `loot` | percent added to everything plundered | `loot.h` — verified in play |
+| `morale` | points on the crew's temper | the morale byte, full authority measured |
+| `cargoGuard` | percent of storm cargo losses prevented | `storms.h` — PEMF's own cargo loss |
+| `discretion` | percent slower suspicion under false colours | `suspicion.h` — PEMF's own rise rate |
+| `surgeon` | percent of crew losses recovered | `crewwatch.h` — sampled, like loot |
+
+Totals live in `officerfx.h`: a leaf header of plain integers, recomputed from
+the hired roster whenever it changes. It is a header rather than an interface
+because every system that reads it would otherwise have to include `officers.h`,
+which includes `content.h`, and the cycle is immediate.
+
+⛔ **Ship stats, player stats and world stats are still not mapped**, and a skill
+naming one is **rejected at load with the reason and the supported list**. The
+target list grows as sites are mapped, and never advertises reach it does not
+have.
+
+### Flaws
+
+An officer may carry a flaw as well as talents, rolled at random, so two Masters
+are not the same man. A flaw is **just a trait with a negative value** — the
+schema does not treat it specially. How often one appears is per tier
+(`flawChance`): a Novice is cheap and often shabby, a Master is dear and usually
+not, which is what makes the expensive search worth making rather than merely
+likelier to succeed.
 
 ---
 
