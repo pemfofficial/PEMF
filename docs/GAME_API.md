@@ -2142,9 +2142,42 @@ Prose first, then options, exactly like PEMF's own cards:
 | `0x00411677`, `0x004116AE`, `0x004116C3`, `0x00411729`, `0x004117A0`, `0x004117BD`, `0x004117D4`, `0x004117E8`, `0x00411815`, `0x0041185B`, `0x004118A8` | `AddText1` (`0x004F60B0`) | one selectable row each |
 | `0x0041191E` | `ShowMessage` (`0x00410C50`) | presents; returns the picked index |
 
-**The option sites are conditional.** Which ones run is decided by a jump table
-at `0x004126E4` (dispatched at `0x0041169D`), so the number of rows on screen
-varies with the town. This matters — see the remap below.
+**The option sites are conditional, and mostly alternatives to each other.**
+Which ones run is decided by a jump table at `0x004126E4` (dispatched at
+`0x0041169D`). Three of them are the settlement-type variants, and each pushes
+**one multi-line string containing every option at once**:
+
+| Site | String | Contents |
+|---|---|---|
+| `0x004117E8` | `0x006F5B50` | `\nDo you...\n Talk to the Mayor\n Visit the Tavern\n Trade with the Merchant\n Consult with the Shipwright\n Divide the Plunder\n` |
+| `0x004117D4` | `0x006F5BCC` | `\nDo you...\n Talk to the Chief\n Trade with the Chief\n` (village) |
+| `0x004117BD` | `0x006F5C04` | `\nDo you...\n Talk to the Abbot\n Trade with the Abbot\n` (mission) |
+| `0x0041185B` | `0x006F5B40` | `" Check Status\n"` — appended after the block above |
+| `0x004118A8` | `0x006F5AEC…` | the leave row, by settlement type |
+
+### The full row → action id table
+
+Combining the strings with the jump table at `0x004126F4`:
+
+| id | Row | Target |
+|---|---|---|
+| 0 | Talk to the Mayor / Chief / Abbot | `0x004119A9` |
+| 1 | Visit the Tavern | `0x00411CA1` |
+| 2 | Trade with the Merchant / Chief / Abbot | `0x004122E7` |
+| 3 | Consult with the Shipwright | `0x004119E9` |
+| 4 | Divide the Plunder | `0x00411BC4` |
+| 5 | Check Status | `0x00411BDC` |
+| **6+** | **Leave** | `0x00411BF4` (via the `JA`) |
+
+Two independent confirmations that this table is right:
+
+- id 4's target calls `0x004102A0`, and `0x00410321` — the known "divide the
+  plunder" site already recorded in this file — is **inside** that function.
+- The remap now makes sense arithmetically. A village shows two rows,
+  `0 = Talk`, `1 = Trade`. The remap adds 1 when the index is 1, turning the
+  village's row 1 into **id 2 = Trade**, which is exactly right. It adds 3
+  otherwise, mapping a third compacted row onto id 5 (Check Status). The
+  "5 or 6" in `[EBX+0x860B80]` is the settlement type — village and mission.
 
 ### ⚠️ The returned index is remapped before it is used
 
@@ -2231,10 +2264,34 @@ at `0x0046377A`. A shim there can compose PEMF's extra rows immediately before
 calling the original, then inspect what the player picked and either handle it
 as ours or hand the game back a value it would have produced itself.
 
-Open: **what the shim should return when the player picked a PEMF row.** It must
-be a value the game treats as "nothing happened, show the menu again" rather than
-any real action, and which of `0`–`5` (or a negative) does that has not been
-established.
+### ⛔ There is no "nothing happened" value to return
+
+This was the last open question and the answer is that the premise was wrong.
+Every possible return is meaningful:
+
+- `0`–`5` each dispatch a **real action** (see the table above).
+- Anything above `5` **leaves the settlement**.
+- Negatives do **not** help: the compare is `CMP ESI,5` / `JA`, which is
+  **unsigned**, so `-1` and the polled form's `-2` are both "above 5" and leave
+  the settlement too.
+
+So the shim cannot pick a harmless sentinel — there isn't one.
+
+**The shim must own a loop instead.** When the player picks a PEMF row, the shim
+handles it and then *re-presents the menu itself*, calling the original
+`ShowMessage` again, and only ever returns a genuine game row id to
+`FUN_00410D30`. The game never sees an index it did not produce.
+
+That needs the composed message preserved across the re-show, because
+`ShowMessage` consumes the buffer: snapshot `PGA_MSGBUF` (`0x008E9F58`) before
+the first call and restore it before each re-show. PEMF already composes into
+that buffer, so this is existing ground rather than new.
+
+One consequence worth stating before it is designed around: a PEMF row that
+*should* close the menu (say, "Sail on") cannot be expressed by returning the
+leave id and hoping — it would have to fall through to the real leave path
+deliberately, which is `6`+ and therefore already available. That direction
+works; it is only "do nothing" that has no representation.
 
 ### Where the polled form comes in
 
@@ -2242,20 +2299,28 @@ established.
 one. It sits inside a dispatch target, after a float at `0x008CAC44` is set to
 `1.0f` or `2.0f` depending on whether the town field at `0x00860B74` is 5 or 6.
 
-### Still open — answer before writing code
+### Where PEMF's rows should sit
 
-- **What value the shim returns for a PEMF row** (see above). This is now the
-  one thing genuinely blocking an implementation.
-- **What `0x00860B80` and `0x00860B74` are**, and what `5` and `6` mean. Given
-  the settlement-type strings on the leave row, "settlement type" is now a
-  strong reading rather than a guess — but it is still not a reading, and the
-  remap depends on it.
-- **Which string the other ten `AddText1` sites emit.** Only the last one
-  (`0x004118A8`, the leave row) has been read. Needed before choosing where our
-  rows sit.
+Between **Check Status (id 5)** and the leave row. That keeps every game id
+stable, keeps "leave" last where players expect it, and means our rows occupy
+positions `6…n` on screen — all of which the game would route to the departure
+path, and all of which the shim intercepts before it can.
 
-**Answered since the first pass:** what `0x00411BF4` does (the departure
-sequence, above), and where to hook (`0x0041191E`, above).
+### Still open
+
+Nothing blocking. Remaining unknowns are cosmetic or belong to the
+implementation:
+
+- `0x00860B74` (the float setup at `0x004119A9`) is still unread; `0x00860B80`
+  is now established as the settlement type by the remap arithmetic.
+- The five option sites at `0x00411677`, `0x004116AE`, `0x004116C3`,
+  `0x00411729`, `0x004117A0` (strings `0x006F5D78`, `0x6F5CE8`, `0x6F5CD0`,
+  `0x6F5CB4`, `0x6F5CA0`) are other menu variants — pirate haven and the
+  special cases — and have not been read. They matter only when PEMF wants rows
+  in those menus too.
+
+**Answered:** what `0x00411BF4` does, where to hook, the full row→id table, and
+why the shim must loop rather than return a sentinel.
 
 ---
 
