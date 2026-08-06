@@ -259,10 +259,14 @@ inline int Present(int bg, int flags, int form)
     {
         size_t probe = 0;
         const int rows = CountOptionLines(snapshot, &probe);
-        Log("townmenu: menu #%ld -- port %d (nation %d), %d game row(s), "
-            "%u bytes, form %d -- %d PEMF row(s) offered here",
-            g_presents, city, nation, rows, (unsigned)strlen(snapshot), form,
-            EnabledCount());
+        // `bg` is the city the GAME is drawing this menu for; `city` is the
+        // one our own nearest-port lookup found. They should agree, and saying
+        // so in the log makes a disagreement obvious rather than mysterious.
+        Log("townmenu: menu #%ld -- port %d (nation %d), backdrop city %d%s, "
+            "%d game row(s), %u bytes, form %d -- %d PEMF row(s) here",
+            g_presents, city, nation, bg,
+            (bg == city) ? "" : " ** DISAGREES **",
+            rows, (unsigned)strlen(snapshot), form, EnabledCount());
     }
 
     const int ourFirst = Compose(snapshot);
@@ -318,6 +322,23 @@ inline int Present(int bg, int flags, int form)
             // that is genuinely what is on screen.
             events::EnterDirect();
 
+            // Draw the card against THIS port. `bg` is the city index the town
+            // menu itself was given, so the backdrop is derived from the
+            // settlement's own record -- the same one behind the menu the
+            // player is standing in. Without this the card composites over the
+            // 3D scene, which in port is the overworld coastline.
+            //
+            // Flags are ZERO, not the menu's. Read off the game's own in-town
+            // narrative card at 0x00411C91, which is the exact thing we are
+            // imitating:
+            //     MOV ECX,[ESP+0x458]   city index
+            //     OR  EAX,-1            form -1, message box
+            //     XOR EDX,EDX           flags zero
+            // Passing the menu's flags through was a guess and would have been
+            // a different call from the one the engine makes here.
+            game::g_portCardCity  = bg;
+            game::g_portCardFlags = 0;
+
             content::Fire(row->eventIndex);
 
             // The outcome immediately after, rather than through the queue.
@@ -329,6 +350,11 @@ inline int Present(int bg, int flags, int form)
             // open water in the second playtest.
             content::ShowPendingOutcome(0);
             events::ClearFollowUp();
+
+            // Back to the ordinary dialog path. Leaving this set would put a
+            // port backdrop behind cards fired at sea.
+            game::g_portCardCity  = -1;
+            game::g_portCardFlags = 0;
 
             events::LeaveDirect();
         }
@@ -380,6 +406,10 @@ inline int PresentGuarded(int bg, int flags, int form)
             GetExceptionCode());
         result = CallOriginal(bg, flags, form);
     }
+
+    // Whatever happened above, cards go back to compositing over the world.
+    game::g_portCardCity  = -1;
+    game::g_portCardFlags = 0;
 
     events::Resume();
     return result;

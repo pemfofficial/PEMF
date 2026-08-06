@@ -2336,6 +2336,49 @@ corrected:
   settlement type behind the 5/6 remap. That remap remains untested; Indian
   villages and missions are the cases to try.
 
+### Cards with a port behind them
+
+A card presented in a settlement needs that settlement drawn behind it, and
+`FUN_00430190` cannot do it — it composites over whatever the 3D scene is, which
+in port is the overworld coastline. Playtested: right text, right port name,
+completely wrong place.
+
+The town backdrop is **not a scene**. It is background art drawn by
+`ShowMessage` (`0x00410C50`), which calls `FUN_00410BF0` and then hands off to
+the same `FUN_00430190` we already use:
+
+```c
+FUN_00410BF0(ecx);                        // draws the backdrop
+uVar3 = FUN_00430190(w/12, h/24, sound, edx);
+if (DAT_008CADEC) { ...release the art... }   // consumed, once
+```
+
+⚠️ **`ecx` is the CITY INDEX, not an index into an art table** — this file said
+the latter for a long time and it is wrong in the way that matters.
+`FUN_00410BF0` reads the settlement's own type from its record and picks from
+that:
+
+| Type | Art |
+|---|---|
+| 0–4 | `FUN_004108A0(city)` — the colonial backdrop, built from the settlement's own data |
+| 5 | `native_back.dds` |
+| 6 | `mission_back.dds` |
+| else | `Tm_f_townback_rich.dds` |
+
+**The call to imitate** is the game's own in-town narrative card at
+`0x00411C91`, and every register matters:
+
+```
+00411C82  MOV ECX, [ESP+0x458]   ; the city index
+00411C8C  OR  EAX, 0xFFFFFFFF    ; form -1, message box
+00411C8F  XOR EDX, EDX           ; flags ZERO -- not the menu's flags
+00411C91  CALL 0x00410C50
+```
+
+PEMF routes this through `game::g_portCardCity`, set only while presenting
+inside a settlement, so an event's card *and* its outcome both pick it up — they
+use different helpers but both land on `PresentDialog`.
+
 ### ⚠️ A menu holds the safe point open
 
 The town menu runs the game's own nested pump, so PEMF's safe point keeps being
@@ -2355,8 +2398,12 @@ Anything else that presents from inside a game menu will meet the same problem.
 Nothing blocking. Remaining unknowns are cosmetic or belong to the
 implementation:
 
-- `0x00860B74` (the float setup at `0x004119A9`) is still unread; `0x00860B80`
-  is now established as the settlement type by the remap arithmetic.
+- **Settled.** `0x00860B74` is the **settlement type**, one byte per settlement
+  in records **`0x20` apart** — read directly at `0x00411CA5`
+  (`MOVSX EAX, byte ptr [EAX + 0x860B74]` / `CMP EAX, 5`) and again by
+  `FUN_00410BF0`. `0x00860B80` is the same record, `+0xC` in. **Type 5 = an
+  Indian village, type 6 = a Jesuit mission**, which is what the town menu's
+  index remap keys on.
 - The five option sites at `0x00411677`, `0x004116AE`, `0x004116C3`,
   `0x00411729`, `0x004117A0` (strings `0x006F5D78`, `0x6F5CE8`, `0x6F5CD0`,
   `0x6F5CB4`, `0x6F5CA0`) are other menu variants — pirate haven and the

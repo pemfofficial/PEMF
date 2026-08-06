@@ -694,8 +694,44 @@ inline int ScreenH() { return *(const int*)addr::ScreenH; }
 
 // Present whatever text has been composed, and return the index of the option
 // the player picked (0-based), or a negative value if there was nothing to pick.
+// ---------------------------------------------------- cards inside a port
+// A card presented in a settlement should have that settlement behind it, and
+// FUN_00430190 cannot do that -- it composites over whatever the 3D scene is,
+// which in port is the overworld coastline. That is exactly what a playtest
+// showed: the right text, in the right port, over the wrong place entirely.
+//
+// The town backdrop is not a scene. It is background ART, drawn by ShowMessage
+// (0x00410C50) which calls FUN_00410BF0 with ecx and then hands off to the same
+// FUN_00430190 we already use. And ecx is NOT an index into an art table, as
+// this file used to say -- it is the CITY INDEX. FUN_00410BF0 reads the
+// settlement's own type out of its record and picks the art from that:
+//
+//     (&DAT_00860B74)[city * 0x20]        settlement type, records are 0x20 apart
+//        0..4  -> FUN_004108A0(city)      the ordinary colonial backdrop,
+//                                         built from the settlement's own data
+//        5     -> "native_back.dds"       an Indian village
+//        6     -> "mission_back.dds"      a Jesuit mission
+//        else  -> "Tm_f_townback_rich.dds"
+//
+// (That also settles what the 5 and 6 in the town menu's index remap are.)
+//
+// So: hand ShowMessage the city and the port draws itself, exactly as it does
+// for the game's own town dialogs -- because it IS the call the game's own town
+// dialogs make.
+//
+// Set while presenting inside a settlement; -1 the rest of the time, when cards
+// go through the ordinary dialog path and composite over the sea as before.
+inline int g_portCardCity  = -1;
+inline int g_portCardFlags = 0;
+
 inline int PresentDialog(const char* sound = "snap")
 {
+    // Routed here rather than at every call site so an event's card AND its
+    // outcome both pick it up -- they go through different helpers but both
+    // land on this one function.
+    if (g_portCardCity >= 0)
+        return ShowMessage(g_portCardFlags, g_portCardCity, kFormMessage);
+
     auto fn = (ShowDialog_t)addr::ShowDialogDirect;
     int x = ScreenW() / 4;
     int y = ScreenH() / 8 + 1;
