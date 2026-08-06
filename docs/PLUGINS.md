@@ -16,7 +16,7 @@ it at startup and hands it a table of function pointers. That is the entire
 contract — there is nothing to link against and no PEMF library to build.
 
 Everything you need is one header: **`PEMF\sdk\pemf_sdk.h`**, which ships with
-the mod. A complete worked example sits beside it.
+the mod. Its opening comment carries a working plugin in full.
 
 ---
 
@@ -94,7 +94,7 @@ not running yet.
 game can hold, refused outside a career, and logged with the reason you pass:
 
 ```
-  state: plunder 600 -> 300 [tide_charts]
+  state: plunder 600 -> 300 [my_mod]
 ```
 
 That line is why the reason argument exists. Write the game's memory yourself

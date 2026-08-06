@@ -12,16 +12,16 @@
 //     static const PemfApi* g_pemf;
 //
 //     static void OnPicked(void* user) {
-//         g_pemf->log("the player asked after the tide");
-//         g_pemf->add_plunder(-50, "tide_charts");
+//         g_pemf->log("the player asked at the harbour");
+//         g_pemf->add_plunder(-50, "my_mod");
 //     }
 //
 //     PEMF_PLUGIN_EXPORT int PemfPluginInit(const PemfApi* api, PemfPlugin* me)
 //     {
 //         g_pemf = api;
-//         me->name    = "Tide Charts";
+//         me->name    = "My Mod";
 //         me->version = "1.0";
-//         api->add_menu_row("Buy the tide charts", PEMF_ANY, PEMF_ANY,
+//         api->add_menu_row("Ask at the harbour", PEMF_ANY, PEMF_ANY,
 //                           OnPicked, 0);
 //         return PEMF_OK;
 //     }
@@ -124,7 +124,7 @@ typedef struct PemfApi {
 
     // Writes are clamped to what the game can hold, refused outside a career,
     // and logged with `reason` so a change can always be traced back to you.
-    // `reason` should be short and yours, e.g. "tide_charts". Returns the value
+    // `reason` should be short and yours, e.g. "my_mod". Returns the value
     // actually applied, which may differ from what you asked for.
     int (*add_crew)(int delta, const char* reason);
     int (*add_plunder)(int delta, const char* reason);

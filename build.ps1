@@ -187,9 +187,9 @@ function Copy-Payload([string]$dest) {
             'They must be 32-bit -- the game is x86. A plugin that will not load',
             'says so in pemf.log rather than failing silently.',
             '',
-            'To write one, see PEMF\sdk\pemf_sdk.h and the worked example beside',
-            'it. One header, no linking, and any compiler that can produce a',
-            '32-bit Windows DLL will do.'
+            'To write one, see PEMF\sdk\pemf_sdk.h -- it carries a worked example',
+            'in its opening comment. One header, no linking, and any compiler',
+            'that can produce a 32-bit Windows DLL will do.'
         )
     }
 
@@ -198,12 +198,6 @@ function Copy-Payload([string]$dest) {
     $sdk = Join-Path $dest 'PEMF\sdk'
     New-Item -ItemType Directory -Force $sdk | Out-Null
     Copy-Item (Join-Path $root 'sdk\pemf_sdk.h') $sdk -Force -ErrorAction SilentlyContinue
-    $exampleSrc = Join-Path $root 'sdk\example'
-    if (Test-Path $exampleSrc) {
-        $exampleDst = Join-Path $sdk 'example'
-        New-Item -ItemType Directory -Force $exampleDst | Out-Null
-        Copy-Item (Join-Path $exampleSrc '*.c') $exampleDst -Force -ErrorAction SilentlyContinue
-    }
 
     $docs = Join-Path $dest 'PEMF\docs'
     New-Item -ItemType Directory -Force $docs | Out-Null
