@@ -2522,12 +2522,38 @@ Two consequences, and they are what make a morale system possible at all:
   has to be re-applied after a load — which is a moment PEMF already detects and
   already restores its own state at.
 
-⚠️ **Its authority is not yet known.** As a signed byte it shifts the expectation
-by at most ±508, against a base of `(worldTerm)² / 4` whose magnitude has never
-been measured in a running game. If that base is small the byte is a complete
-lever, able to pin morale at 0 or 4; if it is large the byte is a modest trim.
-**Measure before designing around it** — log the formula's inputs at runtime and
-find out, rather than assuming either.
+### ✅ Measured in game, 2026-08-06
+
+**The reading of the formula is correct.** A probe that recomputes it from the
+same inputs and compares against `GetMoraleLevel` reported `predicted=4 actual=4
+-- formula agrees` at every sample, before and after a sweep.
+
+**The byte has FULL AUTHORITY** — it moves morale across the entire 0–4 range.
+Measured at 996 plunder, 62 crew, with `A(0x869A76)=0` and `B(0x85A158)=0`:
+
+| byte | expect | level |
+|---|---|---|
+| −128 … −4 | 516 … 20 | **0** |
+| −2 | 12 | 1 |
+| −1 | 8 | 2 |
+| 0 | 4 | **4** |
+| +1 … +127 | 1 (clamped) | 4 |
+
+Three things that matter more than the headline:
+
+- ⚠️ **The useful range is tiny — roughly −8 to 0.** Everything below −8 is
+  level 0 and everything above 0 is level 4. This is a lever with four usable
+  notches, not a dial.
+- ⚠️ **Level 3 was unreachable.** The expectation jumps 12 → 8 → 4 as the byte
+  goes −2 → −1 → 0, and the division lands on 1, 2, then 4. Nothing produced 3
+  at this wealth and crew. **Anything mapping a wide scale onto engine levels
+  must accept that some levels are not reachable at some wealths**, rather than
+  assuming a byte exists for every target.
+- ⚠️ **`A` and `B` were both zero here**, so the expectation base was
+  `(0−4+0)² / 4 = 4`. That tiny base is *why* the byte dominates. If either term
+  is non-zero later in a career the base grows and the byte's authority shrinks
+  — so the closed loop should solve for the byte from the **current** inputs
+  each time, never from a table baked at these values.
 
 Everything else in the formula is either the player's actual wealth and crew, or
 a world term we have not identified. Raising morale by giving the player gold

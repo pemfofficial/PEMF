@@ -149,14 +149,20 @@ inline void Tick()
     Log("loot: %d plundered -> +%d (%d%%)", awarded, bonus, g_bonusPercent);
 }
 
-// Read from PEMF\crew.ini. Deliberately one key and the Windows profile API
+// Read from <game>\PEMF\crew.ini. Takes the GAME directory and appends the
+// rest, exactly as storms.h does -- the first version took the game dir and
+// appended only "crew.ini", so it looked beside the exe, never found the file,
+// and silently ran at 0%. It said so in the log, which is the only reason that
+// was a minute's work rather than an afternoon's.
+//
+// Deliberately one key and the Windows profile API
 // rather than a parser of our own: the officer system will drive this number,
 // and the ini exists so the mechanism can be tested and tuned before officers
 // exist to drive it.
-inline void LoadTuning(const char* pemfDir)
+inline void LoadTuning(const char* gameDir)
 {
     char path[MAX_PATH];
-    _snprintf_s(path, sizeof(path), _TRUNCATE, "%s\\crew.ini", pemfDir);
+    _snprintf_s(path, sizeof(path), _TRUNCATE, "%s\\PEMF\\crew.ini", gameDir);
 
     if (GetFileAttributesA(path) == INVALID_FILE_ATTRIBUTES) {
         Log("loot: no %s -- PEMF takes no share (the stock game)", path);
