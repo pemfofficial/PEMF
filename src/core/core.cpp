@@ -551,6 +551,11 @@ static void RunSafePoint()
 // record that we got here -- no engine calls, no allocation, no logging.
 extern "C" void __cdecl PemfOnEndScene(void* /*device*/)
 {
+    // Belt as well as braces: the hook already checks, but this is the entry
+    // point anything else would call, and a draw across a device reset is what
+    // took the game down on alt-tab.
+    if (g_pemfDeviceLost) return;
+
     if (!d3d9hook::WantsNotices()) return;
     if (events::Faulted() || !g_targetOK) return;
 
@@ -580,6 +585,8 @@ extern "C" void __cdecl PemfOnEndScene(void* /*device*/)
 // yet. Nothing else may go here -- a 2D blit issued now would be painted over.
 extern "C" void __cdecl PemfOnBeginScene(void* /*device*/)
 {
+    if (g_pemfDeviceLost) return;
+
     if (!d3d9hook::WantsNotices()) return;
     if (events::Faulted() || !g_targetOK) return;
 

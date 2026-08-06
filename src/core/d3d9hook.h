@@ -94,6 +94,29 @@ volatile LONG  g_pemfResetCount     = 0;
 volatile LONG  g_pemfPassThisFrame  = 0;   // passes so far in the current frame
 volatile LONG  g_pemfPassesLast     = 0;   // passes the previous frame used
 
+// ---------------------------------------------------------- is the device well?
+// ALT-TAB LOSES THE DEVICE, AND THAT KILLED THE GAME. Reported as an R6025
+// "pure virtual function call" on returning to the game, twice, with
+// `d3d9: device Reset #1` as the last line in the log both times.
+//
+// The mechanism: everything PEMF draws goes through the game's own routines,
+// which walk refcounted Gamebryo objects. Across a lost device those objects
+// are released and rebuilt, and calling a virtual on one that has been
+// destructed is exactly what R6025 means. DEVELOPER.md has warned about this
+// shape since the flag-texture crash; this is the same hazard arriving through
+// a door nobody was watching.
+//
+// Two things were missing. Nothing knew a reset was in progress, and -- more
+// subtly -- the pass counter is incremented BEFORE the real BeginScene runs, so
+// when BeginScene failed on a lost device the counter still read 1 and the
+// EndScene hook went ahead and drew into it.
+//
+// So: a device is well only between a BeginScene that SUCCEEDED and its
+// EndScene, and never while a Reset is in flight.
+volatile LONG  g_pemfDeviceLost     = 0;   // non-zero: do not draw
+volatile LONG  g_pemfBeginOk        = 0;   // this pass's BeginScene succeeded
+volatile LONG  g_pemfSkippedDraws   = 0;   // draws declined for the above
+
 // Both implemented in core.cpp.
 //
 // The two phases are NOT interchangeable, and which one a draw belongs in is
@@ -117,9 +140,16 @@ HRESULT WINAPI PemfBeginSceneHook(void* device)
     // The real BeginScene runs FIRST: the device must be inside a scene
     // before anything we do can contribute geometry to it.
     HRESULT hr = ((PemfBeginScene_t)g_pemfOrigBeginScene)(device);
-    if (FAILED(hr)) return hr;
+    if (FAILED(hr)) {
+        // A lost device fails here. Say so, so the EndScene hook -- which sees
+        // only the pass counter, and that was already incremented above -- does
+        // not go on to draw into it.
+        InterlockedExchange(&g_pemfBeginOk, 0);
+        return hr;
+    }
+    InterlockedExchange(&g_pemfBeginOk, 1);
 
-    if (pass == 0) PemfOnBeginScene(device);
+    if (pass == 0 && !g_pemfDeviceLost) PemfOnBeginScene(device);
     return hr;
 }
 
@@ -150,7 +180,13 @@ HRESULT WINAPI PemfEndSceneHook(void* device)
     // it at 1 by the time we get here. Reset comes from the safe point (see the
     // note on g_pemfPassThisFrame -- NOT from Present, which this game never
     // calls on the device).
-    if (g_pemfPassThisFrame == 1) PemfOnEndScene(device);
+    // Only draw when this pass's BeginScene actually succeeded and no reset is
+    // in flight. Either check alone is not enough: the counter says which pass
+    // we are in, not whether the device survived it.
+    if (g_pemfPassThisFrame == 1) {
+        if (g_pemfBeginOk && !g_pemfDeviceLost) PemfOnEndScene(device);
+        else InterlockedIncrement(&g_pemfSkippedDraws);
+    }
 
     return ((PemfEndScene_t)g_pemfOrigEndScene)(device);
 }
@@ -160,8 +196,29 @@ HRESULT WINAPI PemfEndSceneHook(void* device)
 HRESULT WINAPI PemfResetHook(void* device, void* params)
 {
     InterlockedIncrement(&g_pemfResetCount);
-    Log("d3d9: device Reset #%ld", g_pemfResetCount);
-    return ((PemfReset_t)g_pemfOrigReset)(device, params);
+    Log("d3d9: device Reset #%ld -- PEMF standing down until it comes back",
+        g_pemfResetCount);
+
+    // Down BEFORE the reset, not after. The game releases its render objects
+    // inside this call, and anything of ours drawing while that happens is
+    // walking a half-destroyed scene graph.
+    InterlockedExchange(&g_pemfDeviceLost, 1);
+    InterlockedExchange(&g_pemfBeginOk, 0);
+    InterlockedExchange(&g_pemfPassThisFrame, 0);
+
+    HRESULT hr = ((PemfReset_t)g_pemfOrigReset)(device, params);
+
+    if (SUCCEEDED(hr)) {
+        InterlockedExchange(&g_pemfDeviceLost, 0);
+        Log("d3d9: device Reset #%ld succeeded -- drawing again (%ld draw(s) "
+            "declined meanwhile)", g_pemfResetCount, g_pemfSkippedDraws);
+    } else {
+        // Still lost. The game will call Reset again; we stay down until one
+        // of them succeeds rather than guessing that this was the last.
+        Log("d3d9: device Reset #%ld FAILED (0x%08lX) -- staying down",
+            g_pemfResetCount, (unsigned long)hr);
+    }
+    return hr;
 }
 
 } // extern "C"

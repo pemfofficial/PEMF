@@ -140,6 +140,17 @@ boundary comes from the safe point, **not** `Present` — this game never calls
 - **Never** hand the engine a token argument count, or an `@ITEM` index, that has
   not been read out of the disassembly. It does not bounds check; `@ITEM` past
   the end of its list access-violates.
+- **Never** draw across a **device reset**. Alt-tab loses the D3D9 device, and
+  everything PEMF draws goes through the game's own routines, which walk
+  refcounted Gamebryo objects that are released and rebuilt around a reset.
+  Calling a virtual on a destructed one is an `R6025 pure virtual function
+  call`, which took the game down twice on returning from alt-tab, with
+  `d3d9: device Reset #1` as the last line in the log both times. Two things
+  were missing: nothing knew a reset was in flight, and the pass counter is
+  incremented **before** the real `BeginScene`, so a `BeginScene` that FAILED on
+  a lost device still left the counter reading 1 and the `EndScene` hook drew
+  into it. A device is well only between a `BeginScene` that **succeeded** and
+  its `EndScene`, and never while `Reset` is in flight.
 - **Never** keep a pointer to an engine object past the call that produced it
   without **taking a reference**. Gamebryo objects are refcounted — the count is
   the dword at `+4`, and dropping to zero calls `vtable[0](1)`, the destructor.
