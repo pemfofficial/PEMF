@@ -2113,6 +2113,112 @@ the native id-based path for reusing existing game sounds. Either way, audio doe
 
 ---
 
+## The town menu — adding our own options
+
+> **Confidence: read from the disassembly, not yet run.** Mapped 2026-08-06 with
+> live Ghidra. Every address below was read off the listing; the two open
+> questions at the end are marked as open rather than guessed.
+
+This is the groundwork for PEMF adding its own rows to the game's existing
+menus. It is **not** the same problem as an event card, and it is much the
+easier of the two:
+
+| | Event card | Town menu |
+|---|---|---|
+| Renderer | `FUN_00430190`, **blocking** | form `10`, **polled** |
+| Shape | spins the game's own pump until a choice is made | renders one frame, returns `-2` for "nothing yet", expects an outer loop |
+| Consequence | cannot be presented from inside a frame hook — see [Drawing](#drawing-our-own-text--solved-and-how) | no open-scene problem at all |
+
+The whole town menu lives in **`FUN_00410D30`** (`0x00410D30`–`0x004126BB`).
+
+### How the menu is composed
+
+Prose first, then options, exactly like PEMF's own cards:
+
+| Address | Call | Role |
+|---|---|---|
+| `0x00411658` | `AddText0` (`0x004F6090`) | the town description |
+| `0x00411683` | `WrapText` (`0x004879F0`) | wraps the prose only |
+| `0x00411677`, `0x004116AE`, `0x004116C3`, `0x00411729`, `0x004117A0`, `0x004117BD`, `0x004117D4`, `0x004117E8`, `0x00411815`, `0x0041185B`, `0x004118A8` | `AddText1` (`0x004F60B0`) | one selectable row each |
+| `0x0041191E` | `ShowMessage` (`0x00410C50`) | presents; returns the picked index |
+
+**The option sites are conditional.** Which ones run is decided by a jump table
+at `0x004126E4` (dispatched at `0x0041169D`), so the number of rows on screen
+varies with the town. This matters — see the remap below.
+
+### ⚠️ The returned index is remapped before it is used
+
+This is the trap, and it is the reason "just append a row and match on its
+index" would misfire. Immediately after `ShowMessage`:
+
+```
+00411923  MOV  ESI, EAX                    ; ESI = the row the player picked
+00411925  MOV  EAX, [EBX + 0x860B80]       ; a town field
+0041192B  CMP  EAX, 6
+0041192E  JZ   0x00411935
+00411930  CMP  EAX, 5
+00411933  JNZ  0x00411947                  ; not 5 or 6 -> no remap
+00411935  TEST ESI, ESI
+00411937  JLE  0x00411947                  ; index 0 is never remapped
+00411939  XOR  ECX, ECX
+0041193B  CMP  ESI, 1
+0041193E  SETNZ CL
+00411941  LEA  ECX, [ECX + ECX*1 + 1]      ; ECX = 1 when ESI == 1, else 3
+00411945  ADD  ESI, ECX                    ; ESI += 1 or 3
+```
+
+So when `[EBX+0x860B80]` is **5 or 6**, some rows are absent from the display and
+the game **maps the compacted on-screen position back onto a canonical action
+id**. The value `ShowMessage` returns is a *row position*; what the dispatch
+consumes is an *action id*, and in those town states they are not the same
+number.
+
+**Consequence for PEMF:** an appended row's position is not a stable identifier.
+Our own rows have to be identified by where we put them relative to the game's
+count *at composition time*, and any interception has to happen with the same
+remap applied — or before the remap, on the raw return.
+
+### The dispatch, and what an unrecognised index does
+
+```
+00411999  CMP  ESI, 5
+0041199C  JA   0x00411BF4                  ; out of range -> here
+004119A2  JMP  dword ptr [ESI*4 + 0x4126F4]
+```
+
+A six-entry jump table at **`0x004126F4`** covers ids `0`–`5`. The comparison is
+**unsigned**, so anything above 5 — and any negative value, `-2` "nothing
+picked" included — lands at **`0x00411BF4`**, a defined destination rather than a
+wild jump.
+
+That is the good news for safety: **an index the game does not recognise has
+somewhere to go, and does not fall off the end of the table.** It means an
+appended row cannot crash the dispatch on its own.
+
+`FUN_00410D30` has two further jump tables: `0x004126BC` (dispatched at
+`0x00411480`) and `0x004126E4` (at `0x0041169D`, deciding which options compose).
+
+### Where the polled form comes in
+
+`0x004119DF` calls `ShowMessage` with `EAX = 0xA` — form 10, the non-blocking
+one. It sits inside a dispatch target, after a float at `0x008CAC44` is set to
+`1.0f` or `2.0f` depending on whether the town field at `0x00860B74` is 5 or 6.
+
+### Still open — answer before writing code
+
+- **What `0x00411BF4` actually does.** It is where every unrecognised index
+  goes, so it is the natural place to intercept a PEMF row — but whether it
+  re-loops the menu, closes it, or something else has **not** been traced.
+  Everything about how we hook this depends on the answer.
+- **What `0x00860B80` and `0x00860B74` are**, and what `5` and `6` mean. They
+  gate both the remap and the form setup, so they are almost certainly a town
+  type or ownership state, but that is an inference and not yet a reading.
+- **Which string each `AddText1` site emits** — needed to know where our rows
+  can be inserted without displacing a game row's meaning.
+- Whether the right hook is before `0x0041191E` (compose) or at the dispatch.
+
+---
+
 ## Useful Call Sites
 
 Reference points for how the game itself does things.
