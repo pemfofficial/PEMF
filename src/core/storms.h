@@ -169,14 +169,28 @@ struct Tuning {
     // experimenting; not shipped on until it looks right.
     int battleIntensity = 0;
 
-    // The battle draws its cloud at scale 100. The storm prefab is a different
-    // shape and the battle camera sits far closer than the overworld's, so the
-    // size that suits one need not suit the other. 0 = leave the game's.
-    int battleCloudScale = 0;
-    // Nudge it, in the battle's own units. The cloud is placed for a small
-    // white puff; a storm may want to sit differently.
-    int battleCloudDX = 0;
-    int battleCloudDY = 0;
+    // ⚠️ THE BATTLE'S CLOUD ARGUMENTS ARE NOT WHAT THEY LOOK LIKE. Decompiling
+    // the wrapper settled it:
+    //
+    //     FUN_004BBC10(prefab, x, y, z, rotX, rotY, rotZ, p8, p9)
+    //         -> FUN_004DADC0(rotX*k, rotY*k, rotZ*k)      the rotation
+    //         -> FUN_004BBC80(x, y, z, matrix, EDX, p8, p9)
+    //
+    // So the third stack argument is **Z**, not scale -- the first reading of
+    // this call site had it as scale and was wrong -- and the SCALE arrives in
+    // **EDX**, which the call site sets to 0x3E8 (1000) just before the call.
+    //
+    // Measured in a real fight: the battle asks for (16981, 16000) at z = 100,
+    // scale 1000. For comparison the overworld storm sits at z = 300 vanilla
+    // and 1250 as PEMF tunes it. A storm cloud at z = 100 is close to the
+    // water, which is very likely why a prefab demonstrably being drawn 842
+    // times a second could not be seen.
+    //
+    // 0 on any of these means "leave the game's own value".
+    int battleCloudZ     = 0;    // height. Try 800-1500.
+    int battleCloudScale = 0;    // goes into EDX. The game uses 1000.
+    int battleCloudDX    = 0;
+    int battleCloudDY    = 0;
 
     int boundFix = 1;
     int boundScalePct = 100;   // MULTIPLIER on the radius the engine computed
@@ -495,7 +509,9 @@ extern "C" {
 
     // What we substitute. Read by the shim, written from the safe point, so the
     // asm stays trivial and everything that thinks lives in C.
-    inline int   g_battleUseScale  = 0;    // 0 = leave the game's
+    inline int   g_battleSeenZ     = 0;
+    inline int   g_battleUseZ      = 0;    // 0 = leave the game's
+    inline int   g_battleUseScale  = 0;    // goes into EDX
     inline int   g_battleAddX      = 0;
     inline int   g_battleAddY      = 0;
 }
@@ -519,13 +535,15 @@ __declspec(naked) inline void BattleCloudShim()
         push eax
 
         // Record what the game asked for, whether or not we change anything.
-        // This is the only place those numbers exist.
+        // [esp+12] prefab, [esp+16] x, [esp+20] y, [esp+24] z. The SCALE is not
+        // on the stack at all -- it is in EDX.
         mov  eax, dword ptr [esp + 16]
         mov  dword ptr [g_battleSeenX], eax
         mov  eax, dword ptr [esp + 20]
         mov  dword ptr [g_battleSeenY], eax
         mov  eax, dword ptr [esp + 24]
-        mov  dword ptr [g_battleSeenScale], eax
+        mov  dword ptr [g_battleSeenZ], eax
+        mov  dword ptr [g_battleSeenScale], edx
 
         mov  eax, dword ptr [g_battleWantStorm]
         test eax, eax
@@ -533,11 +551,19 @@ __declspec(naked) inline void BattleCloudShim()
 
         mov  dword ptr [esp + 12], 0x008CCB58   // the storm prefab
 
-        // Scale, if we have been given one.
+        // Height. This is the one most likely to matter: the game asks for 100,
+        // and the overworld storm lives at 300-1250.
+        mov  eax, dword ptr [g_battleUseZ]
+        test eax, eax
+        jz   no_z
+        mov  dword ptr [esp + 24], eax
+    no_z:
+
+        // Scale, which travels in EDX rather than on the stack.
         mov  eax, dword ptr [g_battleUseScale]
         test eax, eax
         jz   no_scale
-        mov  dword ptr [esp + 24], eax
+        mov  edx, eax
     no_scale:
 
         // ...and a nudge, in the battle's own units.
@@ -1019,6 +1045,7 @@ inline void LoadTuning(const char* gameDir)
         else if (_stricmp(key, "battleWeather")   == 0) { g_tune.battleWeather   = value; ++applied; }
         else if (_stricmp(key, "battleStormDist") == 0) { g_tune.battleStormDist = value; ++applied; }
         else if (_stricmp(key, "battleIntensity") == 0) { g_tune.battleIntensity = value; ++applied; }
+        else if (_stricmp(key, "battleCloudZ")    == 0) { g_tune.battleCloudZ     = value; ++applied; }
         else if (_stricmp(key, "battleCloudScale")== 0) { g_tune.battleCloudScale = value; ++applied; }
         else if (_stricmp(key, "battleCloudDX")   == 0) { g_tune.battleCloudDX   = value; ++applied; }
         else if (_stricmp(key, "battleCloudDY")   == 0) { g_tune.battleCloudDY   = value; ++applied; }
@@ -1384,6 +1411,7 @@ inline void UpdateBattleWeather(bool worldLive)
 
     // Hand the shim its numbers. Done here rather than in the asm so the shim
     // stays a few moves and a jump.
+    g_battleUseZ     = g_tune.battleCloudZ;
     g_battleUseScale = g_tune.battleCloudScale;
     g_battleAddX     = g_tune.battleCloudDX;
     g_battleAddY     = g_tune.battleCloudDY;
@@ -1401,9 +1429,10 @@ inline void UpdateBattleWeather(bool worldLive)
         static bool s_said = false;
         if (!s_said) {
             s_said = true;
-            Log("storms: battle cloud IS being drawn -- the game asks for "
-                "pos (%d, %d) scale %d; we draw the storm prefab at scale %d",
-                g_battleSeenX, g_battleSeenY, g_battleSeenScale,
+            Log("storms: battle cloud -- the game asks for (%d, %d) z %d "
+                "scale %d; we draw the storm at z %d scale %d",
+                g_battleSeenX, g_battleSeenY, g_battleSeenZ, g_battleSeenScale,
+                g_battleUseZ     ? g_battleUseZ     : g_battleSeenZ,
                 g_battleUseScale ? g_battleUseScale : g_battleSeenScale);
         }
     }
