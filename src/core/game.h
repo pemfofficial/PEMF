@@ -903,8 +903,27 @@ inline int PlayerY() { return *(const int*)addr::PlayerY; }
 
 // ------------------------------------------------------- overworld vessels
 // Raw record access. The player is index 0; see the note on ShipArray.
+//
+// ⛔ BOUNDS-CHECKED, AND THE REASON IS SPECIFIC. The array is 256 records of
+// 0x45C bytes from 0x008142F8, so it ends at 0x00859EF8 -- and slot 256 would
+// span 0x00859EF8..0x0085A353, which contains:
+//
+//     0x0085A154   the sailing tick counter
+//     0x0085A158   the sailing master's prompt interval, and the == 0 that
+//                  gates his "far out to sea" card entirely
+//     0x0085A164   the view flags
+//
+// So a single off-by-one here does not corrupt a ship, it corrupts the state
+// behind an unexplained bug we have been chasing for hours. Every caller
+// happens to bound its own loop correctly today; nothing enforced it, and an
+// accessor that will read or write anywhere on request is a trap left armed.
+//
+// Returns 0 for an out-of-range index. Callers already treat a record address
+// as trusted, so this is deliberately a hard stop rather than a clamp: clamping
+// would silently hand back slot 255 and hide the mistake.
 inline uintptr_t ShipRecord(int index)
 {
+    if (index < 0 || index >= addr::kMaxShips) return 0;
     return addr::ShipArray + (uintptr_t)index * addr::kShipStride;
 }
 
@@ -912,6 +931,7 @@ inline uintptr_t ShipRecord(int index)
 // colors." reports. Read as int16, which is how the engine reads it.
 inline int ShipNationality(int index)
 {
+    if (index < 0 || index >= addr::kMaxShips) return -1;
     return *(const short*)(addr::ShipNationality + (uintptr_t)index * addr::kShipStride);
 }
 
@@ -920,6 +940,9 @@ inline int ShipNationality(int index)
 // validated, logged and reverted. Nothing else should call it.
 inline void SetShipNationalityRaw(int index, int nation)
 {
+    // See ShipRecord: slot 256 lands on the sailing tick and the sailing
+    // master's own gate. A write is the half of that which cannot be undone.
+    if (index < 0 || index >= addr::kMaxShips) return;
     *(short*)(addr::ShipNationality + (uintptr_t)index * addr::kShipStride) = (short)nation;
 }
 
@@ -1286,6 +1309,45 @@ inline void MarkCitySentHunter(int cityIndex, int shipSlot)
             |= kCitySentHunter;
     }
     __except (EXCEPTION_EXECUTE_HANDLER) {}
+}
+
+// ⛔ AND THE OTHER HALF, WHICH DID NOT EXIST. MarkCitySentHunter had no
+// counterpart, so every port that ever dispatched a hunter kept the flag and
+// the slot number for the rest of the session -- across the hunter breaking
+// off, across her sinking, and across starting a whole new career. PEMF was
+// writing a permanent change into the game's city records and never taking it
+// back, which is precisely what a mod must not do.
+//
+// The slot goes back to -1 rather than 0: 0 is the PLAYER's ship, and leaving a
+// port believing the player's own vessel is its hunter is a worse state than
+// the one we were trying to clear.
+inline void ClearCitySentHunter(int cityIndex)
+{
+    if (cityIndex < 0 || cityIndex >= addr::kMaxCities) return;
+    __try {
+        *(short*)(CityAuxRecords + (uintptr_t)cityIndex * kCityAuxStride
+                  + kCityAuxHunterIdx) = (short)-1;
+        *(unsigned*)(CityFlags + (uintptr_t)cityIndex * addr::kCityRecStride)
+            &= ~kCitySentHunter;
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER) {}
+}
+
+// Used when a career ends or a save is loaded, where tracking which ports we
+// touched is neither possible nor worth it -- the flag is ours, so clearing it
+// everywhere is always correct.
+inline int ClearAllCitySentHunter()
+{
+    int n = 0;
+    for (int c = 0; c < addr::kMaxCities; ++c) {
+        __try {
+            unsigned* f = (unsigned*)(CityFlags +
+                                      (uintptr_t)c * addr::kCityRecStride);
+            if (*f & kCitySentHunter) { *f &= ~kCitySentHunter; ++n; }
+        }
+        __except (EXCEPTION_EXECUTE_HANDLER) { break; }
+    }
+    return n;
 }
 
 inline int HunterStrengthFor(int nation)

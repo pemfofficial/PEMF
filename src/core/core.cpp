@@ -50,6 +50,7 @@
 #include "officers.h"
 #include "townmenu.h"
 #include "sailkeys.h"
+#include "sailmaster.h"
 #include "plugin.h"
 #include "d3d9hook.h"
 
@@ -430,6 +431,7 @@ static void RunSafePoint()
             // stock layout 'A' and 'S' mean load and save, as the game intends,
             // and there is nothing to fix.
             if (g_wasdActive) sailkeys::Apply();
+            sailmaster::Install();
         }
     }
 

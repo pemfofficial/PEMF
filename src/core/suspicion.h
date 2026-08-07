@@ -120,6 +120,10 @@ struct Hunt {
     DWORD startedAt = 0;
     DWORD lastAimAt = 0;
     int   aimCity  = -1;
+    // The port that sent her. Recorded so the flag PEMF sets on that port's
+    // record can be taken back when the hunt ends -- without this there was no
+    // way to know which city to clear, and so it was never cleared at all.
+    int   fromCity = -1;
     // Where she was at the previous re-aim, so the log can say whether the
     // re-issued order actually kept her under way or she is sitting in harbour.
     int   lastX = 0, lastY = 0;
@@ -146,6 +150,15 @@ inline void ResetAll()
         for (int k = 0; k < kMaxHuntsPerNation; ++k) g_hunts[n][k] = Hunt{};
     }
     g_wearing = -1;
+
+    // Careers end and saves get loaded, and the hunts we were tracking go with
+    // them -- but the flags we set on the CITY records do not, because they live
+    // in the game's memory rather than ours. Clearing every one is always right:
+    // the bit is ours to set and ours to take back, and after this reset there
+    // is no hunt of ours at sea anywhere.
+    const int cleared = game::ClearAllCitySentHunter();
+    if (cleared)
+        Log("suspicion: cleared the hunter flag from %d port record(s)", cleared);
 }
 
 // How many ships a crown sends. One while they merely dislike you; a squadron
@@ -392,6 +405,7 @@ inline bool DispatchOneHunter(int nation, Hunt& h)
     const int strength = game::HunterStrengthFor(nation);
     game::SetShipRoleRaw(slot, strength);
     game::MarkCitySentHunter(from, slot);
+    h.fromCity = from;          // so EndHunt can give the port its flag back
 
     // Bookkeeping FIRST. This block used to sit below the setup and reset
     // h.aimCity to -1 after the chase branch had just computed it, so the far
@@ -530,7 +544,14 @@ inline void EndHunt(Hunt& h, const char* why, bool tellPlayer = true)
                     game::NationName(h.nation), why);
         Say(line, true);
     }
+    // Give the port its record back. The hunt is over however it ended, so the
+    // flag saying "this port has one at sea" is no longer true -- and leaving it
+    // set was PEMF quietly editing the game's city table for the rest of the
+    // session.
+    if (h.fromCity >= 0) game::ClearCitySentHunter(h.fromCity);
+
     h.active = false; h.slot = -1; h.aimCity = -1; h.lastDist = -1;
+    h.fromCity = -1;
 }
 
 // A crown that wants you keeps wanting you. Dispatch used to be attempted once,
