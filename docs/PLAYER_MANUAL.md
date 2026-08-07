@@ -290,8 +290,22 @@ Two keys had to move to free up the letters:
 
 | | Was | Now |
 |---|---|---|
-| Attack ship | `a` | **Space** |
+| Attack ship | `a` | **`f`** — the same key as Fire in a sea battle |
 | Quick save | `S` | **F5** (quick load is **F9**) |
+
+⚠️ **Attack was on Space in 0.2.4 and 0.2.5, and that was a mistake.** Space is
+the game's own "enter the nearest port" key, so attacking a ship within reach of
+a harbour docked you instead. It is `f` from 0.2.6 on, and your `KeyMap.ini` is
+rewritten once so the change actually reaches you — anything you rebind after
+that is yours and stays, and your pre-PEMF file is still beside it as
+`KeyMap.ini.pemf-backup`.
+
+**Also fixed in 0.2.6:** while sailing, `a` and `s` loaded and saved the game as
+well as steering. The sailing view reads those two keys straight from the
+keyboard rather than from `KeyMap.ini`, so rebinding them in the file never had
+any effect — steering left would load your last save and drop you into a port,
+over and over. They now steer and nothing else. `L` still quick-loads, exactly as
+it does in the stock game.
 
 Your original bindings are kept as `KeyMap.ini.pemf-backup`, next to the
 `KeyMap.ini` it replaced. That lives in your Documents folder, under

@@ -92,8 +92,19 @@ WHAT CHANGES IMMEDIATELY
 WASD steering, in every part of the game - sailing, ship battles, land
 battles, duels, sneaking. Two keys had to move to make room:
 
-    Attack ship   was 'a'   now Space
+    Attack ship   was 'a'   now 'f'     (same key as Fire in a sea battle)
     Quick save    was 'S'   now F5      (quick load is now F9)
+
+If you installed an earlier version of PEMF, Attack was on Space for a while.
+Space is the game's own "enter the nearest port" key, so attacking a ship near a
+harbour docked you instead. Moving it to 'f' fixes that, and your KeyMap.ini is
+rewritten once to pick the change up. Anything you rebind after that is yours
+and stays; your pre-PEMF file is still in KeyMap.ini.pemf-backup.
+
+While sailing, 'a' and 's' used to load and save the game as well as steer -- the
+sailing view reads those two straight from the keyboard rather than from
+KeyMap.ini, so rebinding them was never enough. Steering left could load your
+last save and drop you in a port. That is fixed.
 
 PEMF writes this once, keeps a backup, and never touches the file again - so
 anything you rebind afterwards stays rebound.

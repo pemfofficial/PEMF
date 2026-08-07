@@ -14,7 +14,7 @@ one you're looking at first — the symptoms are not alike.
 Whatever else you do, check the file is the one we published. In PowerShell:
 
 ```powershell
-Get-FileHash .\PEMF-0.2.5.zip -Algorithm SHA256
+Get-FileHash .\PEMF-0.2.6.zip -Algorithm SHA256
 ```
 
 **Every release has its own hashes**, and the current ones are published in two
@@ -39,7 +39,7 @@ Older releases are recorded below, where the circularity does not apply.
 
 | Release | File | SHA256 |
 |---|---|---|
-| 0.2.5 | see the releases page | (this file ships inside it — see above) |
+| 0.2.6 | see the releases page | (this file ships inside it — see above) |
 | 0.2.4 | `PEMF-0.2.4.zip` | `D0C961D197C58A30CDC6940E69A6827176EADF65BC6062459E636FCF266F3A5A` |
 | 0.2.4 | `pemf_core.dll` | `A095B7471D282ED905844A53B85A2B2143C195938072DFA55C4AD3F5E5AC3519` |
 | 0.2.4 | `version.dll` | `B0AB5F2B0AD88625C9B2FC239AD0DE808CB48406977753A793122E7F429A2E12` |

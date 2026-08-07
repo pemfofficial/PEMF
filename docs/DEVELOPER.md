@@ -480,7 +480,7 @@ Each of these cost real debugging time. Do not relearn them.
 ## Releasing
 
 ```powershell
-.\build.ps1 -Package -Version 0.2.5
+.\build.ps1 -Package -Version 0.2.6
 ```
 
 Produces `dist\PEMF-<version>.zip` with no wrapping folder, so a player extracts
