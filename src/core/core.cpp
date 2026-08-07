@@ -49,6 +49,7 @@
 #include "crewmorale.h"
 #include "officers.h"
 #include "townmenu.h"
+#include "sailkeys.h"
 #include "plugin.h"
 #include "d3d9hook.h"
 
@@ -330,6 +331,73 @@ extern bool g_haveTrueFlag;
 // Suspicion's tick baseline. See the note where it is read.
 static DWORD g_lastSusAt = 0;
 
+// Whether the WASD layout is the one in force this session -- set when we
+// install it AND when we find our own marker already there. sailkeys reads it:
+// a player on the stock layout keeps the stock meaning of 'A' and 'S'.
+static bool g_wasdActive = false;
+
+// --------------------------------------------------- staying out of the way
+// ⛔ THE ALT-TAB HANG WAS A RACE, NOT A LEAK, AND PEMF WAS IN THE MESSAGE PUMP.
+//
+// Alt-tab out of a fullscreen-exclusive game and Windows begins a display mode
+// change back to the desktop resolution. Alt-tab back BEFORE that finishes and
+// the device reset races it. Vanilla Pirates! survives that; Pirates! with PEMF
+// hangs on a black screen that needs the process killed. Established by test,
+// both directions, after four wrong theories -- storms, the cloud instance
+// pool, the rain patch and the D3D9 vtable hook were all suspected and all
+// exonerated.
+//
+// PEMF is implicated because the safe point IS the game's message pump: it
+// hooks PeekMessageA and runs its whole per-frame job from inside it. During a
+// mode change that pump has to service WM_ACTIVATEAPP and the resolution
+// handshake promptly, and PEMF was sitting in it scanning the 256-slot ship
+// array, ticking suspicion, and writing flushed log lines. Delaying the pump
+// through a mode change is how the race becomes a deadlock.
+//
+// So: while the game does not have the foreground, PEMF does NOTHING. Not
+// reduced work -- nothing, and it returns immediately.
+//
+// ⚠️ AND IT MUST NOT Sleep() THERE EITHER. 0.2.5 added a Sleep(1) to the
+// dormant path to stop PEMF burning a core while the player was away, and that
+// path is reached on the way BACK IN too, where the game is foreground again
+// but not yet drawing. Sleeping in the pump during the mode change is the exact
+// wrong thing at the exact wrong moment, and 0.2.5 failed on its FIRST reset
+// where 0.2.4 had survived eight. The sleep is now earned rather than assumed:
+// it starts only once we have been quiet long enough that no transition can
+// still be in flight.
+constexpr DWORD kTransitionGuardMs = 2000;
+
+static HWND  g_gameWnd    = nullptr;
+static DWORD g_quietSince = 0;   // AWAY: when the game lost the foreground
+static DWORD g_returnSince = 0;  // RETURN: when it got it back, frames pending
+
+// The game's own window, found once from the game thread. GetForegroundWindow
+// alone is not enough: it answers "who is in front", and we need "is that us".
+static HWND PemfGameWindow()
+{
+    if (g_gameWnd && IsWindow(g_gameWnd)) return g_gameWnd;
+    g_gameWnd = GetActiveWindow();               // ours, this thread
+    if (!g_gameWnd) g_gameWnd = GetForegroundWindow();
+    return g_gameWnd;
+}
+
+// Cheap -- GetForegroundWindow reads shared session state rather than entering
+// the kernel, which matters because this runs on every pump iteration.
+//
+// ⚠️ TRIED AND REVERTED: throttling this to once per 16 ms. It is sound in
+// principle -- the pump runs thousands of times a second and this is traffic
+// into the window manager that is mid mode-change -- but it went in alongside
+// the deferred reset logging, and that pair crashed sooner than what it
+// replaced. Reverted together rather than left half-applied. Worth retrying on
+// its own once there is a build that survives.
+static bool PemfHasFocus()
+{
+    HWND mine = PemfGameWindow();
+    if (!mine) return true;                      // unknown: assume we are up
+    HWND fg = GetForegroundWindow();
+    return fg == mine || (fg && GetWindow(fg, GW_OWNER) == mine);
+}
+
 static void RunSafePoint()
 {
     ++g_safePointHits;
@@ -358,6 +426,10 @@ static void RunSafePoint()
             storms::Apply();
             townmenu::Install();
             render::Install();
+            // Only if OUR layout is the one in force -- see sailkeys.h. On the
+            // stock layout 'A' and 'S' mean load and save, as the game intends,
+            // and there is nothing to fix.
+            if (g_wasdActive) sailkeys::Apply();
         }
     }
 
@@ -383,27 +455,83 @@ static void RunSafePoint()
     // frames come back, and yields the CPU instead of eating it -- which is
     // what the machine's owner alt-tabbed away to get.
     d3d9hook::SamplePulse();
-    if (d3d9hook::Dormant()) {
-        // ⛔ THIS ONE STILL HAS TO RUN. A reset is the likeliest moment for the
-        // engine to rebuild its vtable, which sheds our hooks -- and the pulse
-        // that decides we are dormant is EndScene, which is one of them. Skip
-        // the re-hook here and a shed vtable means EndScene never counts again,
-        // so PEMF concludes the game has stopped drawing and stays dormant for
-        // the rest of the session. Dormancy has to keep the door it came in by.
-        if (g_targetOK) d3d9hook::TryInstall();
 
-        d3d9hook::MarkFrameBoundary();
-        d3d9hook::ReportFromSafePoint();   // heartbeat/warning still runs
+    // ⛔ WHILE THE GAME IS NOT DRAWING ON SCREEN, PEMF IS ABSENT. Not reduced,
+    // not throttled, not doing cheap work -- absent, as near as a loaded DLL can
+    // get. It returns here and does nothing whatsoever.
+    //
+    // This is the shape the evidence forced, after several attempts that each
+    // kept doing "just a little" in this window and each still hung:
+    //
+    //   * Vanilla Pirates! survives a fast alt-tab. PEMF does not. Tested both
+    //     ways, deliberately, several times. So whatever PEMF does here, doing
+    //     LESS of it is always the right direction, and doing none of it is the
+    //     only version that cannot be wrong.
+    //
+    //   * ⚠️ Sleep() IS NOT CHEAP HERE, AND IT IS NOT 1 ms. At Windows' default
+    //     15.6 ms timer resolution a Sleep(1) runs the game's message pump at
+    //     ~64 Hz instead of thousands. Alt-tab back inside that and the
+    //     activation and display-mode messages are serviced late -- which is
+    //     the race. It was added in 0.2.5 to stop PEMF burning a core while the
+    //     player was away, and it bought that at the cost of the pump. Gone.
+    //
+    //   * No re-hook either. TryInstall writes four D3D9 vtable slots, and the
+    //     runtime is rebuilding that vtable for the mode change. Two writers,
+    //     one table, worst possible moment.
+    //
+    //   * No logging. The log is flushed per line, so it is synchronous file
+    //     I/O -- in the message pump, on a machine that may well be busy. That
+    //     is how a tester hit this while copying a large file.
+    //
+    // The CPU relief that Sleep bought is a real thing and it is deliberately
+    // being given back. A game that spins while minimised is what vanilla does;
+    // matching vanilla is the point. Correctness first -- if the burn is worth
+    // solving later it must be solved without touching the pump's timing.
+    const bool focus = PemfHasFocus();
+    const bool quiet = !focus || d3d9hook::Dormant();
 
+    if (quiet) {
         // Every clock PEMF keeps is a delta against GetTickCount, and the wall
-        // clock does not stop while we are dormant. Clearing the baselines here
-        // means the first tick after waking is a small one instead of however
-        // long the player was away -- otherwise suspicion ages every trail to
-        // nothing and the storm jumps across the map the instant you come back.
+        // clock does not stop while we are quiet. Clearing the baseline means
+        // the first tick after waking is a small one rather than however long
+        // the player was away -- otherwise suspicion ages every trail to
+        // nothing and the storm jumps across the map the moment you return.
         g_lastSusAt = 0;
+        if (!g_quietSince) g_quietSince = GetTickCount();
 
-        Sleep(1);
+        // ⚠️ THE ONE EXCEPTION, AND IT IS A SAFETY VALVE, NOT WORK. "Not
+        // drawing" is measured by our own EndScene hook. If a reset rebuilds the
+        // vtable and sheds that hook, the counter stops for good and this state
+        // would never end -- PEMF loaded, running, and permanently inert, with
+        // no crash to explain it. That latch is a real bug this file has had
+        // before.
+        //
+        // So: only with focus (the player is here and expects a game), only
+        // after five seconds (far outside any reset), and only then does it
+        // touch the vtable. In the case this whole branch exists for -- a fast
+        // alt-tab, over in well under a second -- it never fires at all.
+        if (focus) {
+            const DWORD nowR = GetTickCount();
+            if (!g_returnSince) g_returnSince = nowR;
+            else if (nowR - g_returnSince >= 5000) {
+                g_returnSince = nowR;
+                Log("d3d9: no frames 5s after regaining focus -- re-checking "
+                    "the hooks in case the vtable was rebuilt");
+                if (g_targetOK) d3d9hook::TryInstall();
+            }
+        } else {
+            g_returnSince = 0;
+        }
         return;
+    }
+    g_returnSince = 0;
+
+    // Fully back: focus AND frames. A drawn frame proves the reset finished,
+    // which no timer can prove, so this is the first safe moment to touch the
+    // vtable again.
+    if (g_quietSince) {
+        g_quietSince = 0;
+        if (g_targetOK) d3d9hook::TryInstall();
     }
 
     // A career starting, ending, or being loaded invalidates all trigger
@@ -1298,6 +1426,7 @@ static void InstallWasdKeymap(const char* gameDir)
                     free(buf);
                     if (found) {
                         fclose(f);
+                        g_wasdActive = true;
                         Log("keymap: WASD already installed in %s -- left "
                             "alone so your own rebinds survive", target);
                         return;
@@ -1378,6 +1507,8 @@ static void InstallWasdKeymap(const char* gameDir)
 
     fclose(out);
     free(ascii);
+
+    g_wasdActive = true;
 
     if (haveTarget)
         Log("keymap: WASD installed -> %s (original saved as %s)", target, backup);

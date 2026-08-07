@@ -251,6 +251,19 @@ static long PemfLiveObjects(void)
     __except (EXCEPTION_EXECUTE_HANDLER) { return -1; }
 }
 
+// ⚠️ TRIED AND REVERTED: deferring this log line to the safe point.
+//
+// Log() takes a lock and fflush()es, so logging here is a blocking disk write
+// immediately before the call that races the display mode change -- which
+// looked like an excellent explanation for the hang, especially as the first
+// tester hit it while copying a large file. It was not: with the line deferred
+// the game crashed sooner, on an R6025 rather than a hang.
+//
+// It also blinded the log. The safe point does nothing at all while the game is
+// not drawing, which is exactly when a reset happens, so the deferred line was
+// never written -- the log simply ended at "going dormant" with no reset
+// recorded. A diagnostic that disappears in the case it exists for is worse
+// than the cost it was avoiding.
 HRESULT WINAPI PemfResetHook(void* device, void* params)
 {
     InterlockedIncrement(&g_pemfResetCount);
@@ -258,9 +271,7 @@ HRESULT WINAPI PemfResetHook(void* device, void* params)
     // The count goes in the ENTRY line, not just the result line, because the
     // failures we are chasing do not reach a result line: one hangs inside the
     // driver's Reset and one returns D3DERR_INVALIDCALL. Whatever happens next,
-    // this number was true going in -- and if it climbs reset over reset, the
-    // engine is holding objects it should have released, which is exactly what
-    // INVALIDCALL means. A flat number rules PEMF out just as usefully.
+    // this number was true going in.
     Log("d3d9: device Reset #%ld -- PEMF standing down until it comes back "
         "(engine objects live: %ld)", g_pemfResetCount, PemfLiveObjects());
 
@@ -500,6 +511,29 @@ inline void ReportFromSafePoint()
             "-- world text draws in the first pass",
             passes, g_pemfBeginSceneCalls, g_pemfPresentCalls);
     }
+    // ------------------------------------------------- the object-count curve
+    // Every 5s, and DELIBERATELY OUTSIDE the heartbeat below, which only fires
+    // every 15s and not at all in a short session -- the run that produced the
+    // first reading lasted 17 seconds and logged no heartbeat, so a single
+    // number at the crash was all we got and it could not be read as high or
+    // low without something to compare it to.
+    //
+    // This runs while dormant too, because the whole question is what happens
+    // to the object population while the player is alt-tabbed away.
+    {
+        static DWORD lastObjT = 0;
+        static long  lastObj  = -1;
+        DWORD tnow = GetTickCount();
+        if (lastObjT == 0 || tnow - lastObjT >= 5000) {
+            lastObjT = tnow;
+            const long live = PemfLiveObjects();
+            Log("engine: %ld object(s) live (%+ld since last sample)%s",
+                live, (lastObj >= 0) ? live - lastObj : 0,
+                g_pemfNotRendering ? "  [dormant]" : "");
+            lastObj = live;
+        }
+    }
+
     static DWORD lastT = 0;
     static LONG  lastCalls = 0;
     DWORD now = GetTickCount();

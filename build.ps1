@@ -34,7 +34,18 @@ param(
     # Bump this with each release. It is stamped into the DLL resources AND
     # logged on the first line of pemf.log, so a stale default is not cosmetic:
     # it makes a bug report name a version that was never shipped.
-    [string]$Version = "0.2.5"
+    [string]$Version = "0.2.5",
+
+    # Extra preprocessor defines, for building a diagnostic variant without
+    # editing the source. Bisecting a crash means producing several builds that
+    # differ in one switch, and hand-editing a header between them is how you
+    # end up unsure which build you are looking at.
+    #
+    #   .\build.ps1 -Deploy -Defines "PEMF_D3D9_STAGE=0"
+    #
+    # ⚠️ A build made this way is NOT the release. It reports the same version,
+    # so note what you built when handing one to a tester.
+    [string]$Defines = ""
 )
 
 $ErrorActionPreference = 'Stop'
@@ -78,6 +89,10 @@ Write-Host "version : $verS" -ForegroundColor DarkGray
 # runtime that may be absent), /GS- so the naked thunks get no stack-check
 # prologue, /std:c++17 for inline variables.
 $common = '/nologo /O2 /MT /GS- /W3 /EHsc /std:c++17 /DWIN32 /D_CRT_SECURE_NO_WARNINGS'
+if ($Defines) {
+    foreach ($d in ($Defines -split '[;,\s]+' | Where-Object { $_ })) { $common += " /D$d" }
+    Write-Host "  extra defines: $Defines" -ForegroundColor Yellow
+}
 
 $cmd = @"
 call "$vcvars" x86 >nul 2>&1
