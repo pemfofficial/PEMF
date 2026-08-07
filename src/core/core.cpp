@@ -1416,8 +1416,21 @@ static void InstallWasdKeymap(const char* gameDir)
                     const size_t got = fread(buf, 1, (size_t)n, f);
                     // The marker is UTF-16, so look for its letters spaced by
                     // nulls rather than decoding the whole file.
+                    // ⚠️ VERSIONED, AND THE VERSION IS LOAD-BEARING. PEMF writes
+                    // this file once and then leaves it alone forever, which is
+                    // right for a player's rebinds and wrong for a layout we
+                    // later find to be broken -- the Space/Attack collision
+                    // would have stayed on every existing install for good.
+                    //
+                    // Bumping the suffix makes the old marker stop matching, so
+                    // the corrected layout is written once more. Do this ONLY to
+                    // fix a real fault in the layout, never for cosmetics: it
+                    // costs everyone their own rebinds. The original file is
+                    // safe either way -- the backup below refuses to overwrite
+                    // one that already exists, so it still holds the player's
+                    // pre-PEMF bindings and not our last attempt.
                     static const char kNeedle[] =
-                        "P\0E\0M\0F\0-\0W\0A\0S\0D\0-\0I\0N\0S\0T\0A\0L\0L\0E\0D";
+                        "P\0E\0M\0F\0-\0W\0A\0S\0D\0-\0I\0N\0S\0T\0A\0L\0L\0E\0D\0-\0" "2";
                     const size_t nlen = sizeof(kNeedle) - 1;
                     bool found = false;
                     for (size_t i = 0; i + nlen <= got; ++i) {
@@ -1493,10 +1506,14 @@ static void InstallWasdKeymap(const char* gameDir)
     // actually in so nobody goes hunting for it in the game folder.
     char marker[512];
     const int mlen = _snprintf_s(marker, sizeof(marker), _TRUNCATE,
-        "\r\n; PEMF-WASD-INSTALLED\r\n"
+        "\r\n; PEMF-WASD-INSTALLED-2\r\n"
         "; PEMF wrote the layout above into this file, once, and will not touch\r\n"
         "; it again -- so anything you rebind from here on is yours and stays.\r\n"
-        "; Delete the PEMF-WASD-INSTALLED line IN THIS FILE to have the layout\r\n"
+        "; (The -2 is the layout's version. It changed once, to move Attack off\r\n"
+        "; Space, which the sailing view also uses to enter a port. If it ever\r\n"
+        "; changes again your file is rewritten once more and your original is\r\n"
+        "; still in the .pemf-backup beside this one.)\r\n"
+        "; Delete the PEMF-WASD-INSTALLED-2 line IN THIS FILE to have the layout\r\n"
         "; put back on the next launch. (The copy in the game folder under\r\n"
         "; PEMF\\KeyMap_WASD.ini is only the template and deleting anything\r\n"
         "; there changes nothing.)\r\n");
