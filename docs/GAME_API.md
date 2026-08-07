@@ -3034,3 +3034,77 @@ At runtime, after the unpacker has run:
 
 **The rule:** for a packed target, static analysis maps the code and only runtime
 checks confirm it. Never report parity from a file comparison alone.
+
+## The sailing master's "far out to sea" card — NOT A BUG
+
+Reported repeatedly, by two testers and by us, as PEMF's fault: *"We're far out
+to sea captain, shall I set a course for..."* comes up while apparently sitting
+beside a port. **It is stock behaviour. Measured, twice, independently. Do not
+investigate this again without reading this section first.**
+
+### How it actually works
+
+It is a **timer**, not a map-bounds check. The sailing update keeps one:
+
+```
+00473749  INC  [0x0085A154]              ; sailing tick
+0047374F  MOV  EAX, [0x0085A158]
+00473761  IMUL EAX, EAX, 0x1F4           ; (B + 1) * 500
+00473767  ADD  EAX, [0x008B98D4]         ; + next-prompt-due
+00473769  CMP  ECX, EAX
+0047376D  CALL 0x0045B890                ; -> the card
+```
+
+`FUN_0045B890` then decides whether to speak:
+
+```
+0045B8D0  CALL 0x0045FEE0    ; nearest city, ANY nation, all 128, exclude 0x80008000
+0045B8D8  XOR  ECX, ECX      ; the player's ship, explicitly
+0045B8DA  CALL 0x00405D90    ; distance
+0045B8DF  CMP  EAX, 0xC
+0045B8E2  JL   <stay quiet>  ; under 12 -> nothing
+```
+
+It re-arms itself: `+250` ticks if it stayed quiet, `+99999` if it spoke.
+
+**Leagues are the distance × 5**, so the threshold is 12 → **60 leagues**. That
+is easily crossed while coasting, which is why it feels wrong: you can be in
+sight of land and still be 60 leagues from the nearest *port*.
+
+### Two things that mislead
+
+- `FUN_00405D90` takes BOTH arguments implicitly — `ECX` = ship index, `EAX` =
+  city index, the latter being whatever the preceding search returned. That
+  looks fragile and is not: every call site sets both deliberately.
+- The per-nation LIST is a **different** function, `FUN_0045FCB0`, and it scans
+  only **44** cities unless the mask is exactly `0x10` (Pirate), when it scans
+  128 — `while (i < (uVar3 + 0x2c))` where `uVar3 = (mask != 0x10) - 1 & 0x54`.
+  So the list and the gate do not consider the same set of ports. Still the
+  game's own design.
+
+### The measurement that closed it
+
+A temporary shim on `0x0047376D` logged PEMF's own city lookup against the
+engine's, every time the card fired:
+
+```
+sailmaster: card allowed -- nearest city 31 is 13249 away (engine 13).
+            Both agree we are at sea.
+```
+
+`13 * 5 = 65` leagues, exactly what the card printed. For scale, alongside a port
+reads ~984 in the same units. The two independent calculations agreed, so
+nothing of ours was distorting it, and the shim was deleted.
+
+### Ruled out, so nobody repeats it
+
+- PEMF writes **none** of the inputs: `0x008B98D4`, `0x0085A154`, `0x0085A158`
+  (read only, as morale's term B) and `0x0085A164` (read only).
+- `MarkCitySentHunter` sets bit `0x800` on a city record; the searches exclude
+  `0x80008000` / `0xC0008000`. Bit 11 is in neither, and `kCityRecStride = 32`
+  matches the engine's own `puVar5 += 8` dwords.
+- The flag-mesh arrays that end one dword below the city table (`0x00860B54 +
+  nation*4`) are declared in `game.h` and never written.
+
+If a player finds the card too talkative, that is a **preference**, and the
+honest way to serve it is an opt-in setting — not a bug fix.
