@@ -132,6 +132,30 @@ overwrite one you have edited. Start with stormScale, and raise stormHeight
 whenever you raise it.
 
 
+KNOWN ISSUE - ALT-TABBING QUICKLY
+---------------------------------
+
+Alt-tab out of the game and Windows starts putting your desktop back to its
+normal resolution. That takes a moment. If you alt-tab BACK IN before it has
+finished, the game can lock up on a black screen that sits over everything and
+has to be force-closed.
+
+Give it a second before you switch back and you will not see it.
+
+If it does happen, you do not need to reboot:
+
+    Ctrl+Shift+Esc  ->  find Pirates!.exe  ->  End task
+
+Task Manager draws above the stuck window, so it will come to the front.
+
+Playing in a window instead of full screen avoids this completely - the
+graphics device is never taken away, so there is nothing to race.
+
+This is being worked on. It is ours, not the game's: the stock game survives the
+same test. What it is NOT is a risk to your saves - the game is stuck, not
+writing anything.
+
+
 REPORTING A PROBLEM
 -------------------
 
