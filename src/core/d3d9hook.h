@@ -132,6 +132,27 @@ volatile LONG  g_pemfSkippedDraws   = 0;   // draws declined for the above
 // drawing. It stops, and PEMF goes dormant until it starts again.
 volatile LONG  g_pemfNotRendering   = 0;   // non-zero: game is not drawing
 
+// ---------------------------------------------------- does the game have focus
+// ⛔ THE FASTEST SIGNAL WE HAVE, AND THE ONLY ONE QUICK ENOUGH FOR A FAST
+// ALT-TAB. Published by the safe point; read by the draw hooks.
+//
+// A tester pinned this exactly: alt-tab out and click another window first and
+// you can alt-tab as much as you like; alt-tab out and straight back in and it
+// dies, every time, on `Reset #1 FAILED (0x8876086C)`.
+//
+// The difference is elapsed time, not what was clicked. g_pemfNotRendering needs
+// a WHOLE SECOND of missing frames before it believes the game has stopped, and
+// a fast alt-tab is over long before that -- so PEMF went on drawing straight
+// through the window where the game releases its resources and calls Reset.
+// Everything we draw goes through the game's own routines, which build engine
+// objects, and those hold D3DPOOL_DEFAULT buffers. Reset with any of those alive
+// is D3DERR_INVALIDCALL, which is exactly the code in every one of those logs.
+//
+// Losing the foreground is instantaneous, so this catches the case the pulse
+// cannot. The pulse stays for the other case -- a game that stops drawing while
+// still in front.
+volatile LONG  g_pemfAppActive      = 1;   // zero: we are not the foreground
+
 // ------------------------------------------------------ settling after a reset
 // A SUCCESSFUL RESET IS NOT THE ALL-CLEAR. The device is usable again the
 // instant Reset returns, but the ENGINE's own objects are not: the game rebuilds
@@ -191,7 +212,8 @@ HRESULT WINAPI PemfBeginSceneHook(void* device)
     }
     InterlockedExchange(&g_pemfBeginOk, 1);
 
-    if (pass == 0 && !g_pemfDeviceLost && !PemfSettlingAfterReset())
+    if (pass == 0 && g_pemfAppActive && !g_pemfDeviceLost
+        && !PemfSettlingAfterReset())
         PemfOnBeginScene(device);
     else if (pass == 0)
         InterlockedIncrement(&g_pemfSkippedDraws);
@@ -232,7 +254,10 @@ HRESULT WINAPI PemfEndSceneHook(void* device)
         // The settle check is the third condition and the newest: the other two
         // both read "clear" the instant Reset returns, which is exactly when the
         // engine's own objects are still being rebuilt. See the settle note.
-        if (g_pemfBeginOk && !g_pemfDeviceLost && !PemfSettlingAfterReset())
+        // g_pemfAppActive is FIRST because it is the one that fires soon enough
+        // to matter on a fast alt-tab -- see the note where it is declared.
+        if (g_pemfAppActive && g_pemfBeginOk && !g_pemfDeviceLost
+            && !PemfSettlingAfterReset())
             PemfOnEndScene(device);
         else InterlockedIncrement(&g_pemfSkippedDraws);
     }

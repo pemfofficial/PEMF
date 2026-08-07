@@ -488,6 +488,20 @@ static void RunSafePoint()
     // matching vanilla is the point. Correctness first -- if the burn is worth
     // solving later it must be solved without touching the pump's timing.
     const bool focus = PemfHasFocus();
+
+    // ⛔ PUBLISHED BEFORE ANY EARLY RETURN. The draw hooks read this, and the
+    // whole point of it is to stop them drawing the instant the player alt-tabs
+    // -- so it has to be written on the very pass that notices, not after a
+    // branch that returns first. Getting that ordering wrong would leave the
+    // flag stuck at whatever it was when we last did a full pass, which is
+    // exactly the state it exists to correct.
+    InterlockedExchange(&g_pemfAppActive, focus ? 1 : 0);
+
+    // Same reason, different sense: the storm track is driven from inside the
+    // work we are about to skip, so it has to be told here or it plays on into
+    // an empty room. Cheap -- it only does anything on the edge.
+    stormaudio::SetAway(!focus);
+
     const bool quiet = !focus || d3d9hook::Dormant();
 
     if (quiet) {

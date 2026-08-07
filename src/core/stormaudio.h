@@ -136,11 +136,42 @@ inline bool Load()
     return true;
 }
 
+// ------------------------------------------------------- away from the game
+// THE DRUMS KEPT PLAYING WHILE ALT-TABBED, AND LOOPED UNTIL YOU CAME BACK.
+// Reported by a tester, who was generous enough to call it "not necessarily a
+// bad thing". It is: a game you are not looking at should not be making noise.
+//
+// It is not the ramp's fault. PEMF stands down completely while the player is
+// in another application, and this Tick runs from inside that stood-down work
+// -- so the track was simply never told anything had changed and held whatever
+// level it was at, forever.
+//
+// So the silence is applied from OUTSIDE the tick, straight to the voice, and
+// g_level is deliberately left alone: it is the ramp's memory of where the storm
+// had got to, and coming back should return you to that storm rather than make
+// you earn it again from silence.
+inline bool g_away = false;
+
+inline void SetAway(bool away)
+{
+    if (away == g_away) return;
+    g_away = away;
+    if (!g_loaded) return;
+    // Straight to the voice. On the way back, the next Tick writes g_level
+    // again and the storm is exactly where it was.
+    // g_level is 0..1000; the mixer takes 0..1. Getting that conversion wrong
+    // here would have set the gain to a thousand rather than to full.
+    audiomix::SetLevel(g_track, away ? 0.0f : (float)g_level / 1000.0f);
+    Log("storm audio: %s", away ? "silenced -- you are in another window"
+                                : "back");
+}
+
 // `intensity` is the engine's own weather value; `sailing` gates the whole
 // thing so the track never plays over a menu or a town.
 inline void Tick(int intensity, bool sailing)
 {
     if (!g_tune.enabled || g_failed) return;
+    if (g_away) return;   // silenced from outside; leave the ramp untouched
 
     const DWORD now = GetTickCount();
     const int dt = g_lastTick ? (int)(now - g_lastTick) : 0;

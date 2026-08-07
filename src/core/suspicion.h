@@ -251,7 +251,23 @@ inline int Octagonal(int dx, int dy)
 // Who can see us, and how hard they are looking. Called once per safe point.
 struct Look {
     int ships = 0;      // vessels of the deceived nation within shipRange
-    int close = 0;      // ANY vessel inside closeRange
+    // ⛔ THEIR vessels inside closeRange -- NOT "any vessel", which is what this
+    // counted until 0.2.7 and is the single worst bug the mechanic has had.
+    //
+    // Observe() is called once PER NATION and its result drives THAT nation's
+    // meter. Counting any hull at all therefore meant one unrelated merchant
+    // sailing past raised the Spanish, English, French, Dutch and Pirate meters
+    // at once, each by riseCloseRange -- the heaviest term there is, 9 a second
+    // against a threshold of 100 and a decay of 2.
+    //
+    // So a single passing ship of ANY flag unmasked you to EVERY crown in about
+    // fourteen seconds, and two did it in six. Reported from open water as
+    // "called out by the English, circled back, called out by the French, and
+    // their nearest town is even further away" -- which reads like a detection
+    // radius problem and is nothing of the kind.
+    //
+    // A ship that cannot report to them cannot help them see through you.
+    int close = 0;      // vessels of the deceived nation inside closeRange
     int port  = -1;     // their settlement within portRange, or -1
     int portDist = 0;
     int nearest  = 0;   // closest vessel of theirs, for the panel
@@ -286,10 +302,13 @@ inline Look Observe(int nation)
         if (x == 0 && y == 0) continue;
 
         const int d = Octagonal(x - px, y - py);
-        if (d <= g_tune.closeRange) ++look.close;
 
+        // Both counts are THEIRS. See the note on Look::close -- the close
+        // count used to sit outside this test, and that one line made every
+        // nation suspicious of you at once whenever any hull passed by.
         if (game::ShipNationality(i) == nation) {
             if (d <= g_tune.shipRange) ++look.ships;
+            if (d <= g_tune.closeRange) ++look.close;
             if (d < look.nearest) { look.nearest = d; look.nearestSlot = i; }
         }
     }
