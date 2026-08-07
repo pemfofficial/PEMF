@@ -516,6 +516,19 @@ namespace addr {
     constexpr uintptr_t RendererPtr       = 0x00727C30;  // renderer object*
     constexpr uintptr_t RendererDeviceOfs = 0x60;        // IDirect3DDevice9* at +0x60
     constexpr uintptr_t D3D9Ptr           = 0x00728D74;  // IDirect3D9*
+
+    // HOW MANY ENGINE OBJECTS ARE ALIVE RIGHT NOW. Every scene-object
+    // constructor increments it and the destructor at 0x00538400 decrements it,
+    // so it is a LIVE count rather than a running total -- which is what makes
+    // it worth reading. Confirmed from ~20 constructor sites (FUN_004bb500, the
+    // cloud-instance clone, and FUN_004108a0, the town menu's backdrop, among
+    // them) against the single decrement.
+    //
+    // Read-only, and purely diagnostic. It exists because "PEMF leaks engine
+    // objects" was a plausible cause of Reset failing with D3DERR_INVALIDCALL
+    // and there was no way to tell -- a number that climbs across alt-tabs
+    // settles it in one log line, where argument could not.
+    constexpr uintptr_t LiveSceneObjects  = 0x00727444;
 }
 
 // ------------------------------------------------------------- state access

@@ -242,11 +242,27 @@ HRESULT WINAPI PemfEndSceneHook(void* device)
 
 // A device reset means a resolution change or a lost device; worth seeing in
 // the log because it is also when the vtable tends to be rebuilt.
+// Guarded read of the engine's live-object count. Never faults: this runs on the
+// path into a device reset, and a fault here would turn a diagnostic into the
+// very crash it exists to explain.
+static long PemfLiveObjects(void)
+{
+    __try { return *(const long*)game::addr::LiveSceneObjects; }
+    __except (EXCEPTION_EXECUTE_HANDLER) { return -1; }
+}
+
 HRESULT WINAPI PemfResetHook(void* device, void* params)
 {
     InterlockedIncrement(&g_pemfResetCount);
-    Log("d3d9: device Reset #%ld -- PEMF standing down until it comes back",
-        g_pemfResetCount);
+
+    // The count goes in the ENTRY line, not just the result line, because the
+    // failures we are chasing do not reach a result line: one hangs inside the
+    // driver's Reset and one returns D3DERR_INVALIDCALL. Whatever happens next,
+    // this number was true going in -- and if it climbs reset over reset, the
+    // engine is holding objects it should have released, which is exactly what
+    // INVALIDCALL means. A flat number rules PEMF out just as usefully.
+    Log("d3d9: device Reset #%ld -- PEMF standing down until it comes back "
+        "(engine objects live: %ld)", g_pemfResetCount, PemfLiveObjects());
 
     // Down BEFORE the reset, not after. The game releases its render objects
     // inside this call, and anything of ours drawing while that happens is
@@ -493,7 +509,8 @@ inline void ReportFromSafePoint()
     if (calls == lastCalls)
         Log("d3d9: WARNING -- EndScene silent for 15s (calls stuck at %ld)", calls);
     else
-        Log("d3d9: heartbeat -- %ld EndScene calls (+%ld)", calls, calls - lastCalls);
+        Log("d3d9: heartbeat -- %ld EndScene calls (+%ld), engine objects live %ld",
+            calls, calls - lastCalls, PemfLiveObjects());
     lastT = now; lastCalls = calls;
 }
 
