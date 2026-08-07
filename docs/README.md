@@ -23,6 +23,7 @@ The game executable is never modified.
 | **[ASSETS.md](ASSETS.md)** | Modders | `.FPK` archives, byte-exact round-tripping, and which files the game will read loose from disk (it varies per subsystem — probe, don't assume) |
 | **[WIDESCREEN.md](WIDESCREEN.md)** | Developers | The 16:9 work: why the UI is two fixed 4:3 virtual spaces rather than the real resolution |
 | **[ARCHITECTURE_REVIEW.md](ARCHITECTURE_REVIEW.md)** | Developers | Nine passes: hazards found, fixed, and the invariants they establish |
+| **[RELEASE_NOTES_0.2.5.md](RELEASE_NOTES_0.2.5.md)** | Everyone | Alt-tab: the R6025 crash on returning to the game, and PEMF no longer burning a core while you are away |
 | **[RELEASE_NOTES_0.2.4.md](RELEASE_NOTES_0.2.4.md)** | Everyone | Officers and crew: named officers with talents and flaws, PEMF's own morale, town-menu rows, the plugin SDK, and the alt-tab crash fix |
 | **[RELEASE_NOTES_0.2.3.md](RELEASE_NOTES_0.2.3.md)** | Everyone | Launch fix: the Steam "Application corrupt." race, and mixed-install detection |
 | **[RELEASE_NOTES_0.2.2.md](RELEASE_NOTES_0.2.2.md)** | Everyone | Fixes: the profile folder that broke WASD on GOG, notice wrapping, storms clearing behind cards |

@@ -14,22 +14,35 @@ one you're looking at first — the symptoms are not alike.
 Whatever else you do, check the file is the one we published. In PowerShell:
 
 ```powershell
-Get-FileHash .\PEMF-0.2.4.zip -Algorithm SHA256
+Get-FileHash .\PEMF-0.2.5.zip -Algorithm SHA256
 ```
 
-**Every release has its own hashes.** These are **0.2.4**, the current one:
+**Every release has its own hashes**, and the current ones are published in two
+places you can reach without trusting this file:
 
-| File | SHA256 |
-|---|---|
-| `PEMF-0.2.4.zip` | `D0C961D197C58A30CDC6940E69A6827176EADF65BC6062459E636FCF266F3A5A` |
-| `pemf_core.dll` | `A095B7471D282ED905844A53B85A2B2143C195938072DFA55C4AD3F5E5AC3519` |
-| `version.dll` | `B0AB5F2B0AD88625C9B2FC239AD0DE808CB48406977753A793122E7F429A2E12` |
+- the **[releases page](https://github.com/pemfofficial/PEMF/releases/latest)**,
+  in the release notes
+- the [`README`](https://github.com/pemfofficial/PEMF#check-what-you-downloaded)
+  in the repository
+
+⚠️ **This page deliberately does not list the current release's hash**, and that
+is not an oversight. This file ships *inside* the zip it would be vouching for,
+so any hash printed here is necessarily the hash of a *different* build than the
+one you are holding — the archive changes the moment this line does. A table
+that cannot be right is worse than no table: it tells a player with a perfectly
+good download that they have a bad one. Earlier releases did exactly that.
+
+Older releases are recorded below, where the circularity does not apply.
 
 <details>
 <summary>Older releases</summary>
 
 | Release | File | SHA256 |
 |---|---|---|
+| 0.2.5 | see the releases page | (this file ships inside it — see above) |
+| 0.2.4 | `PEMF-0.2.4.zip` | `D0C961D197C58A30CDC6940E69A6827176EADF65BC6062459E636FCF266F3A5A` |
+| 0.2.4 | `pemf_core.dll` | `A095B7471D282ED905844A53B85A2B2143C195938072DFA55C4AD3F5E5AC3519` |
+| 0.2.4 | `version.dll` | `B0AB5F2B0AD88625C9B2FC239AD0DE808CB48406977753A793122E7F429A2E12` |
 | 0.2.3 | `PEMF-0.2.3.zip` | `1D7B3880B9489F4FB545F7A9384B6CD56AA6DBE5BBCD53BCC5344B5DA8546EC4` |
 | 0.2.0 | `PEMF-0.2.0.zip` | `AF66FB5F0581AF8321725C13DC1311C78FBB9756EE69C29E5C78F2E2080AF690` |
 | 0.2.0 | `pemf_core.dll` | `4997313EA02A4496285A94F82AC17216031CCF7BA7559ED9F97A0625059AE8FE` |

@@ -480,7 +480,7 @@ Each of these cost real debugging time. Do not relearn them.
 ## Releasing
 
 ```powershell
-.\build.ps1 -Package -Version 0.2.4
+.\build.ps1 -Package -Version 0.2.5
 ```
 
 Produces `dist\PEMF-<version>.zip` with no wrapping folder, so a player extracts
@@ -491,16 +491,29 @@ player-facing docs.
 ### Release checklist
 
 `-Package` also prints the SHA256 of the zip and both DLLs, and writes the same
-table to `dist\PEMF-<version>.sha256.md`. **Paste it into both places before
-publishing:**
+table to `dist\PEMF-<version>.sha256.md`. **Paste it into `README.md` — and
+nowhere else.**
 
-- `README.md` — the download table
-- `docs/WINDOWS_SECURITY.md` — the verify-what-you-downloaded table
+⛔ **THE HASH TABLE LIVES IN `README.md` ONLY, BECAUSE THE README IS NOT SHIPPED
+IN THE ZIP.** `docs/WINDOWS_SECURITY.md` used to carry it too, and that could
+never be right: it ships *inside* the archive it was vouching for, so writing the
+hash into it changes the archive and invalidates the hash it just wrote. Editing
+the README is free; editing anything under `docs/` that gets packaged means
+rebuilding, which re-stamps the DLL timestamps and rots every hash again.
 
-This is mechanical and it has been missed before: `WINDOWS_SECURITY.md` shipped
-0.2.0's hashes for three releases running, which is worse than publishing none —
-it tells a player with a good download that they have a bad one. Also check the
-README names the **current** zip; it advertised `0.2.0` for two releases.
+⚠️ **DO NOT REBUILD AFTER TAKING THE HASHES.** The zip in `dist\` must be the
+exact one you publish. `build.ps1` with no changes still produces different
+bytes — MSVC writes the build time into the PE header.
+
+The order that works:
+
+1. finish every change, **including docs that go in the zip**
+2. `.\build.ps1 -Package`
+3. paste the hashes into `README.md`
+4. commit, tag, `gh release create` with **that** zip
+
+Related, same family of mistake: check the README names the **current** zip. It
+advertised `0.2.0` for two releases running.
 
 ### Then actually publish it
 
