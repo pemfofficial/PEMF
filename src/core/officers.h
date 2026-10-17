@@ -7,11 +7,22 @@
 //
 // -------------------------------------------------------------- what is real
 // A skill's `target` says what it touches, and PEMF only offers targets it can
-// actually deliver. Today that is two:
+// actually deliver. Today that is five:
 //
-//     loot    -- adds to PEMF's share of what the crew takes (loot.h). Real,
-//                measured in game: 660 plundered became 990 at +50%.
-//     morale  -- feeds PEMF's own morale, once that exists.
+//     loot        -- adds to PEMF's share of what the crew takes (loot.h).
+//                    Measured in game: 660 plundered became 990 at +50%.
+//     morale      -- moves the resting point of PEMF's own morale scale
+//                    (crewmorale.h), so a well-liked officer makes a crew that
+//                    recovers to a better place.
+//     cargoGuard  -- keeps a share of the cargo a storm would have taken
+//                    (storms.h).
+//     discretion  -- slows the rise of suspicion under false colours
+//                    (suspicion.h).
+//     surgeon     -- puts back a share of the men lost (crewwatch.h), sampled
+//                    the same way loot is.
+//
+// The totals are in officerfx.h, recomputed from the hired roster rather than
+// accumulated, so they cannot drift out of step with who is actually aboard.
 //
 // ⛔ Ship stats, player stats and world stats are NOT here. They are on the
 // wish list and no engine site has been mapped for them, so a skill naming one

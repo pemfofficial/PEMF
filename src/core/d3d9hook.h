@@ -52,8 +52,46 @@
 #define PEMF_VTBL_PRESENT    17
 #define PEMF_VTBL_BEGINSCENE 41
 #define PEMF_VTBL_ENDSCENE   42
+// DrawIndexedPrimitive -- widescreen.h watches it for the full-screen backdrop.
+// The highest slot we touch, so it bounds the span we unprotect.
+#define PEMF_VTBL_DRAWINDEXED 82
+// The other three draws, hooked for the Ctrl+Shift+D trace only: each is a
+// single flag test and a jump to the original unless a trace is running.
+#define PEMF_VTBL_DRAWPRIM     81
+#define PEMF_VTBL_DRAWPRIMUP   83
+#define PEMF_VTBL_DRAWINDEXEDUP 84
+#define PEMF_VTBL_LAST        PEMF_VTBL_DRAWINDEXEDUP
 
 extern "C" {
+
+// widescreen.h. Cheap when there is nothing to do; the draw hook pre-filters.
+void __cdecl PemfWidescreenPassBegin(void);
+int  __cdecl PemfWidescreenOnDrawIndexed(void* device, INT base, UINT minIndex);
+void __cdecl PemfWidescreenAfterDraw(void* device);
+void __cdecl PemfWidescreenPassEnd(void* device);
+void __cdecl PemfWidescreenOnPresent(void* device);   // screenshots
+void __cdecl PemfWidescreenBeforeReset(void);         // drop our state block
+int  __cdecl PemfWidescreenTracing(void);             // Ctrl+Shift+D draw trace
+void __cdecl PemfWidescreenTraceDraw(void* device, UINT type, INT base, UINT minIndex,
+                                     UINT numVerts, UINT startIndex, UINT primCount);
+void __cdecl PemfWidescreenTraceDrawUP(void* device, const char* kind, UINT type,
+                                       UINT numVerts, UINT primCount, const void* data,
+                                       UINT stride);
+
+typedef HRESULT (WINAPI *PemfDrawPrim_t)(void* device, UINT type, UINT start, UINT primCount);
+typedef HRESULT (WINAPI *PemfDrawPrimUP_t)(void* device, UINT type, UINT primCount,
+                                           const void* data, UINT stride);
+typedef HRESULT (WINAPI *PemfDrawIndexedUP_t)(void* device, UINT type, UINT minIndex,
+                                              UINT numVerts, UINT primCount, const void* idx,
+                                              UINT idxFmt, const void* data, UINT stride);
+void* g_pemfOrigDrawPrim      = nullptr;
+void* g_pemfOrigDrawPrimUP    = nullptr;
+void* g_pemfOrigDrawIndexedUP = nullptr;
+
+typedef HRESULT (WINAPI *PemfDrawIndexed_t)(void* device, UINT type, INT base,
+                                            UINT minIndex, UINT numVerts,
+                                            UINT startIndex, UINT primCount);
+void*          g_pemfOrigDrawIndexed = nullptr;  // the real DrawIndexedPrimitive
 
 typedef HRESULT (WINAPI *PemfEndScene_t)(void* device);
 typedef HRESULT (WINAPI *PemfBeginScene_t)(void* device);
@@ -211,6 +249,7 @@ HRESULT WINAPI PemfBeginSceneHook(void* device)
         return hr;
     }
     InterlockedExchange(&g_pemfBeginOk, 1);
+    PemfWidescreenPassBegin();
 
     if (pass == 0 && g_pemfAppActive && !g_pemfDeviceLost
         && !PemfSettlingAfterReset())
@@ -229,6 +268,9 @@ HRESULT WINAPI PemfPresentHook(void* device, const RECT* src, const RECT* dst,
     InterlockedIncrement(&g_pemfPresentCalls);
     const LONG passes = InterlockedExchange(&g_pemfPassThisFrame, 0);
     if (passes > 0) g_pemfPassesLast = passes;
+    // The frame is finished here, which is what a screenshot wants.
+    if (g_pemfAppActive && !g_pemfDeviceLost && !PemfSettlingAfterReset())
+        PemfWidescreenOnPresent(device);
     return ((PemfPresent_t)g_pemfOrigPresent)(device, src, dst, wnd, dirty);
 }
 
@@ -262,7 +304,59 @@ HRESULT WINAPI PemfEndSceneHook(void* device)
         else InterlockedIncrement(&g_pemfSkippedDraws);
     }
 
+    // Every pass, not only the first: the backdrop may be drawn in any of them.
+    // A plain Clear, but held to the same health checks as everything else.
+    if (g_pemfAppActive && g_pemfBeginOk && !g_pemfDeviceLost
+        && !PemfSettlingAfterReset())
+        PemfWidescreenPassEnd(device);
+
     return ((PemfEndScene_t)g_pemfOrigEndScene)(device);
+}
+
+// Called for every indexed draw in the game, so the fast path is two compares.
+// Only a four-vertex, two-triangle draw can be a full-screen 2D layer. If
+// widescreen adjusts the projection for it, it is put back right after.
+HRESULT WINAPI PemfDrawIndexedHook(void* device, UINT type, INT base, UINT minIndex,
+                                   UINT numVerts, UINT startIndex, UINT primCount)
+{
+    if (PemfWidescreenTracing())
+        PemfWidescreenTraceDraw(device, type, base, minIndex, numVerts, startIndex, primCount);
+    const int adjusted =
+        (numVerts == 4 && primCount == 2 && g_pemfAppActive && !g_pemfDeviceLost)
+            ? PemfWidescreenOnDrawIndexed(device, base, minIndex) : 0;
+    const HRESULT hr = ((PemfDrawIndexed_t)g_pemfOrigDrawIndexed)(
+        device, type, base, minIndex, numVerts, startIndex, primCount);
+    if (adjusted) PemfWidescreenAfterDraw(device);
+    return hr;
+}
+
+HRESULT WINAPI PemfDrawPrimHook(void* device, UINT type, UINT start, UINT primCount)
+{
+    if (PemfWidescreenTracing())
+        PemfWidescreenTraceDrawUP(device, "DP", type, 0, primCount, nullptr, 0);
+    return ((PemfDrawPrim_t)g_pemfOrigDrawPrim)(device, type, start, primCount);
+}
+
+HRESULT WINAPI PemfDrawPrimUPHook(void* device, UINT type, UINT primCount, const void* data,
+                                  UINT stride)
+{
+    if (PemfWidescreenTracing()) {
+        const UINT n = type == 4 ? primCount * 3 : (type == 5 || type == 6) ? primCount + 2
+                     : type == 2 ? primCount * 2 : type == 3 ? primCount + 1 : primCount;
+        PemfWidescreenTraceDrawUP(device, "DPUP", type, n, primCount, data, stride);
+    }
+    return ((PemfDrawPrimUP_t)g_pemfOrigDrawPrimUP)(device, type, primCount, data, stride);
+}
+
+HRESULT WINAPI PemfDrawIndexedUPHook(void* device, UINT type, UINT minIndex, UINT numVerts,
+                                     UINT primCount, const void* idx, UINT idxFmt,
+                                     const void* data, UINT stride)
+{
+    if (PemfWidescreenTracing())
+        PemfWidescreenTraceDrawUP(device, "DIPUP", type, minIndex + numVerts, primCount,
+                                  data, stride);
+    return ((PemfDrawIndexedUP_t)g_pemfOrigDrawIndexedUP)(device, type, minIndex, numVerts,
+                                                          primCount, idx, idxFmt, data, stride);
 }
 
 // A device reset means a resolution change or a lost device; worth seeing in
@@ -306,6 +400,11 @@ HRESULT WINAPI PemfResetHook(void* device, void* params)
     InterlockedExchange(&g_pemfDeviceLost, 1);
     InterlockedExchange(&g_pemfBeginOk, 0);
     InterlockedExchange(&g_pemfPassThisFrame, 0);
+
+    // ⛔ Reset FAILS while any state block is alive (D3DERR_INVALIDCALL -- the
+    // very code the alt-tab hang came with). widescreen keeps one for the map's
+    // parchment strips; it is released here and rebuilt on next use.
+    PemfWidescreenBeforeReset();
 
     HRESULT hr = ((PemfReset_t)g_pemfOrigReset)(device, params);
 
@@ -374,10 +473,14 @@ inline void TryInstall()
     if (g_installed && device == g_pemfGameDevice) {
         void** vt = SlotReadable(device, sizeof(void*)) ? *(void***)device : nullptr;
         if (vt == g_pemfDeviceVTable &&
-            SlotReadable(&vt[PEMF_VTBL_ENDSCENE], sizeof(void*)) &&
-            vt[PEMF_VTBL_ENDSCENE]   == (void*)&PemfEndSceneHook &&
-            vt[PEMF_VTBL_BEGINSCENE] == (void*)&PemfBeginSceneHook &&
-            vt[PEMF_VTBL_PRESENT]    == (void*)&PemfPresentHook)
+            SlotReadable(&vt[PEMF_VTBL_LAST], sizeof(void*)) &&
+            vt[PEMF_VTBL_ENDSCENE]    == (void*)&PemfEndSceneHook &&
+            vt[PEMF_VTBL_BEGINSCENE]  == (void*)&PemfBeginSceneHook &&
+            vt[PEMF_VTBL_PRESENT]     == (void*)&PemfPresentHook &&
+            vt[PEMF_VTBL_DRAWINDEXED] == (void*)&PemfDrawIndexedHook &&
+            vt[PEMF_VTBL_DRAWPRIM]    == (void*)&PemfDrawPrimHook &&
+            vt[PEMF_VTBL_DRAWPRIMUP]  == (void*)&PemfDrawPrimUPHook &&
+            vt[PEMF_VTBL_DRAWINDEXEDUP] == (void*)&PemfDrawIndexedUPHook)
             return;
         Log("d3d9: hooks lost (vtable rebuilt under us) -- rehooking");
         g_installed = false;
@@ -386,15 +489,19 @@ inline void TryInstall()
 
     if (!SlotReadable(device, sizeof(void*))) return;
     void** vtable = *(void***)device;
-    if (!vtable || !SlotReadable(vtable, (PEMF_VTBL_ENDSCENE + 1) * sizeof(void*)))
+    if (!vtable || !SlotReadable(vtable, (PEMF_VTBL_LAST + 1) * sizeof(void*)))
         return;
 
     // A recreated device can come back on the SAME vtable. If our hook is
     // already in the slot, re-hooking would capture our own hook as the
     // "original" and recurse -- just adopt the new device pointer.
-    if (vtable[PEMF_VTBL_ENDSCENE]   == (void*)&PemfEndSceneHook ||
-        vtable[PEMF_VTBL_BEGINSCENE] == (void*)&PemfBeginSceneHook ||
-        vtable[PEMF_VTBL_PRESENT]    == (void*)&PemfPresentHook) {
+    if (vtable[PEMF_VTBL_ENDSCENE]    == (void*)&PemfEndSceneHook ||
+        vtable[PEMF_VTBL_BEGINSCENE]  == (void*)&PemfBeginSceneHook ||
+        vtable[PEMF_VTBL_PRESENT]     == (void*)&PemfPresentHook ||
+        vtable[PEMF_VTBL_DRAWINDEXED] == (void*)&PemfDrawIndexedHook ||
+        vtable[PEMF_VTBL_DRAWPRIM]    == (void*)&PemfDrawPrimHook ||
+        vtable[PEMF_VTBL_DRAWPRIMUP]  == (void*)&PemfDrawPrimUPHook ||
+        vtable[PEMF_VTBL_DRAWINDEXEDUP] == (void*)&PemfDrawIndexedUPHook) {
         Log("d3d9: new device 0x%p reuses the hooked vtable 0x%p", device, vtable);
         g_pemfGameDevice = device;
         g_installed = true;
@@ -403,7 +510,7 @@ inline void TryInstall()
 
     DWORD old = 0;
     void** first = &vtable[PEMF_VTBL_RESET];
-    SIZE_T span  = (PEMF_VTBL_ENDSCENE - PEMF_VTBL_RESET + 1) * sizeof(void*);
+    SIZE_T span  = (PEMF_VTBL_LAST - PEMF_VTBL_RESET + 1) * sizeof(void*);
     if (!VirtualProtect(first, span, PAGE_EXECUTE_READWRITE, &old)) {
         Log("d3d9: could not unprotect the vtable (err=%lu) -- giving up",
             GetLastError());
@@ -416,10 +523,18 @@ inline void TryInstall()
     g_pemfOrigEndScene   = vtable[PEMF_VTBL_ENDSCENE];
     g_pemfOrigBeginScene = vtable[PEMF_VTBL_BEGINSCENE];
     g_pemfOrigPresent    = vtable[PEMF_VTBL_PRESENT];
-    vtable[PEMF_VTBL_RESET]      = (void*)&PemfResetHook;
-    vtable[PEMF_VTBL_ENDSCENE]   = (void*)&PemfEndSceneHook;
-    vtable[PEMF_VTBL_BEGINSCENE] = (void*)&PemfBeginSceneHook;
-    vtable[PEMF_VTBL_PRESENT]    = (void*)&PemfPresentHook;
+    g_pemfOrigDrawIndexed = vtable[PEMF_VTBL_DRAWINDEXED];
+    g_pemfOrigDrawPrim      = vtable[PEMF_VTBL_DRAWPRIM];
+    g_pemfOrigDrawPrimUP    = vtable[PEMF_VTBL_DRAWPRIMUP];
+    g_pemfOrigDrawIndexedUP = vtable[PEMF_VTBL_DRAWINDEXEDUP];
+    vtable[PEMF_VTBL_RESET]       = (void*)&PemfResetHook;
+    vtable[PEMF_VTBL_ENDSCENE]    = (void*)&PemfEndSceneHook;
+    vtable[PEMF_VTBL_BEGINSCENE]  = (void*)&PemfBeginSceneHook;
+    vtable[PEMF_VTBL_PRESENT]     = (void*)&PemfPresentHook;
+    vtable[PEMF_VTBL_DRAWINDEXED] = (void*)&PemfDrawIndexedHook;
+    vtable[PEMF_VTBL_DRAWPRIM]      = (void*)&PemfDrawPrimHook;
+    vtable[PEMF_VTBL_DRAWPRIMUP]    = (void*)&PemfDrawPrimUPHook;
+    vtable[PEMF_VTBL_DRAWINDEXEDUP] = (void*)&PemfDrawIndexedUPHook;
     VirtualProtect(first, span, old, &old);
 
     g_installed = true;
@@ -434,10 +549,14 @@ inline void Uninstall()
     if (!g_pemfDeviceVTable) return;
     void** vtable = g_pemfDeviceVTable;
     void** first  = &vtable[PEMF_VTBL_RESET];
-    SIZE_T span   = (PEMF_VTBL_ENDSCENE - PEMF_VTBL_RESET + 1) * sizeof(void*);
+    SIZE_T span   = (PEMF_VTBL_LAST - PEMF_VTBL_RESET + 1) * sizeof(void*);
     DWORD old = 0;
     if (SlotReadable(first, span) &&
         VirtualProtect(first, span, PAGE_EXECUTE_READWRITE, &old)) {
+        if (g_pemfOrigDrawIndexed) vtable[PEMF_VTBL_DRAWINDEXED] = g_pemfOrigDrawIndexed;
+        if (g_pemfOrigDrawPrim)      vtable[PEMF_VTBL_DRAWPRIM]      = g_pemfOrigDrawPrim;
+        if (g_pemfOrigDrawPrimUP)    vtable[PEMF_VTBL_DRAWPRIMUP]    = g_pemfOrigDrawPrimUP;
+        if (g_pemfOrigDrawIndexedUP) vtable[PEMF_VTBL_DRAWINDEXEDUP] = g_pemfOrigDrawIndexedUP;
         if (g_pemfOrigReset)      vtable[PEMF_VTBL_RESET]      = g_pemfOrigReset;
         if (g_pemfOrigEndScene)   vtable[PEMF_VTBL_ENDSCENE]   = g_pemfOrigEndScene;
         if (g_pemfOrigBeginScene) vtable[PEMF_VTBL_BEGINSCENE] = g_pemfOrigBeginScene;

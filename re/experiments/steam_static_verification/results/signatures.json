@@ -1,0 +1,200 @@
+[
+ {
+  "where": "src/core/game.h:2009",
+  "bytes": "8b 4c 24 04 6a 00",
+  "found_where_checked": true,
+  "note": ""
+ },
+ {
+  "where": "src/core/game.h:2010",
+  "bytes": "8b 4c 24 04 6a 01",
+  "found_where_checked": true,
+  "note": ""
+ },
+ {
+  "where": "src/core/game.h:2011",
+  "bytes": "0f bf 05",
+  "found_where_checked": true,
+  "note": ""
+ },
+ {
+  "where": "src/core/game.h:2012",
+  "bytes": "83 ec 10 53 55",
+  "found_where_checked": true,
+  "note": ""
+ },
+ {
+  "where": "src/core/game.h:2013",
+  "bytes": "83 ec 08 55 56 57",
+  "found_where_checked": true,
+  "note": ""
+ },
+ {
+  "where": "src/core/game.h:2016",
+  "bytes": "ff 15 a4 03 6c 00",
+  "found_where_checked": true,
+  "note": ""
+ },
+ {
+  "where": "src/core/game.h:2017",
+  "bytes": "81 ec 1c 01 00 00",
+  "found_where_checked": true,
+  "note": ""
+ },
+ {
+  "where": "src/core/game.h:2018",
+  "bytes": "81 ec 34 04 00 00",
+  "found_where_checked": true,
+  "note": ""
+ },
+ {
+  "where": "src/core/game.h:2064",
+  "bytes": "51 a0 f8 ac 8c 00 53 32",
+  "found_where_checked": true,
+  "note": ""
+ },
+ {
+  "where": "src/core/game.h:2066",
+  "bytes": "8b 0d e0 a4 8c 00 83 ec",
+  "found_where_checked": true,
+  "note": ""
+ },
+ {
+  "where": "src/core/game.h:2068",
+  "bytes": "a1 b0 8f 8e 00 85 c0 56",
+  "found_where_checked": true,
+  "note": ""
+ },
+ {
+  "where": "src/core/game.h:2070",
+  "bytes": "81 ec fc 00 00 00 53 55",
+  "found_where_checked": true,
+  "note": ""
+ },
+ {
+  "where": "src/core/game.h:2072",
+  "bytes": "a1 d8 ac 8c 00 81 ec b4",
+  "found_where_checked": true,
+  "note": ""
+ },
+ {
+  "where": "src/core/game.h:2074",
+  "bytes": "81 ec 70 01 00 00 53 55",
+  "found_where_checked": true,
+  "note": ""
+ },
+ {
+  "where": "src/core/game.h:2077",
+  "bytes": "83 ec 08 56 be 08 00 00",
+  "found_where_checked": true,
+  "note": ""
+ },
+ {
+  "where": "src/core/game.h:2080",
+  "bytes": "83 ec 0c 53 55 8b d8 bd",
+  "found_where_checked": true,
+  "note": ""
+ },
+ {
+  "where": "src/core/game.h:2083",
+  "bytes": "51 56 be 08 00 00 00 89",
+  "found_where_checked": true,
+  "note": ""
+ },
+ {
+  "where": "src/core/game.h:1008",
+  "bytes": "83 ec 08 56 be 08 00 00 00",
+  "found_where_checked": true,
+  "note": ""
+ },
+ {
+  "where": "src/core/game.h:1030",
+  "bytes": "83 ec 0c 53 55 8b d8 bd 08 00",
+  "found_where_checked": true,
+  "note": ""
+ },
+ {
+  "where": "src/core/game.h:1033",
+  "bytes": "51 56 be 08 00 00 00",
+  "found_where_checked": true,
+  "note": ""
+ },
+ {
+  "where": "src/core/gameaudio.h:67",
+  "bytes": "8b 0d c0 d4 8e 00 33 c0",
+  "found_where_checked": true,
+  "note": ""
+ },
+ {
+  "where": "src/core/hudcorners.h:162",
+  "bytes": "0f b7 c3 0f af 05 7c 63 72 00 99 f7 3d 18 ac 8c 00",
+  "found_where_checked": true,
+  "note": ""
+ },
+ {
+  "where": "src/core/piratestart.h:84",
+  "bytes": "39 3d e0 6b 87 00 0f 85",
+  "found_where_checked": true,
+  "note": ""
+ },
+ {
+  "where": "src/core/piratestart.h:85",
+  "bytes": "b9 08 00 00 00",
+  "found_where_checked": true,
+  "note": ""
+ },
+ {
+  "where": "src/core/piratestart.h:86",
+  "bytes": "8a 8e 74 0b 86 00",
+  "found_where_checked": true,
+  "note": ""
+ },
+ {
+  "where": "src/core/piratestart.h:89",
+  "bytes": "53 45 46 44 00",
+  "found_where_checked": true,
+  "note": ""
+ },
+ {
+  "where": "src/core/storms.h:328",
+  "bytes": "0f af 05",
+  "found_where_checked": true,
+  "note": ""
+ },
+ {
+  "where": "src/core/storms.h:335",
+  "bytes": "8d 14 9b",
+  "found_where_checked": true,
+  "note": ""
+ },
+ {
+  "where": "src/core/storms.h:1194",
+  "bytes": "6b c0 90 90 90 90",
+  "found_where_checked": false,
+  "note": "patch bytes PEMF writes, not a check"
+ },
+ {
+  "where": "src/core/storms.h:1332",
+  "bytes": "b8 d3 4d 62 10 f7 6c 24 08",
+  "found_where_checked": true,
+  "note": ""
+ },
+ {
+  "where": "src/core/storms.h:1586",
+  "bytes": "0f af 05 f8 a0 85 00",
+  "found_where_checked": true,
+  "note": ""
+ },
+ {
+  "where": "src/core/widescreen.h:261",
+  "bytes": "8b 54 24 04 56 8b f1",
+  "found_where_checked": true,
+  "note": ""
+ },
+ {
+  "where": "src/core/wind.h:75",
+  "bytes": "a1 30 a9 8c 00 0f af 05 58 a1 85 00",
+  "found_where_checked": true,
+  "note": ""
+ }
+]

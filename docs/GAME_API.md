@@ -42,11 +42,21 @@ to touch memory on a mismatch.
 
 The **Steam executable is DRM-wrapped**. Its on-disk form has only two sections; the
 `.text` is `~1.1 MB` raw but `~5 MB` virtual with **entropy 8.00** (fully
-compressed/encrypted), and its import stub pulls in exactly `LoadLibraryA`,
+compressed/encrypted), and from `kernel32` it pulls exactly `LoadLibraryA`,
 `GetProcAddress`, `VirtualAlloc`, `VirtualFree` — an unpacker that allocates memory,
 decompresses the real code at launch, and rebuilds the import table in memory. The
 real game imports (`timeGetTime`, `PeekMessageA`, `CreateFileA`, …) are **not on
 disk**.
+
+The stub does, however, keep **one token symbol per dependent DLL**, so the Windows
+loader maps them all before the unpacker runs — `binkw32.dll _BinkClose@4`,
+`mss32.dll`, `MSVCP71`, `MSVCR71`, `USER32`, `GDI32`, `ADVAPI32`, `SHELL32`,
+`ole32`, `OLEAUT32`, `WINMM`, and **`VERSION.dll VerQueryValueA`**. That last one
+matters more than it looks: it means the proxy is loaded through the ordinary loader
+pass on the packed build exactly as it is on GOG, and that the loader must probe the
+game folder during process initialisation whatever the DRM does afterwards. Four of
+those DLLs live in the game folder, so a launch that never touches that directory is
+not a launch of this executable.
 
 **What the runtime probe established** (mod deployed to the Steam copy and run):
 
@@ -154,6 +164,62 @@ A city name is a **three-word record**, not a string pointer. Any token not in
 the table above is refused by the content loader, because enabling one means
 reading its call site first. `docs/EVENT_AUTHORING.md` hides all of this behind
 `{port}`.
+
+### Every token, and how many arguments it takes — decompiled 2026-10-17
+
+Reading the call site is no longer the only way. The argument count follows
+from the token's **type**, and both the types and the counts are now known for
+every token the game defines.
+
+- **Tokens are data.** `text.ini` (inside `Pak1.FPK`) defines each token as a
+  section `[NAME]` with `Type = __…`; the file's own header documents the
+  types. `TextLoadTokens` (`0x004F5870`, called by `InitEngine` with
+  `Text.INI`) maps each type to a kind:
+  `__NUM` 0, `__STR` 1, `__CHAR` 2, `__VAR` 3, `__GEN` 4, `__PER` 5,
+  `__MALE` 6, `__FEMALE` 7, `__NEUTER` 8, `__MP` 9, `__FP` 10, `__NP` 11,
+  `__SING` 12, `__PLUR` 13. **Any other type string becomes `__STR`.**
+- **The count is fixed by the kind** (`TextExpandTokens`, `0x004F61A0`):
+  - kinds 0–3 take **one** argument: an int, a `char*`, a char, or (for
+    `__VAR`) a **0-based index into the token's `Value =` list**;
+  - kinds 4–13 take **three**: a name record `{ int gender; int plural;
+    string text; }` with gender 0 male, 1 female, 2 neuter. The `string` is the
+    game's own string type: a `char*` whose **length is the int at
+    `ptr - 4`**. A plain C string is not enough; it would read garbage as the
+    length.
+  - An `@WORD` that is not a defined token is left in the text as written and
+    takes **no** argument.
+- **The 72 tokens by kind.** `__VAR`, one argument: `CITYTYPE LOCTYPE
+  NATIONALITY ANATIONALITY NATION RANK RANKBONUS DIRECTION ITEM SHIPTYPE ORDINAL
+  UPGRADE UPGRADED SPEC SPECED NPCADJECTIVE PROP1 APROP1 RAREPROP1 PROP2 APROP2
+  RAREPROP2 PROP3 BEAUTY QUAYLE DIFFICULTY ADIFFICULTY SHARE MONTH HAPPY
+  DUELINGSKILL RELATIVE ARELATIVE LOSTCITY TREASURE ROCK TEMPLE TOTEM FALLS
+  SHIPWRIGHTBUTTON SAVEGAME_SLOT REPUTATION HEALTH TRADER ECONOMY URBAN DAMAGE
+  KEYBOARD DANCEKEYHELP DUELKEYHELP NAVKEYHELP ONLANDKEYHELP BATTLEKEYHELP
+  LBATTLEKEYHELP LBATTLETURNKEYHELP LBATTLESKEYHELP LAND_PARTY MAPLEGEND SHOT
+  PAUSEMENU UNIQUES SPECIALSKILL ERAS`. `__NUM`: `NUM`. `__CHAR`: `CHAR`.
+  Three arguments (name record): `CITYNAME SHIPNAME` (`__PER`); `PCNAME TOP10
+  NPCNAME EVILNAME FAMTEXT` (`__MALE`).
+- This agrees with every count verified by hand above (`@CITYNAME` 3,
+  `@NATIONALITY` and `@LOCTYPE` 1). Enabling more `__VAR` tokens in the
+  content loader is now a matter of supplying an index in range, and the
+  value count is in `text.ini`.
+
+### The message buffer and the two AddText modes — decompiled 2026-10-17
+
+- **Capacity is 4,096 bytes.** `InitEngine` (`0x004D2950`) sets the message
+  object's destination `[0x008E9F58 + 0x78] = 0x00869B48`, capacity
+  `[+0x74] = 0x1000` and token character `[+0x7C] = '@'` (`0x004D2A3F`…
+  `0x004D2A53`). `TextFormat` (`0x004F60D0`) copies with `strncpy`/`strncat`
+  bounded by capacity − 1, so the game itself cannot overrun it. PEMF's 1 KB
+  ceiling in `townmenu.h` is well inside.
+- **Mode 0 replaces, mode 1 appends.** `AddText` (`0x004F6090`) pushes 0 and
+  the formatted text replaces the buffer; `AddTextAppend` (`0x004F60B0`,
+  "AddTextOption" above) pushes 1 and it is **appended** with `strncat`. That
+  is how the town menu builds its rows one line at a time, and why mode 1 does
+  nothing for a modal card that was composed in one piece.
+- **A grammar pass** (`0x004F6FA0`) runs only when `[0x008CAD04]` is non-zero:
+  the gender and plural agreement the name records exist for. Argument counts
+  are the same either way.
 
 ### Functions
 
@@ -780,7 +846,10 @@ Notes that matter:
   *not* the `× 0.001` float scaling the positional-audio call uses.
 - `a5` is a camera-relative tilt the game recomputes every frame:
   `-90` if view flag `0x40` is set in `[0x0085A164]`, else `-70`, times the
-  double at `0x00713600`.
+  double at `0x00713600` (GOG). **On Steam this double is at `0x007135F8`**;
+  `0x00713600` there holds two unrelated floats. PEMF uses its own copy
+  (`kDegToBam`) and never reads either address
+  (`re/experiments/steam_static_verification`).
 - `a7` runs `0` … `500`. The game ramps it **up** as a line appears; driving it
   **down** is what gives a notice a fade as it expires.
 - `a9 = 0` makes the callee use the default label manager at `[0x008C9DD8]`.
@@ -1428,8 +1497,88 @@ Sound is already loose on disk and named by intensity: `Storm.wav`,
 `StormBoom.wav`, `StormYell1/2/Neg-NNN.wav`, and the cues `NAV_THUNDER_LOW` /
 `_MEDIUM` / `_HIGH` (`0x0070B814`).
 
-**Purely visual.** Whether a storm does more to your ship — damage, crew, speed
-— lives somewhere else and has not been located.
+**The cloud is purely visual** — its scale changes nothing below. What a storm
+*does* is measured from the position arrays, and is now located:
+
+### ✅ What a storm does — decompiled 2026-10-16
+
+`FUN_00467F90`, the per-ship sailing update, `0x00468907–0x00468B35`:
+
+| Who | Where | Effect |
+|---|---|---|
+| any ship | always | speed folds in the weather curve (above), scaled by a per-type factor at `0x00723B0C + type*0x44`; floor 200 |
+| player | inside `R = DAT_00725678 * 2000 / 3` of slot 0 | **+400 speed** (blown along); `DAT_008C8218 = 2` |
+| player | inside `R / (2*DAT_00869B26 + 3)` | `DAT_008C8218 = 3`; a random ship of the fleet (`0x00814318 + i*0x45C`) takes **+1 damage**, max 70, unless `0x0085A164 & 0x484` |
+| player | near, outside R | `DAT_008C8218 = 1` |
+| AI ship | inside R | 1-in-3 per update, +1 damage, max 50 |
+
+`DAT_008C8218` (0 clear · 1 near · 2 inside · 3 core) is the game's own storm
+state; PEMF exposes it to event triggers as `field: "storm"`. `0x0085A0F8` is
+the HUD's **"@NUM knots"** (`FUN_004741B0`) and turns the wind needle; it is
+`field: "wind"`. `DAT_00869B26` shrinking the core is *inferred* to be a skill.
+
+⚠️ PEMF draws its own storm system and hides the engine's. Every rule above
+measures from the engine's slot 0, so `storms.h` holds slot 0 on PEMF's system
+(`syncEngineStorm`). Without that, the push and the damage come from a storm
+the player cannot see.
+
+`FUN_0045FBF0` re-seeds the three slots at random within ±10 cells of
+`(0x008B96B0, 0x008B96B4)`, slot 0 offset +10; called from `0x00466F74`,
+`0x00471CEC`, `0x00472412`.
+
+### ✅ The wind — decompiled 2026-10-16
+
+`DAT_007253BC` is the wind direction: int32, a full turn = 2^32,
+`0x40000000` = 90° = the trade wind. Weather drifts along it
+(`0x0046359C`: `x -= v·sin w`, `y -= v·sin(w+90°)`, `v = DAT_00725684/16`,
+trig `FUN_004DB210`), so storms come from `+(sin w, cos w)` and go the other
+way. Ship speed reads it (`0x0046885E`), as do the HUD needle, sails and waves.
+
+Written three places: every sailing tick at `0x00461E51` (render shared by the
+overworld and battles) easing `wind += (target − wind)/32` toward
+`3·(DAT_008CA930·DAT_0085A158 + 0x15555540)` ≈ 90°; and in the battle instance
+`FUN_0047A040` at `0x0047A0C9` (= 90°) and `0x0047EDE3`.
+
+PEMF (`wind.h`) replaces the two loads at `0x00461E23`
+(`A1 30 A9 8C 00 0F AF 05 58 A1 85 00`) with `mov eax,[g_pemfWindTerm]` + NOPs
+and steers the target on the overworld only; off it, the term is the game's
+own product, so battles are unchanged.
+
+⚠️ **AI ships have their own wind.** The point-of-sail speed (`FUN_00477450`,
+`ecx` = wind, `eax` = heading `+0x81430C`, ship type pushed) is fed
+`DAT_007253BC` only for ships **0–7**; every other ship gets **`DAT_00725600`**
+(`0x00468845`), written once to `0x40000000` at `0x0045F99D` and never again.
+Change one without the other and the player sails a different wind from
+everyone else. PEMF holds them equal on the overworld and restores 90° off it.
+
+### ✅ Pirate-hunters chase the player — decompiled 2026-10-16
+
+`FUN_00467F90`, the per-ship sailing update. A ship with purpose `1` steers
+every tick for the player's position (`0x008B96B4`/`0x008B96B0`, copied from
+slot 0 at the top of the function), through `FUN_004750C0` (terrain-aware), and
+skips the arrival test. She stays a hunter while (`0x0046AECC`):
+
+```
+FUN_00405D90(+0x3E) <= FUN_0045E6B0(+0x3E)     ; distance <= reach, in cells
+  reach = (int16[0x0085BF7E + c*0x94] / 50 - rep[CityNation(c)]) * ([0x0085A158] + 2) / 2
+!(0x0085A164 & 0x400)
+word [0x0081431A] <= (10 - rep[her nation]) * 5   ; ABSOLUTE: slot 0's word
+```
+
+else purpose `3` and `FUN_0045B740` (flag `0x80`, `+0x3E` = a home port). PEMF
+redirects the reach call at `0x0046AEF0` for its own hunters (`suspicion.h`).
+`FUN_004DB270` = angle(dx, dy). This supersedes the "never found" conclusion in
+the `+0x08` section below: `+0x08` still ignores the player, but purpose 1 does
+not need it.
+
+### AI navigation is a waypoint graph — decompiled 2026-10-16
+
+AI ships do not steer straight at their destination. A ship holds a destination
+city (`+0x3E`) and a next waypoint city (`+0x40`); the hop comes from a per-city
+table of `0x94`-byte rows (read at `0x004696EA`), gated by city-to-city distance
+(`FUN_00405D50`, limit `0x9A`) and city flags at `0x00860B70` (bit `2`,
+`0xC0000000`). This is why a ship can be aimed *past* the player but has never
+been made to *chase*: there is no position target, only ports.
 
 ## Making ships — the factory
 
@@ -1703,8 +1852,10 @@ there is a reason not to.
 | `+0x10` | `0x00814308` | Y |
 | `+0x02` | `0x008142FA` | **purpose** — what the ship *is*. See below. |
 | `+0x2A` | `0x00814322` | a second classifier, values 1–4, meaning unknown |
-| `+0x3E` | `0x00814336` | a city index (destination) |
-| `+0x40` | `0x00814338` | a city index (origin) |
+| `+0x14` | `0x0081430C` | heading she has, int32 angle (2^32 = 360°) |
+| `+0x44` | `0x0081433C` | heading she wants; she turns toward it each tick |
+| `+0x3E` | `0x00814336` | ⚠️ the port she RETURNS to, and a hunter's leash port (was mislabelled "destination") |
+| `+0x40` | `0x00814338` | ⚠️ the port she is BOUND for (was mislabelled "origin") |
 | `+0x58` | `0x00814350` | flags |
 
 ⚠️ Those three offsets were first written down as `+0x22`, `+0x36` and `+0x38` —
@@ -1773,6 +1924,19 @@ fingerprint of the career into each sidecar and compares it against the live
 game instead. Same write-up.
 
 ---
+
+## Town prices — `FUN_00428570` (decompiled 2026-10-17)
+
+`FUN_00428570(city)`, cdecl, computes the town's price table: int16 at
+`0x0085BFB4 + city*0x94 + good*2`, good 0..6 = Gold (always 1), Food, Luxuries,
+Goods, Spice, Sugar, Cannon. Inputs: town size `0x00860B75`, wealth
+`0x00860B7C`, `0x00860B76`, world averages `0x00861B70`/`0x00861B74` (rebuilt
+by `FUN_00428A30`, called from the world update `0x00460D12` and new-game setup
+`0x00404512`). A switch on the city index adjusts specific ports (regional
+specialties). Called fresh before use from `0x0041010B` (merchant),
+`0x004110B2` (town menu), `0x00428E0D` (world recompute), `0x0044E8C7`.
+PEMF scales the table after it (`market.h`). The merchant's own trade test is
+`FUN_0040FE00(edx = city)` — only Spanish ports ever refuse ("heretics").
 
 ## Ship-battle instance (naval combat)
 
@@ -2068,7 +2232,8 @@ Two things this proves:
 - **The game resolves sounds by building a filename at runtime, not from a fixed
   compiled catalogue.** A file that matches the constructed name is picked up.
 - **MP3 is supported as well as WAV** (`".wav"` @ `0x0070AB88`, `".mp3"` @
-  `0x00712E74`, `"-%03d.wav"` @ `0x00712F68`).
+  `0x00712E74`, `"-%03d.wav"` @ `0x00712F68`; GOG addresses. On Steam the last
+  two are at `0x00712E6C` and `0x00712F60`).
 
 On disk the sounds are **loose files under `Assets/Sounds/`** (not sealed inside
 the `.FPK` archives) — the same situation as the text overrides.
@@ -2727,6 +2892,58 @@ Why this is the right shape here:
 
 ---
 
+## Battle effects — debris, shots, shake (decompiled 2026-10-17)
+
+| What | Where | Notes |
+|---|---|---|
+| Flying debris | `FUN_00476F10(type, x, y, height, f5, f6)`, cdecl | 40-piece pool `0x008B99D8` (0x40 B); type 0/1 crewman in water + splash, 2 `cannon_barrel.nif`, 3 `cannon_truck.nif`, 4 `barrel_01.nif`. Hit calls `0x0047DE17`, `0x0047DE91`, `0x0047E11B`. |
+| One cannon shot | `FUN_00477CB0(side, ship, x, y)` | Shot table `0x008BA668` (24 per ship, 0x28 B). Broadside loop call `0x0047E4E6`; side 0 = player. |
+| Shot smoke/flash | `0x0047E56D` `mov edx, 0x46` → `FUN_004BBC10` | EDX = size. |
+| Camera shake | `0x008CAB70`–`0x008CAB88` | 4 float amplitudes, start (clock `0x008C8494`), ms, active. Stock: player struck (500 ms), event `0x4D` (200 ms). |
+| Timed effect | `FUN_004AB290`, 12 args, callee-cleaned (`ret 0x30`), list in **EDI** | Node 0x5C B: effect object (arg 1), position (3, 4, 5), facing (6), lifetime (10), playback rate % (11 → +0x2C = rate/100). `FUN_004AB530` ages nodes by dt × rate and removes them past their lifetime: lower rate = slower and longer on screen. |
+| Cannon-hit blowout | `0x0047DF65`–`0x0047E044` | One of three effects at `0x008E66B4` (`fx_cannon_hit_blowout01/02.nif`, …; loaded `0x00480B26`–`0x00480C72`), rate `push 0x64` at `0x0047DF75`, list `0x007268DC`; the game then sets node +0x28 (age) = 0.5. |
+
+The shot smoke is ONE effect object per side (`[0x008BA670 + side*0x3C0]`),
+re-placed on every shot by `FUN_004BBC80`; it cannot be multiplied like the
+blowouts, only sized.
+
+PEMF adds debris, a broadside kick, bigger smoke, slower (lingering) blowouts
+and more of them (`combatfx.h`).
+
+## Career start — the tavern, the haven, the captain's clothes (decompiled 2026-10-17)
+
+New-career order (`0x00471AB0`, called from `0x0042BDBD`; then `0x0042BDF4`):
+
+1. Default settlement records copied in: `0x007242D0` → `0x00860B68`, 0x400 dwords.
+2. `FUN_0046FE30` — the tavern. "Take yer pick!" loops while `[0x00876BE0] == -1`
+   (`0x00470391 cmp [0x876BE0], edi` / `jne 0x00470782`). A table's crown =
+   local_154 {2,0,3,1} at `[esp+0x70]`; picking stores a random colonial city
+   (< 0x2C, size ≥ 5, economy ≥ 0x32, flags & 0xC0000000 clear) of that crown.
+   `0x004707BB` switches on local_154[ebp] for the walk to the table; > 3 = none.
+3. `FUN_0046C8D0(0)` — generates villages (5), missions (6) and pirate havens
+   (4); slots ≥ 0x6C are forced to haven at `0x0046D597`.
+4. `FUN_00471E00(0)` — career setup. Start city EDI of the sign-up city's crown
+   (`0x00471F9B`–`0x00471FE6`; arg ≠ 0 takes any non-Spanish city instead), then:
+
+| Address | What |
+|---|---|
+| `0x00472264` | `mov cl, [esi+0x860B74]` — the start city's crown |
+| `0x0047226D` | starting ship / crew / ? / gold row = (crown + era*4) × 16, era = (year − 1600)/20; 20 rows (5 eras × 4 crowns) |
+| `0x004722F7` | `0x00869AA8` = crown (the "nation" cache) |
+| `0x00472318` | crown ≠ 0 → at war with Spain (relations 0x0085A168), `FUN_0043A970(0x10, crown)` |
+| `0x0047235C`–`0x0047240D` | ship position from the city's harbour direction (int16 `[city*0x94 + 0x0085BFF6]`, 0..23, tables `0x007252F0`/`0x00725350`) and position (`0x0085B170`); map position from `0x00860B68`/`6C` |
+
+**`0x00869AA8` is an index**, not only text: `FUN_004BCD90(outfit, nation, head)`
+dresses the player's model — `sprintf("PC_%s_%c.dds", outfitName[outfit]
+(0x007272B4), 0x0070D594[nation])`, head `"Player_head_%s.dds"`. Callers pass the
+cache at `0x0044F2D9`, `0x0045337B`, `0x0045338D`, `0x00483745`, `0x00483C7F`,
+`0x00486031`, `0x0048715E`, `0x004D5FE1`. `0x0070D594` = "SEFD" and the fifth
+(Pirate) byte is 0, so nation 4 draws untextured (pink). Only
+`pc_<rank>_{s,e,f,d}.dds` ship.
+
+PEMF (`piratestart.h`): no tavern choice, a pirate-haven start, the stats row
+read with a crown, and a letter for the Pirate's outfit (`pirateOutfit`).
+
 ## Weather during a ship battle
 
 Asked: can a battle keep the weather it started in?
@@ -3009,6 +3226,29 @@ Verified 2026-07-28 against both live installs.
 | **Steam** | 1,189,888 | **DRM-packed.** `.text` has a virtual size of 5,177,344 against 1,176,576 on disk. |
 | Challenge Pack | 3,334,144 | A **different build**. Not supported; contains a code cave the others lack. |
 
+### Update 2026-10-17: the unpacked Steam image can be checked statically
+
+The reference workspace `D:\pirates-reference` rebuilt the **unpacked** Steam
+image by decoding the packer statically (loader checksum matched). Checked
+against it with `re/experiments/steam_static_verification/verify_steam.py`:
+
+* **Code and game state: same addresses as GOG.** The code is the same, and
+  so is every `.data` and uninitialised address. All 417 addresses in
+  `src/` and all 32 byte signatures check out on Steam.
+* **Read-only data: not always.** Steam is a separate link of the same
+  1.0.2.0 source. 599 pointers to `.rdata` (vtables, float constants, some
+  strings) point to different addresses, mostly 8 or 24 bytes apart. **Any
+  address in `0x006C0000-0x00716FFF` taken from the GOG file must be checked
+  against Steam**, using `results/relocated_rdata.json`.
+* Steam has one extra 6-byte function at `0x004EDAC0`, which moves the next
+  three small functions 16 bytes later (up to `0x004EDB60`).
+* The packer is **PECompact 2** (`PEC2` marker, no `.bind`, no Steam API),
+  not SteamStub. The first-safe-point rule for code writes is unchanged.
+
+The runtime checks below still matter. They are what protects a player whose
+build differs from both of these files. But "cannot be verified from the
+file" no longer holds for the two known builds.
+
 ### ⛔ You cannot verify the Steam build from its file
 
 The on-disk bytes at any address are compressed. Reading `Pirates!.exe` at
@@ -3039,8 +3279,11 @@ checks confirm it. Never report parity from a file comparison alone.
 
 Reported repeatedly, by two testers and by us, as PEMF's fault: *"We're far out
 to sea captain, shall I set a course for..."* comes up while apparently sitting
-beside a port. **It is stock behaviour. Measured, twice, independently. Do not
-investigate this again without reading this section first.**
+beside a port. **The mechanism below is settled and measured. Do not
+investigate this again without reading this section first** — but see
+[Reopened](#reopened-2026-08-12-the-measurement-did-not-cover-the-reported-case)
+at the end before repeating "not a bug" to a tester, because the measurement
+that closed it did not sample the case that opened it.
 
 ### How it actually works
 
@@ -3106,5 +3349,80 @@ nothing of ours was distorting it, and the shim was deleted.
 - The flag-mesh arrays that end one dword below the city table (`0x00860B54 +
   nation*4`) are declared in `game.h` and never written.
 
+### Reopened 2026-08-12: the measurement did not cover the reported case
+
+Reported a fourth time, as firing "no matter where you are". Re-derived the
+whole path from the binary again. Everything above holds, and the following is
+added rather than corrected — but the closing argument was weaker than it read.
+
+**The shim measured open water. The report was about a port.** The sample that
+closed this — *"nearest city 31 is 13249 away (engine 13)"* — was taken at sea,
+where the engine was right and agreed with us. The observation that started the
+pass was the card *"offering ports 140 leagues away while moored beside Santo
+Domingo"*. Those are different scenarios, and only the one that was already fine
+got sampled. Two independent calculations agreeing that you are at sea is not
+evidence about what happens when you are not. **A measurement only closes the
+case it actually sampled.**
+
+**Distance is probably the wrong variable.** After the card speaks it cannot
+speak again for **99999** ticks. For it to feel constant, either the tick counter
+`0x0085A154` is advancing faster than it should — it increments once per pass of
+the sailing loop tail — or something is resetting `0x008B98D4`. `FUN_00471E00`
+writes it on entering the sailing view, which is the reset worth watching.
+**Instrument the rate and the re-arm, not the distance.** The previous shim
+logged the one input already known to be correct.
+
+**A screenshot of the card is not by itself a bug report.** In the 2026-08-12
+report the nearest port was 215 leagues — a distance value of 43 against a gate
+of 12. By the engine's own arithmetic that card was correct. Get the distance to
+the nearest port at the moment it fires before treating an instance as a fault.
+
+**What was additionally ruled out this pass:**
+
+- The `sailkeys` patch. Slot `0x0C` is **not** a special "does nothing" entry —
+  it is the common loop tail at `0x00473731`, reached every iteration, and it is
+  already the default for `W` and `D`. Routing `A`/`S` there makes them behave
+  like the other two steering keys. (The tail is real code: it advances the
+  tick, runs the sinking check, and falls into `0x00473829`, which jumps back to
+  `0x004724D0`. "Does nothing" means "nothing key-specific", not "no code".)
+- Writes to ship slot 0. Our setters use +0x02, +0x08, +0x2A, +0x3E and +0x58;
+  the player's position is +0x0C/+0x10. No overlap, so no accessor of ours can
+  move the player by aiming at the wrong slot.
+- The slot-256 trap this file warns about, **via those setters specifically**. A
+  slot-256 write with our field offsets lands in `0x00859EFA..0x00859F50`, short
+  of `0x0085A154/58/64`. The hazard below is still real; it is just not reachable
+  through `SetShipDestCityRaw` and friends.
+
+**⛔ A latent defect found while ruling the above out, worth fixing regardless.**
+`SetShipDestCityRaw`, `SetShipTargetRaw`, `SetShipRoleRaw`, `SetShipPurposeRaw`
+and `OrShipFlagsRaw` still take an **unchecked index**. `ShipRecord` and the
+nationality accessors were bounded in `7f4b5c5`; these five were not. Their
+`__try/__except` is **false comfort and reads as protection**: writing into
+`0x0085A158` raises no exception, because it is valid, mapped, writable memory.
+SEH catches access violations, not arithmetic that lands somewhere legal and
+wrong. An unbounded write into the game's own globals is exactly the failure
+this section exists to document, and it would be silent.
+
+### Two corrections to the map layout, while here
+
+- **The city record starts at `0x00860B68`, not `0x00860B70`.** `FUN_00405D90`
+  reads x at `0x00860B68 + c*32` and y at `0x00860B6C + c*32`. Our `CityRecords`
+  / `CityFlags` constant is `0x00860B70`, which is **+8 into the record** — the
+  flags field. That is correct and `game.h` says so, but the constant is named as
+  though it were the base, and anything computing an offset *from* it is working
+  from +8.
+- City coordinates in that table are stored in **thousands of map units** — the
+  engine multiplies them by 1000 (`IMUL EBX,EBX,0x3E8`) to compare against the
+  ship position divided by 1000. The scales look mismatched in the decompiler
+  output and are not.
+
 If a player finds the card too talkative, that is a **preference**, and the
 honest way to serve it is an opt-in setting — not a bug fix.
+
+**Done, 2026-10-16** (`sailmaster.h`, `farOutCard` / `farOutLeagues` in
+`storms.ini`, default 150 leagues). `FUN_0045B890` takes no arguments and its
+result is unused; PEMF replaces the call at `0x0047376D`, calls the original
+when the policy allows, and otherwise re-arms exactly as the game's quiet path
+does (`[0x008B98D4] = tick + 250`, `0x0045B8A1`). The playtest that settled it:
+the ship went from 3.1 to 13.8 units off the nearest port in 80 s, and the card
+spoke at 12 — right by its rule.

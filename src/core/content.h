@@ -34,6 +34,7 @@
 #include "state.h"
 #include "nations.h"
 #include "suspicion.h"
+#include "session.h"
 #include "crewmorale.h"
 #include "render.h"
 #include "d3d9hook.h"
@@ -138,7 +139,15 @@ inline int ResolveArgs(const std::vector<Arg>& args, int* out, int maxSlots)
 
 // ------------------------------------------------------------------ effects
 enum class EffectOp { AddPlunder, SetPlunder, AddCrew, SetCrew,
-                      AddMorale };
+                      AddMorale,
+                      // False colours (suspicion.h). Each acts on the flag
+                      // being worn now; with none worn they do nothing.
+                      HoldRuse,       // value: base chance, percent
+                      StrikeColours,  // value: reputation it costs, 0 = none
+                      Run,            // value: unused
+                      // On the waterfront (suspicion.h). Each shows its own card.
+                      Bribe,          // value: gold
+                      Gossip };       // value: unused
 
 struct Effect {
     EffectOp op    = EffectOp::AddPlunder;
@@ -170,6 +179,10 @@ enum class StateField {
     Gold,       // undivided plunder
     Morale,     // 0 (mutinous) .. 4 (devoted)
     Months,     // months at sea this voyage
+    Storm,      // the game's own storm state: 0 clear, 1 near, 2 inside, 3 core
+    Wind,       // the knots on the sailing HUD -- rises toward a storm
+    Suspicion,  // 0..100, how far the false colours now worn have been seen
+                // through; 0 under true colours
 };
 
 struct Trigger {
@@ -196,6 +209,9 @@ enum class EventKind {
 struct Event {
     EventKind           kind = EventKind::Choice;
     std::string         id;
+    // Only happens while this officer role (an id from officers/roster.json,
+    // e.g. "surgeon") is aboard. Empty = anyone.
+    std::string         requiresOfficer;
     std::string         body;
     std::vector<Arg>    bodyArgs;
     std::vector<Option> options;      // Choice only
@@ -420,9 +436,12 @@ inline bool ParseTrigger(const json& j, Trigger* out, std::string* err)
         else if (field == "gold")   out->field = StateField::Gold;
         else if (field == "morale") out->field = StateField::Morale;
         else if (field == "months") out->field = StateField::Months;
+        else if (field == "storm")  out->field = StateField::Storm;
+        else if (field == "wind")   out->field = StateField::Wind;
+        else if (field == "suspicion") out->field = StateField::Suspicion;
         else {
             *err = "trigger 'stateCrosses' needs a 'field' of crew, gold, "
-                   "morale or months (got '" + field + "')";
+                   "morale, months, storm, wind or suspicion (got '" + field + "')";
             return false;
         }
 
@@ -441,6 +460,21 @@ inline bool ParseTrigger(const json& j, Trigger* out, std::string* err)
             if (v < 0 || v > 4) {
                 *err = "trigger 'stateCrosses' on 'morale' takes 0..4 "
                        "(0 mutinous, 4 devoted)";
+                return false;
+            }
+        }
+        if (out->field == StateField::Storm) {
+            const int v = hasBelow ? out->below : out->above;
+            if (v < 0 || v > 3) {
+                *err = "trigger 'stateCrosses' on 'storm' takes 0..3 "
+                       "(0 clear, 1 near, 2 inside, 3 the core)";
+                return false;
+            }
+        }
+        if (out->field == StateField::Suspicion) {
+            const int v = hasBelow ? out->below : out->above;
+            if (v < 0 || v > 100) {
+                *err = "trigger 'stateCrosses' on 'suspicion' takes 0..100";
                 return false;
             }
         }
@@ -467,10 +501,15 @@ inline bool ParseEffect(const json& j, Effect* out, std::string* err)
     // HAPPENED to the crew, and "the men are now exactly content" is not a
     // thing that happens.
     else if (op == "addMorale")  out->op = EffectOp::AddMorale;
+    else if (op == "holdRuse")      out->op = EffectOp::HoldRuse;
+    else if (op == "strikeColours") out->op = EffectOp::StrikeColours;
+    else if (op == "run")           out->op = EffectOp::Run;
+    else if (op == "bribe")         out->op = EffectOp::Bribe;
+    else if (op == "gossip")        out->op = EffectOp::Gossip;
     else {
         *err = "unknown effect op '" + op +
                "' (expected addPlunder, setPlunder, addCrew, setCrew, "
-               "addMorale)";
+               "addMorale, holdRuse, strikeColours, run, bribe, gossip)";
         return false;
     }
     if (!j.contains("value") || !j["value"].is_number_integer()) {
@@ -529,6 +568,16 @@ inline bool ValidateText(const std::string& what, const std::string& text,
 
 // ------------------------------------------------------------------ library
 inline std::vector<Event> g_events;
+
+// Is this officer role aboard? Installed by core.cpp (officers.h comes later in
+// the include order). Null means no officer system, so nothing that needs one.
+inline bool (*g_hasOfficer)(const char* roleId) = nullptr;
+
+inline bool RequirementsMet(const Event& ev)
+{
+    if (ev.requiresOfficer.empty()) return true;
+    return g_hasOfficer && g_hasOfficer(ev.requiresOfficer.c_str());
+}
 
 inline const Event* Get(int index)
 {
@@ -838,6 +887,7 @@ inline int LoadFile(const char* path)
         if (id.empty())                  { fail("missing 'id'"); continue; }
         if (FindByIdIndex(id) >= 0)      { fail("duplicate id"); continue; }
         ev.id = id;
+        ev.requiresOfficer = je.value("requiresOfficer", "");
 
         ev.body = je.value("body", "");
         if (ev.body.empty())             { fail("missing 'body'"); continue; }
@@ -968,6 +1018,14 @@ inline int LoadFolder(const char* dir)
     FindClose(h);
 
     Log("content: %d event(s) from %d file(s)", (int)g_events.size(), files);
+
+    // An event that watches suspicion takes over the challenge rung, so the
+    // ladder does not also speak its own line at the same moment.
+    suspicion::g_challengeByEvent = false;
+    for (const auto& ev : g_events)
+        if (ev.trigger.type == TriggerType::StateCrosses &&
+            ev.trigger.field == StateField::Suspicion)
+            suspicion::g_challengeByEvent = true;
     return (int)g_events.size();
 }
 
@@ -1247,14 +1305,31 @@ inline bool DrawSuspicionPanel()
 {
     if (suspicion::g_panelLines <= 0) return false;
     __try {
-        // TOP RIGHT, properly. The engine CENTRES text on the x it is given,
-        // so an x of three-quarters across put the block in the middle-right of
-        // the screen rather than in the corner -- which is why it read as an
-        // awkward floating position rather than a panel. Seven-eighths puts the
-        // centre of a short line near the corner, and every line here is short
-        // by design.
-        const int x = (game::ScreenW() * 7) / 8;
-        int y = 40;
+        // TOP RIGHT OF THE SCREEN, at every resolution and aspect. The engine
+        // CENTRES text on the x it is given, in interface units (ScreenW x
+        // ScreenH, 640 x 480 -- SetResolution copies them from 0x0072637C), and
+        // which of those units are on screen depends on the interface camera:
+        // stock 4:3 shows 0..640, PEMF's widescreen shows more at the sides. So
+        // the corner is read from that camera's own frustum (camera at
+        // 0x008E9FE0, frustum at +0x128: l r t b), where r * ScreenW is the half
+        // width on screen and t * ScreenW the half height, both measured from
+        // the centre. Fixed insets from the true corner keep the block in the
+        // same place whatever the screen.
+        int x = (game::ScreenW() * 7) / 8, y = 40;
+        {
+            const int sw = game::ScreenW(), sh = game::ScreenH();
+            const uint8_t* cam = *(const uint8_t* const*)0x008E9FE0;
+            if (cam && sw > 0 && sh > 0) {
+                const float r = *(const float*)(cam + 0x128 + 4);
+                const float t = *(const float*)(cam + 0x128 + 8);
+                if (r > 0.1f && r < 4.f && t > 0.1f && t < 4.f) {
+                    const float right = sw * 0.5f + r * sw;
+                    const float top   = sh * 0.5f - t * sw;
+                    x = (int)(right - 80.f);    // a short line's centre, clear of the edge
+                    y = (int)(top + 40.f);
+                }
+            }
+        }
         for (int i = 0; i < suspicion::g_panelLines; ++i) {
             game::DrawHudLineAt(suspicion::g_panel[i], x, y);
             y += 22;
@@ -1599,6 +1674,11 @@ inline void Fire(int index)
             case EffectOp::AddCrew:    state::AddCrew(ef.value,    why.c_str()); break;
             case EffectOp::SetCrew:    state::SetCrew(ef.value,    why.c_str()); break;
             case EffectOp::AddMorale:  crewmorale::Nudge(ef.value,  why.c_str()); break;
+            case EffectOp::HoldRuse:      suspicion::HoldRuse(ef.value);      break;
+            case EffectOp::StrikeColours: suspicion::StrikeColours(ef.value); break;
+            case EffectOp::Run:           suspicion::Run();                   break;
+            case EffectOp::Bribe:         suspicion::Bribe(ef.value);         break;
+            case EffectOp::Gossip:        suspicion::Gossip(session::OwnedFlags()); break;
         }
     }
 

@@ -17,7 +17,14 @@ coordinate spaces**, both 4:3, and both independent of the display resolution:
 | Space | Size | Used by | Where |
 |---|---|---|---|
 | Draw | **640 × 480** | the quad blit, HUD text, everything PEMF draws | `0x0072637C` / `0x00726380` |
-| Input | **1024 × 768** | the widget hit-test and widget interaction | constants `0x007135C8` / `0x007135C4` |
+| Input | **1024 × 768** | the widget hit-test and widget interaction | constants `0x007135C8` / `0x007135C4` (GOG); **`0x007135C0` / `0x007135BC` on Steam** |
+
+> **Steam note (2026-10-17).** The two builds place some read-only constants
+> differently. On Steam the 1024 and 768 constants are 8 bytes earlier, and
+> the instructions that read them point at the Steam addresses. Never write
+> to these constants by GOG address. If an operand is repointed, compare the
+> old operand against the running build's own value first. See
+> [`re/experiments/steam_static_verification`](../re/experiments/steam_static_verification/README.md).
 
 `0x0072637C` and `0x00726380` are **never written** — no store instruction anywhere
 in the image targets them. They are constants: 640 and 480, always.
@@ -165,7 +172,110 @@ paths could diverge at all.
 
 ---
 
-## Order of work
+## Second attempt — the camera choke point (2026-10-16)
+
+Implemented in `src/core/widescreen.h`; the session record is in
+[`JOURNAL.md`](JOURNAL.md). It replaces the plan below for the first two steps
+and the 3D step, and changes the mouse approach.
+
+- **3D and UI, one place.** `FUN_004CCE40` is the camera set-frustum; all 24 of
+  its call sites are redirected through PEMF, which corrects the frustum and then
+  calls the original. The renderer derives the fixed-function projection *and*
+  the vertex-shader constants from the camera afterwards, so correcting here
+  reaches both pipelines — the split that tore ships in July should not occur.
+  World cameras (exactly 4:3) get `l/r × 3W/4H`; the UI camera (far/near = 5/3,
+  `∓0.5` wide) gets the height-fit frustum derived above. Both rules are
+  idempotent, because many call sites re-set a camera's current frustum.
+  Setting a frustum does not rebuild the camera's culling planes: only the
+  camera's update (`FUN_00533D10` → `FUN_005373F0`) does, and the game always
+  calls it right after. The interface camera exists before PEMF installs, so
+  PEMF corrects it once in place and must make the same update call; without it,
+  culling kept the stock 16:9 top and bottom, and small pieces near the top of
+  the interface (the attack prompt's frame corners) vanished.
+- **Mouse, one place.** The input handler and the widget hit-test both read the
+  window message's `lParam`, so PEMF subclasses the game window and maps X from
+  the centred 4:3 area to the full width before the game sees it. The eight
+  operand sites in the table above are left untouched — they all receive an
+  already-corrected coordinate.
+- **Mode list.** The 4:3 filter at `0x004B2E8A` is lifted, as in July.
+
+The same choke point and input handler are what Pirates! Unbound (MIT) uses for
+the Steam 1.0.2.0 build. It served as a cross-check; every address was confirmed
+against our own decompilation.
+
+On top of the camera and mouse work, full-screen 2D layers needed handling of
+their own, at the draw (vtable 82): painted screens are scaled evenly to fill
+the width ("cover"), solid strips and frame copies are laid back exactly full
+width (enlarging a frame copy produced a ghost image), and the map parchment
+stays 4:3 with black sides. Town and card scenes (`DAT_008CADEC` set) use cover
+for their camera instead of Hor+, so the painting, clouds and flags scale
+together. The Options list is rebuilt by PEMF: each size once, sorted.
+
+Status (2026-10-16, five test rounds on Steam): verified in game — main menu,
+options, character creation, recruitment cutscene, tavern, governor, town menu,
+shipwright, sailing, map. Open: the sailing HUD sits at the 4:3 edges rather
+than the screen corners; moving it needs its click areas moved too.
+
+## The HUD in the screen corners (2026-10-16, `src/core/hudcorners.h`)
+
+The interface stays height-fitted and centred; only the HUD moves out into the
+margins. A margin is `(480 × W/H − 640) / 2` interface units (107 at 16:9).
+
+**How the HUD is placed** (decompiled with REA). Every HUD element is drawn by
+one of five primitives, each taking its x as a stack argument and converting
+with `x − 640/2`:
+
+| Function | What | x argument |
+|---|---|---|
+| `FUN_004BBA60(node, x, y, scale, angle)` | HUD models: compass, icons, keypad buttons | 2nd |
+| `FUN_004B06C0(text, x, y, …)`, `eax` = 0 | text | 2nd |
+| `FUN_004884A0(x, y)`, `eax`/`ecx`/`edx` | 9-slice panel | 1st |
+| `FUN_004AF080(tex, u, v, w, h, x, …)` | textured quad | 6th |
+| `FUN_00412900(x, y, size)`, `esi` = node | the keypad's small form | 1st |
+
+Positions are fractions of the interface width or constants: compass at `W/13`
+(sailing) and `W/10 + 8` (battle), keypad at `W − 3·(W/16) − 6`, battle ship
+panels at `W/4` and `3W/4`, battle buttons from a table of offsets from the
+centre (`0x0072581C`), the date at x = 8.
+
+**The move.** 51 draw calls are redirected to stubs that add an offset to x and
+jump on with every register intact. Each site is LEFT (bottom-left cluster,
+quests, date, guns-loaded bar), RIGHT (the keypad) or SIDE (battle panels and
+buttons: left of centre goes left, right goes right, within 64 of the centre
+stays). A group always moves as one piece. The notice strip is centred and is
+not moved.
+
+Two things that do not work:
+- Changing ScreenW (`0x0085A26C`) for the HUD — the keypad takes its button
+  SIZE from it (`W/16`).
+- Changing the 640 at `0x0072637C` that every primitive centres with — the text
+  primitive also uses it as a scale (`0x004B09EC`: size × 640 / device width).
+
+**Hover and clicks.** The HUD tests hover against the positions it computed,
+not the moved ones. The four cursor reads that do this (`0x00474009` keypad,
+`0x00474434`/`0x004745F1` quests, `0x0047626C` battle buttons) are pointed at
+PEMF copies of the cursor moved the opposite way. Battle buttons and quests act
+on the hovered id (`0x00725828`, `0x0072568C`). The keypad also writes click
+boxes into the region table — count `0x0086C330` (int16), then int16 arrays id
+`0x0086C1A0`, x0 `0x0086C010`, y0 `0x0086BE80`, x1 `0x0086BCF0`, y1
+`0x0086BB60`; add `FUN_0042C590`, find `FUN_0042C5E0`, remove `FUN_0042C610`,
+hit-test `FUN_0042C6F0`. All 13 keypad calls go through a wrapper that moves
+the boxes it wrote.
+
+**The cursor in the margins.** The game converts the mouse as
+`LOWORD(lParam) × 640 / device width` — unsigned, so never outside 0..640 — at
+`0x0042C23F` (move → `0x008DC30C`/`0x008DC310`) and `0x0042C3C5` (button down →
+`0x0086C33C`/`0x0086C340`, which clicks are tested with). Both 17-byte
+sequences become a call to PEMF, which returns the same value unless a moved
+HUD was drawn in the last 250 ms; then it converts the real client position
+(saved by the window subclass before MapX), clamped to the visible width. The
+mouse handler runs synchronously inside the window procedure (relay
+`0x004D3E00`), so the saved position belongs to the message being handled.
+The gamepad cursor path (`0x0042CC60`) still clamps to 0..640.
+
+`hudCorners = 0` in `widescreen.ini` turns it off.
+
+## Order of work (first attempt's plan, kept for reference)
 
 1. Frustum correction, alone. The UI should become fully visible and centred, with
    the mouse now wrong *everywhere* by a known constant factor.

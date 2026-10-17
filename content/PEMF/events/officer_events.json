@@ -1,0 +1,62 @@
+{
+  "_comment": [
+    "PEMF -- things that only happen with the right officer aboard.",
+    "",
+    "\"requiresOfficer\" names a role from officers/roster.json (quartermaster,",
+    "sailing_master, bosun, master_gunner, carpenter, surgeon). Without that",
+    "officer signed on, the event never fires. Officers are found through",
+    "'Manage yer crew!' in the town menu; press C at sea to see who you have."
+  ],
+
+  "events": [
+    {
+      "id": "officer_gun_drill",
+      "requiresOfficer": "master_gunner",
+      "trigger": { "type": "elapsedSailing", "seconds": 500, "cooldown": 1800 },
+      "body": "Your master gunner asks leave to exercise the great guns. 'Powder and time, Captain, that's all it costs. They'll be faster for it when it counts.'",
+      "options": [
+        { "text": "Beat to quarters and run them out.", "effects": [ { "op": "addMorale", "value": 2 } ],
+          "outcome": "The deck shakes with dry runs until sundown. The men are hoarse and pleased with themselves." },
+        { "text": "Not today.", "outcome": "He touches his hat and goes below, disappointed." }
+      ]
+    },
+
+    {
+      "id": "officer_quartermaster_stash",
+      "requiresOfficer": "quartermaster",
+      "trigger": { "type": "elapsedSailing", "seconds": 800, "cooldown": 2400 },
+      "body": "Your quartermaster has been going through the last prize's papers. A false bottom in the master's sea chest, he says, and something inside it.",
+      "options": [
+        { "text": "Into the strongbox with it.", "effects": [ { "op": "addPlunder", "value": 200 } ],
+          "outcome": "Two hundred in good coin. He makes a careful note of it in the articles, as a quartermaster should." },
+        { "text": "Share it out among the men now.", "effects": [ { "op": "addMorale", "value": 3 } ],
+          "outcome": "It goes round the mess tables before supper. Nobody grumbles that night." }
+      ]
+    },
+
+    {
+      "id": "officer_surgeon_rounds",
+      "requiresOfficer": "surgeon",
+      "trigger": { "type": "stateCrosses", "field": "months", "above": 3, "cooldown": 1800 },
+      "body": "The surgeon has been making his rounds below. Scurvy is starting in the forecastle, he reports, but it is early, and he knows what to do about it.",
+      "options": [
+        { "text": "Give him what he needs.", "effects": [ { "op": "addPlunder", "value": -40 }, { "op": "addMorale", "value": 2 } ],
+          "outcome": "Limes and sauerkraut from the stores, and a surgeon's temper with anyone who will not eat them. It goes no further." },
+        { "text": "It will keep until port.", "effects": [ { "op": "addCrew", "value": -2 } ],
+          "outcome": "It does not keep. Two men are too weak to work by the time you make land." }
+      ]
+    },
+
+    {
+      "id": "officer_sailing_master_passage",
+      "requiresOfficer": "sailing_master",
+      "trigger": { "type": "elapsedSailing", "seconds": 650, "cooldown": 2400 },
+      "body": "Your sailing master taps the chart. 'There's a passage through the shoals here that most captains won't risk. I've run it before.'",
+      "options": [
+        { "text": "Take us through.", "effects": [ { "op": "addMorale", "value": 1 } ],
+          "outcome": "He takes her through with a hand on the lead line and never raises his voice. The men watch him with new respect." },
+        { "text": "We'll go the long way.", "outcome": "The long way it is. He shrugs; it is your ship." }
+      ]
+    }
+  ]
+}

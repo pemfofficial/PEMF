@@ -130,9 +130,44 @@ inline void LearnWorldSignature(int id, int depth);
 // REFUSES to learn -- the worst it can do is make PEMF slightly more cautious
 // about what it calls the overworld, and a wrong reading of a screen we have
 // never seen fails in the safe direction.
-inline bool LooksLikeBattle(int id)
+// ⚠️ MEASURED 2026-08-12, AND THE OLD NAME WAS WRONG. This bit does NOT mark a
+// ship battle. Logging every screen transition through a real engagement gave:
+//
+//     0x0FFFEFDF / 0x0FFFFFDF  depth 3   overworld -- AND THE SHIP BATTLE
+//     0x0FFFEFFA / 0x0FFFFFFA  depth 3   town
+//     0x0FFBE750               depth 4   Load / Save
+//     0x8FFFEFFF / 0x8FFFFFFF  depth 4-5 BOARDING -- the deck duel
+//
+// A naval battle is fought on the same sea in the same screen context, so it
+// carries the overworld's own signature and there was NO transition logged for
+// the whole fight. The top bit is the boarding duel and always was; the note
+// that called it "battle" was written from a session where the two were not
+// told apart, and it cost this a second playtest -- the battle music played
+// during boarding and nowhere else, which is precisely backwards.
+//
+// The name now says what it is. For "are we in a naval battle", see
+// InShipBattle() below, which reads the engine's own flag.
+inline bool LooksLikeBoarding(int id)
 {
     return (id & 0x80000000) != 0;
+}
+
+// The engine's own battle flag: 0x0085A118, set to 1 on entering the battle
+// function (0x0047A07B in FUN_0047A040) and back to 0 at 0x0045F996. Exactly
+// two writers in the whole binary, one of each, which is what makes it
+// trustworthy where the screen signature is not.
+//
+// A boarding duel is reached FROM a battle and the flag stays set through it,
+// so boarding is excluded explicitly -- the brief is that a duel keeps the
+// game's own music.
+inline bool InShipBattle()
+{
+    __try {
+        if (!state::InGame()) return false;
+        if (*(const int*)game::addr::BattleActive == 0) return false;
+        return !LooksLikeBoarding(*(const int*)game::addr::ScreenId);
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
 }
 
 inline int   g_lastX = 0, g_lastY = 0;
@@ -166,7 +201,7 @@ inline WorldSample Sample()
             // same recent-movement history.
             // ...unless it is a battle. A battle moves the ship too, and
             // learning it here is what put notices over a fight.
-            if (!LooksLikeBattle(s.screenId))
+            if (!LooksLikeBoarding(s.screenId))
                 LearnWorldSignature(s.screenId, s.screenDepth);
             else {
                 static bool told = false;
@@ -247,7 +282,7 @@ inline bool WorldOnScreen()
 
         // Belt as well as braces. A signature learned before this check existed
         // would otherwise stay in the table for the rest of the session.
-        if (LooksLikeBattle(id)) return false;
+        if (LooksLikeBoarding(id)) return false;
         for (int i = 0; i < g_worldSigCount; ++i)
             if (g_worldSig[i].id == id && g_worldSig[i].depth == depth)
                 return true;
@@ -303,6 +338,7 @@ inline void Reset(const char* why)
 inline bool Eligible(const content::Event& ev, Runtime& rt, DWORD now)
 {
     if (ev.trigger.once && rt.fireCount > 0) return false;
+    if (!content::RequirementsMet(ev)) return false;     // the officer it needs
     if (ev.trigger.cooldown > 0 && rt.lastFired &&
         (now - rt.lastFired) < (DWORD)ev.trigger.cooldown * 1000) return false;
     return true;
@@ -403,6 +439,15 @@ inline void Tick()
                 value = state::Morale();  what = "morale"; break;
             case content::StateField::Months:
                 value = state::Months();  what = "months"; break;
+            // The engine refreshes these on a sailing tick only. Anywhere else
+            // they are stale, so they read as calm until the player is under way.
+            case content::StateField::Storm:
+                value = Sailing(s) ? state::Storm() : 0; what = "storm"; break;
+            case content::StateField::Wind:
+                value = Sailing(s) ? state::Wind()  : 0; what = "wind";  break;
+            // At sea only: the challenge it drives is a ship coming about.
+            case content::StateField::Suspicion:
+                value = Sailing(s) ? suspicion::CurrentLevel() : 0; what = "suspicion"; break;
             }
 
             const int  limit  = ev->trigger.useBelow ? ev->trigger.below
@@ -457,9 +502,55 @@ inline void LogSample()
 {
     const WorldSample s = Sample();
     Log("world: inGame=%d sailing=%d pos=(%d,%d) nearest=city%d dist=%d "
-        "closestEver=%d",
+        "closestEver=%d screen=0x%08X/%d battle=%d",
         (int)s.inGame, (int)Sailing(s), s.x, s.y,
-        s.nearestCity, s.nearestDist, g_closestEver);
+        s.nearestCity, s.nearestDist, g_closestEver,
+        (unsigned)s.screenId, s.screenDepth, (int)LooksLikeBoarding(s.screenId));
+}
+
+// ------------------------------------------------- what screen is this really
+// ⛔ THE RECORDED BATTLE SIGNATURE DID NOT HOLD. game.h and this file both say a
+// ship battle reads 0x8FFFEFFF / 0x8FFFFFFF -- "the battle alone sets the top
+// bit" -- and the predicate tested exactly that. Measured in a real fight on
+// 2026-08-12 it never fired once: no notice about ignoring a battle screen for
+// learning, and no battle music, through a whole engagement.
+//
+// The overworld position also stayed FROZEN for the length of that fight, which
+// contradicts the other half of the old note ("a battle moves the ship too").
+// Both claims came from the same session, so both are suspect.
+//
+// Rather than guess a third time, this logs the signature whenever it CHANGES.
+// One line per screen transition, so a single fight names every screen it goes
+// through and the real battle value stops being a matter of opinion.
+inline int  g_prevSigId = 0, g_prevSigDepth = 0, g_prevBattleFlag = -2;
+inline bool g_haveSig = false;
+
+inline void LogScreenChange(const WorldSample& s)
+{
+    if (!s.inGame) return;
+
+    int battleFlag = -1;
+    __try { battleFlag = *(const int*)game::addr::BattleActive; }
+    __except (EXCEPTION_EXECUTE_HANDLER) {}
+
+    // ⚠️ KEYED ON THE BATTLE FLAG AS WELL AS THE SCREEN, and that is the whole
+    // point: a naval battle does NOT change the screen signature, so a watcher
+    // that only noticed screen changes would stay silent through the exact
+    // event it was added to observe. That is how the first version of this
+    // missed it.
+    if (g_haveSig && s.screenId == g_prevSigId &&
+        s.screenDepth == g_prevSigDepth && battleFlag == g_prevBattleFlag)
+        return;
+
+    g_haveSig = true;
+    g_prevSigId = s.screenId; g_prevSigDepth = s.screenDepth;
+    g_prevBattleFlag = battleFlag;
+
+    Log("screen: 0x%08X depth %d  (boarding=%d, battleFlag=%d, shipBattle=%d, "
+        "moving=%d)",
+        (unsigned)s.screenId, s.screenDepth,
+        (int)LooksLikeBoarding(s.screenId), battleFlag,
+        (int)InShipBattle(), (int)s.moving);
 }
 
 } // namespace triggers

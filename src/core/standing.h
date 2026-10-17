@@ -64,6 +64,24 @@ inline bool   g_live = false;      // a career is loaded and the ledger is real
 // be a decision rather than a wait, short enough to fit inside a career.
 inline int kDebtForgetMonths = 12;
 
+// Installed by suspicion.h, which owns the hunts. A plain function pointer
+// rather than an include, because standing.h is pulled in first and a mutual
+// include would be a cycle. Null until suspicion initialises, and a null hook
+// simply means "nothing is holding the debt", which is the correct behaviour
+// for a build with the suspicion system compiled out.
+inline bool (*g_debtHeldBy)(int nation) = nullptr;
+
+// Told whenever the ENGINE takes reputation from us (an act the game punished):
+// suspicion turns it into certainty for that crown. Installed by suspicion.h.
+inline void (*g_onAggression)(int nation, int severity) = nullptr;
+
+// How far PEMF's own share of a crown's opinion may go. The engine's reputation
+// runs in tens, not hundreds, and without these a loop of penalties once drove
+// one crown to -502 in five minutes. Applied every tick, so an affected save is
+// repaired the moment it loads; the game's own baseline is never touched.
+inline int kDebtCap      = 15;
+inline int kNotorietyCap = 25;
+
 // How much of a hostile act's own penalty also becomes notoriety. The engine
 // has already applied its number; this is the part that we make permanent so a
 // pattern of raids outlives any single one of them.
@@ -233,6 +251,7 @@ inline void Tick()
             // engine's own penalty or were told about it directly.
             if (delta < 0) {
                 Log("standing: %s took %d from us themselves", game::NationName(n), -delta);
+                if (g_onAggression) g_onAggression(n, -delta);
                 NoteHostileAct(n, (-delta) * kActNotorietyShare,
                                "we gave them the proof");
                 continue;   // NoteHostileAct has already projected everyone
@@ -240,12 +259,28 @@ inline void Tick()
         }
 
         // 2. Forgiveness. Only ever applies to debt, never to notoriety.
-        if (L.debt > 0 && months - L.debtSetAt >= kDebtForgetMonths) {
+        //
+        // ⛔ AND NEVER WHILE THEIR HUNTER IS STILL AT SEA. Forgiving the fright
+        // sets reputation back to zero, and a hunt ends when the reputation
+        // that started it does -- so the crown that just dispatched a warship
+        // would call her home again moments later. Seen in play: dispatched at
+        // 16:43:20, "their quarrel with us is settled" at 16:43:23, because a
+        // month happened to turn over in between.
+        //
+        // The hunt IS the consequence being enacted. Cancelling the reason for
+        // it while it is being carried out is always wrong, at any tuning, which
+        // is why this is a guard here and not a larger number in the ini.
+        if (L.debt > 0 && months - L.debtSetAt >= kDebtForgetMonths
+            && !(g_debtHeldBy && g_debtHeldBy(n))) {
             Log("standing: %s let it go -- %d point(s) of suspicion lapse after "
                 "%d months with nothing to show for it",
                 game::NationName(n), L.debt, months - L.debtSetAt);
             L.debt = 0;
         }
+
+        // Our share is bounded (see kDebtCap).
+        if (L.debt > kDebtCap) L.debt = kDebtCap;
+        if (L.notoriety > kNotorietyCap) L.notoriety = kNotorietyCap;
 
         // 3. Project. Only write when it actually differs, so we are not
         //    hammering a game global every frame for nothing.

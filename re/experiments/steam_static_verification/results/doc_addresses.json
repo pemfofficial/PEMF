@@ -1,0 +1,5398 @@
+[
+ {
+  "address": "0x00401400",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1159"
+  ]
+ },
+ {
+  "address": "0x00404229",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1091"
+  ]
+ },
+ {
+  "address": "0x004042e0",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1096"
+  ]
+ },
+ {
+  "address": "0x0040431d",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1096"
+  ]
+ },
+ {
+  "address": "0x00404512",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1935",
+   "docs/JOURNAL.md:803"
+  ]
+ },
+ {
+  "address": "0x0040451c",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2870"
+  ]
+ },
+ {
+  "address": "0x00404810",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/CREW_AND_OFFICERS.md:25",
+   "docs/GAME_API.md:2634",
+   "re/out/offsets.json:72"
+  ]
+ },
+ {
+  "address": "0x0040482a",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2677"
+  ]
+ },
+ {
+  "address": "0x00405466",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:451"
+  ]
+ },
+ {
+  "address": "0x00405472",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:472"
+  ]
+ },
+ {
+  "address": "0x00405d90",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:3306"
+  ]
+ },
+ {
+  "address": "0x00406265",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1130"
+  ]
+ },
+ {
+  "address": "0x00409a28",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/JOURNAL.md:683"
+  ]
+ },
+ {
+  "address": "0x00409aef",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/JOURNAL.md:686",
+   "docs/JOURNAL.md:701"
+  ]
+ },
+ {
+  "address": "0x00409b27",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/JOURNAL.md:688"
+  ]
+ },
+ {
+  "address": "0x00409b78",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/JOURNAL.md:683"
+  ]
+ },
+ {
+  "address": "0x0040b5dc",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1123"
+  ]
+ },
+ {
+  "address": "0x0040b5ea",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1124"
+  ]
+ },
+ {
+  "address": "0x0040d3bf",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/JOURNAL.md:895"
+  ]
+ },
+ {
+  "address": "0x0040d5ff",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/JOURNAL.md:895"
+  ]
+ },
+ {
+  "address": "0x0040d690",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1147"
+  ]
+ },
+ {
+  "address": "0x0040d6c9",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/JOURNAL.md:898"
+  ]
+ },
+ {
+  "address": "0x0040da19",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1151",
+   "docs/JOURNAL.md:899"
+  ]
+ },
+ {
+  "address": "0x0040da9a",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1685"
+  ]
+ },
+ {
+  "address": "0x0040daca",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1782"
+  ]
+ },
+ {
+  "address": "0x0040dad3",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1890"
+  ]
+ },
+ {
+  "address": "0x0040db62",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1692"
+  ]
+ },
+ {
+  "address": "0x0040fe10",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/JOURNAL.md:899"
+  ]
+ },
+ {
+  "address": "0x0040ff40",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/JOURNAL.md:810"
+  ]
+ },
+ {
+  "address": "0x0040ff62",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1152"
+  ]
+ },
+ {
+  "address": "0x0041010b",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1936",
+   "docs/JOURNAL.md:804"
+  ]
+ },
+ {
+  "address": "0x004102a0",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2339"
+  ]
+ },
+ {
+  "address": "0x00410321",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2339",
+   "docs/GAME_API.md:3087",
+   "re/out/offsets.json:137",
+   "re/out/offsets.json:140"
+  ]
+ },
+ {
+  "address": "0x0041032a",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "re/out/offsets.json:42",
+   "re/out/offsets.json:137"
+  ]
+ },
+ {
+  "address": "0x00410c50",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:232",
+   "docs/GAME_API.md:2308",
+   "docs/GAME_API.md:2438",
+   "docs/GAME_API.md:2541",
+   "docs/GAME_API.md:2569"
+  ]
+ },
+ {
+  "address": "0x00410cfa",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/JOURNAL.md:216"
+  ]
+ },
+ {
+  "address": "0x00410d30",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2297",
+   "docs/JOURNAL.md:810"
+  ]
+ },
+ {
+  "address": "0x00410e26",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2794"
+  ]
+ },
+ {
+  "address": "0x004110b2",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1937",
+   "docs/JOURNAL.md:804"
+  ]
+ },
+ {
+  "address": "0x00411480",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2430"
+  ]
+ },
+ {
+  "address": "0x00411658",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2305"
+  ]
+ },
+ {
+  "address": "0x00411677",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2307",
+   "docs/GAME_API.md:2614"
+  ]
+ },
+ {
+  "address": "0x00411683",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2306"
+  ]
+ },
+ {
+  "address": "0x0041169d",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2312",
+   "docs/GAME_API.md:2430"
+  ]
+ },
+ {
+  "address": "0x004116ae",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2307",
+   "docs/GAME_API.md:2614"
+  ]
+ },
+ {
+  "address": "0x004116c3",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2307",
+   "docs/GAME_API.md:2614"
+  ]
+ },
+ {
+  "address": "0x00411729",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2307",
+   "docs/GAME_API.md:2615"
+  ]
+ },
+ {
+  "address": "0x004117a0",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2307",
+   "docs/GAME_API.md:2615"
+  ]
+ },
+ {
+  "address": "0x004117bd",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2307",
+   "docs/GAME_API.md:2319"
+  ]
+ },
+ {
+  "address": "0x004117d4",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2307",
+   "docs/GAME_API.md:2318"
+  ]
+ },
+ {
+  "address": "0x004117e8",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2307",
+   "docs/GAME_API.md:2317"
+  ]
+ },
+ {
+  "address": "0x00411815",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2307"
+  ]
+ },
+ {
+  "address": "0x0041185b",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2307",
+   "docs/GAME_API.md:2320"
+  ]
+ },
+ {
+  "address": "0x0041186c",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2401"
+  ]
+ },
+ {
+  "address": "0x00411889",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2402"
+  ]
+ },
+ {
+  "address": "0x00411890",
+  "region": "text",
+  "first_difference": 31,
+  "issues": [
+   "bytes differ at +31"
+  ],
+  "cited_at": [
+   "docs/GAME_API.md:2403"
+  ]
+ },
+ {
+  "address": "0x00411897",
+  "region": "text",
+  "first_difference": 24,
+  "issues": [
+   "bytes differ at +24"
+  ],
+  "cited_at": [
+   "docs/GAME_API.md:2404"
+  ]
+ },
+ {
+  "address": "0x0041189e",
+  "region": "text",
+  "first_difference": 17,
+  "issues": [
+   "bytes differ at +17"
+  ],
+  "cited_at": [
+   "docs/GAME_API.md:2405"
+  ]
+ },
+ {
+  "address": "0x004118a8",
+  "region": "text",
+  "first_difference": 7,
+  "issues": [
+   "bytes differ at +7"
+  ],
+  "cited_at": [
+   "docs/GAME_API.md:2307",
+   "docs/GAME_API.md:2321",
+   "docs/GAME_API.md:2397"
+  ]
+ },
+ {
+  "address": "0x0041191e",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2308",
+   "docs/GAME_API.md:2435",
+   "docs/GAME_API.md:2438",
+   "docs/GAME_API.md:3091"
+  ]
+ },
+ {
+  "address": "0x00411925",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/JOURNAL.md:694"
+  ]
+ },
+ {
+  "address": "0x00411935",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2356"
+  ]
+ },
+ {
+  "address": "0x00411947",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2358",
+   "docs/GAME_API.md:2360"
+  ]
+ },
+ {
+  "address": "0x00411999",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2435"
+  ]
+ },
+ {
+  "address": "0x004119a9",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2329"
+  ]
+ },
+ {
+  "address": "0x004119df",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2475"
+  ]
+ },
+ {
+  "address": "0x004119e9",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2332"
+  ]
+ },
+ {
+  "address": "0x00411bc4",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2333"
+  ]
+ },
+ {
+  "address": "0x00411bdc",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2334"
+  ]
+ },
+ {
+  "address": "0x00411bf4",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2335",
+   "docs/GAME_API.md:2383",
+   "docs/GAME_API.md:2389",
+   "docs/GAME_API.md:2391",
+   "docs/GAME_API.md:2412",
+   "docs/GAME_API.md:2620"
+  ]
+ },
+ {
+  "address": "0x00411c91",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2563"
+  ]
+ },
+ {
+  "address": "0x00411ca1",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2330"
+  ]
+ },
+ {
+  "address": "0x00411ca5",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2596"
+  ]
+ },
+ {
+  "address": "0x00411d9e",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2792"
+  ]
+ },
+ {
+  "address": "0x0041203c",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2793"
+  ]
+ },
+ {
+  "address": "0x004122e7",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2331"
+  ]
+ },
+ {
+  "address": "0x004125a0",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2773",
+   "docs/GAME_API.md:3085",
+   "re/out/offsets.json:138"
+  ]
+ },
+ {
+  "address": "0x004126bb",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2297"
+  ]
+ },
+ {
+  "address": "0x004126bc",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2429"
+  ]
+ },
+ {
+  "address": "0x004126e4",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2311",
+   "docs/GAME_API.md:2430"
+  ]
+ },
+ {
+  "address": "0x004126f4",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2325",
+   "docs/GAME_API.md:2387"
+  ]
+ },
+ {
+  "address": "0x00412810",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2157"
+  ]
+ },
+ {
+  "address": "0x00412f10",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:234"
+  ]
+ },
+ {
+  "address": "0x004135f8",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1842"
+  ]
+ },
+ {
+  "address": "0x00413fd0",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1782"
+  ]
+ },
+ {
+  "address": "0x00414093",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1783"
+  ]
+ },
+ {
+  "address": "0x0041412a",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1783"
+  ]
+ },
+ {
+  "address": "0x00414b3c",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1784"
+  ]
+ },
+ {
+  "address": "0x00414fc0",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:3255"
+  ]
+ },
+ {
+  "address": "0x0041535d",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1784"
+  ]
+ },
+ {
+  "address": "0x004155b6",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1785"
+  ]
+ },
+ {
+  "address": "0x00428e0d",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1937",
+   "docs/JOURNAL.md:804"
+  ]
+ },
+ {
+  "address": "0x004293d7",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:998"
+  ]
+ },
+ {
+  "address": "0x0042a0cc",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2964",
+   "docs/GAME_API.md:2965"
+  ]
+ },
+ {
+  "address": "0x0042bdbd",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2915"
+  ]
+ },
+ {
+  "address": "0x0042bdf4",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2915",
+   "docs/JOURNAL.md:974"
+  ]
+ },
+ {
+  "address": "0x0042c170",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/JOURNAL.md:87"
+  ]
+ },
+ {
+  "address": "0x0042c23f",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/JOURNAL.md:754",
+   "docs/WIDESCREEN.md:267"
+  ]
+ },
+ {
+  "address": "0x0042c3c5",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/JOURNAL.md:754",
+   "docs/WIDESCREEN.md:267"
+  ]
+ },
+ {
+  "address": "0x0042cc60",
+  "region": "text",
+  "first_difference": 21,
+  "issues": [
+   "bytes differ at +21"
+  ],
+  "cited_at": [
+   "docs/WIDESCREEN.md:274"
+  ]
+ },
+ {
+  "address": "0x0042e1d0",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/JOURNAL.md:1171"
+  ]
+ },
+ {
+  "address": "0x0042e206",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/ARCHITECTURE_REVIEW.md:67",
+   "docs/DEVELOPER.md:82"
+  ]
+ },
+ {
+  "address": "0x0042e20c",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/ARCHITECTURE_REVIEW.md:67",
+   "docs/ARCHITECTURE_REVIEW.md:265",
+   "docs/ARCHITECTURE_REVIEW.md:318",
+   "docs/DEVELOPER.md:82"
+  ]
+ },
+ {
+  "address": "0x0042f7d0",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/JOURNAL.md:685"
+  ]
+ },
+ {
+  "address": "0x00430190",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:233"
+  ]
+ },
+ {
+  "address": "0x00431127",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/JOURNAL.md:691"
+  ]
+ },
+ {
+  "address": "0x00437a5b",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/DEVELOPER.md:441",
+   "docs/GAME_API.md:3088",
+   "re/out/offsets.json:142"
+  ]
+ },
+ {
+  "address": "0x00437ca6",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/DEVELOPER.md:441",
+   "docs/GAME_API.md:3088",
+   "re/out/offsets.json:143"
+  ]
+ },
+ {
+  "address": "0x00443dc0",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:3086",
+   "re/out/offsets.json:139"
+  ]
+ },
+ {
+  "address": "0x00443e76",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:452"
+  ]
+ },
+ {
+  "address": "0x004458d0",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:520"
+  ]
+ },
+ {
+  "address": "0x00445d40",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:520"
+  ]
+ },
+ {
+  "address": "0x00446bd1",
+  "region": "text",
+  "first_difference": 2,
+  "issues": [
+   "bytes differ at +2"
+  ],
+  "cited_at": [
+   "docs/WIDESCREEN.md:133"
+  ]
+ },
+ {
+  "address": "0x00446d5f",
+  "region": "text",
+  "first_difference": 2,
+  "issues": [
+   "bytes differ at +2"
+  ],
+  "cited_at": [
+   "docs/WIDESCREEN.md:133"
+  ]
+ },
+ {
+  "address": "0x0044e8c7",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1937",
+   "docs/JOURNAL.md:805"
+  ]
+ },
+ {
+  "address": "0x0044e91b",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2106",
+   "re/out/offsets.json:99"
+  ]
+ },
+ {
+  "address": "0x0044eb10",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "re/out/offsets.json:112"
+  ]
+ },
+ {
+  "address": "0x0044ef0d",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1607",
+   "re/out/offsets.json:167"
+  ]
+ },
+ {
+  "address": "0x0044f2d9",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2939",
+   "docs/JOURNAL.md:986"
+  ]
+ },
+ {
+  "address": "0x00451910",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2855"
+  ]
+ },
+ {
+  "address": "0x0045337b",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2939",
+   "docs/JOURNAL.md:986"
+  ]
+ },
+ {
+  "address": "0x0045338d",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2939",
+   "docs/JOURNAL.md:987"
+  ]
+ },
+ {
+  "address": "0x0045b890",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:3298"
+  ]
+ },
+ {
+  "address": "0x0045b8a1",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:3426"
+  ]
+ },
+ {
+  "address": "0x0045e6b0",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/JOURNAL.md:565"
+  ]
+ },
+ {
+  "address": "0x0045f060",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1742",
+   "re/out/offsets.json:119"
+  ]
+ },
+ {
+  "address": "0x0045f99d",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1550",
+   "docs/JOURNAL.md:341"
+  ]
+ },
+ {
+  "address": "0x0045fa70",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1259",
+   "re/out/offsets.json:310"
+  ]
+ },
+ {
+  "address": "0x0045faf6",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1282",
+   "re/out/offsets.json:315"
+  ]
+ },
+ {
+  "address": "0x0045fee0",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:3304"
+  ]
+ },
+ {
+  "address": "0x004600a0",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "re/out/offsets.json:97"
+  ]
+ },
+ {
+  "address": "0x00460822",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2796"
+  ]
+ },
+ {
+  "address": "0x004608e0",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:3089",
+   "re/out/offsets.json:145"
+  ]
+ },
+ {
+  "address": "0x00460d12",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1934",
+   "docs/JOURNAL.md:802"
+  ]
+ },
+ {
+  "address": "0x00460f50",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:545",
+   "docs/GAME_API.md:579"
+  ]
+ },
+ {
+  "address": "0x004612b0",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/ARCHITECTURE_REVIEW.md:338",
+   "docs/GAME_API.md:911",
+   "docs/GAME_API.md:917"
+  ]
+ },
+ {
+  "address": "0x00461e23",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1542",
+   "docs/JOURNAL.md:304"
+  ]
+ },
+ {
+  "address": "0x00461e51",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1537",
+   "docs/JOURNAL.md:287"
+  ]
+ },
+ {
+  "address": "0x00462098",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1713"
+  ]
+ },
+ {
+  "address": "0x0046231a",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:826"
+  ]
+ },
+ {
+  "address": "0x0046239a",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "re/out/offsets.json:222"
+  ]
+ },
+ {
+  "address": "0x00462548",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:144"
+  ]
+ },
+ {
+  "address": "0x004628a9",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "re/out/offsets.json:222"
+  ]
+ },
+ {
+  "address": "0x00462e88",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:826"
+  ]
+ },
+ {
+  "address": "0x0046338d",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:924"
+  ]
+ },
+ {
+  "address": "0x004633b3",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "re/out/offsets.json:132"
+  ]
+ },
+ {
+  "address": "0x0046354a",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1229",
+   "re/out/offsets.json:277",
+   "ROADMAP.md:180"
+  ]
+ },
+ {
+  "address": "0x00463563",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1240",
+   "re/out/offsets.json:278"
+  ]
+ },
+ {
+  "address": "0x00463567",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "re/out/offsets.json:322"
+  ]
+ },
+ {
+  "address": "0x00463587",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "re/out/offsets.json:323"
+  ]
+ },
+ {
+  "address": "0x0046359c",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1533",
+   "docs/JOURNAL.md:292"
+  ]
+ },
+ {
+  "address": "0x004635d2",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/JOURNAL.md:292"
+  ]
+ },
+ {
+  "address": "0x0046374a",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1216",
+   "re/out/offsets.json:250"
+  ]
+ },
+ {
+  "address": "0x0046376e",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1217",
+   "re/out/offsets.json:256"
+  ]
+ },
+ {
+  "address": "0x00463775",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2964"
+  ]
+ },
+ {
+  "address": "0x0046377a",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1346",
+   "docs/GAME_API.md:2440",
+   "re/out/offsets.json:333"
+  ]
+ },
+ {
+  "address": "0x0046393a",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1218",
+   "re/out/offsets.json:261"
+  ]
+ },
+ {
+  "address": "0x0046395d",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1219",
+   "re/out/offsets.json:266"
+  ]
+ },
+ {
+  "address": "0x00463964",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2965"
+  ]
+ },
+ {
+  "address": "0x00463973",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1220",
+   "re/out/offsets.json:271"
+  ]
+ },
+ {
+  "address": "0x00463cb2",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/ARCHITECTURE_REVIEW.md:338"
+  ]
+ },
+ {
+  "address": "0x00463cb4",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1720",
+   "re/out/offsets.json:182"
+  ]
+ },
+ {
+  "address": "0x00465670",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1744",
+   "re/out/offsets.json:117"
+  ]
+ },
+ {
+  "address": "0x0046568d",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "re/out/offsets.json:119"
+  ]
+ },
+ {
+  "address": "0x00466f74",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1526",
+   "docs/JOURNAL.md:282"
+  ]
+ },
+ {
+  "address": "0x00467f90",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "re/out/offsets.json:107"
+  ]
+ },
+ {
+  "address": "0x00468845",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1550"
+  ]
+ },
+ {
+  "address": "0x0046885e",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1535",
+   "docs/JOURNAL.md:285",
+   "docs/JOURNAL.md:338"
+  ]
+ },
+ {
+  "address": "0x00468907",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1505",
+   "docs/JOURNAL.md:269"
+  ]
+ },
+ {
+  "address": "0x00468b35",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1505",
+   "docs/JOURNAL.md:269"
+  ]
+ },
+ {
+  "address": "0x004692da",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:291"
+  ]
+ },
+ {
+  "address": "0x004692ef",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:3090"
+  ]
+ },
+ {
+  "address": "0x0046932b",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:249"
+  ]
+ },
+ {
+  "address": "0x00469698",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/JOURNAL.md:548"
+  ]
+ },
+ {
+  "address": "0x004696ea",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1578",
+   "docs/JOURNAL.md:360"
+  ]
+ },
+ {
+  "address": "0x00469df6",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1645",
+   "re/out/offsets.json:109"
+  ]
+ },
+ {
+  "address": "0x00469dfb",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1646"
+  ]
+ },
+ {
+  "address": "0x00469f40",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1624"
+  ]
+ },
+ {
+  "address": "0x0046a345",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1761"
+  ]
+ },
+ {
+  "address": "0x0046a4fc",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1600",
+   "re/out/offsets.json:167"
+  ]
+ },
+ {
+  "address": "0x0046a61e",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1641",
+   "re/out/offsets.json:109",
+   "re/out/offsets.json:215"
+  ]
+ },
+ {
+  "address": "0x0046aecc",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1559",
+   "docs/JOURNAL.md:538"
+  ]
+ },
+ {
+  "address": "0x0046aef0",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1569",
+   "docs/JOURNAL.md:565",
+   "docs/SUSPICION.md:249"
+  ]
+ },
+ {
+  "address": "0x0046d597",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2924",
+   "docs/JOURNAL.md:977"
+  ]
+ },
+ {
+  "address": "0x0046f488",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/JOURNAL.md:446"
+  ]
+ },
+ {
+  "address": "0x00470391",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2919",
+   "docs/JOURNAL.md:966",
+   "docs/JOURNAL.md:1014"
+  ]
+ },
+ {
+  "address": "0x00470782",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2919",
+   "docs/JOURNAL.md:967"
+  ]
+ },
+ {
+  "address": "0x004707bb",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2922",
+   "docs/JOURNAL.md:970"
+  ]
+ },
+ {
+  "address": "0x00471ab0",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2915",
+   "docs/JOURNAL.md:974"
+  ]
+ },
+ {
+  "address": "0x00471cec",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1527",
+   "docs/JOURNAL.md:282"
+  ]
+ },
+ {
+  "address": "0x00471f3a",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1311",
+   "re/out/offsets.json:323"
+  ]
+ },
+ {
+  "address": "0x00471f9b",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2926",
+   "docs/JOURNAL.md:979"
+  ]
+ },
+ {
+  "address": "0x00471fe6",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2926",
+   "docs/JOURNAL.md:979"
+  ]
+ },
+ {
+  "address": "0x00471fe8",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/JOURNAL.md:1017"
+  ]
+ },
+ {
+  "address": "0x00472264",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2930",
+   "docs/JOURNAL.md:980",
+   "docs/JOURNAL.md:1018"
+  ]
+ },
+ {
+  "address": "0x0047226d",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2931"
+  ]
+ },
+ {
+  "address": "0x004722d4",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/JOURNAL.md:980"
+  ]
+ },
+ {
+  "address": "0x004722f7",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2932",
+   "docs/JOURNAL.md:897",
+   "docs/JOURNAL.md:981"
+  ]
+ },
+ {
+  "address": "0x00472318",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2933",
+   "docs/JOURNAL.md:982"
+  ]
+ },
+ {
+  "address": "0x0047235c",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2934"
+  ]
+ },
+ {
+  "address": "0x0047240d",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2934"
+  ]
+ },
+ {
+  "address": "0x00472412",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1527",
+   "docs/JOURNAL.md:282"
+  ]
+ },
+ {
+  "address": "0x004724d0",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:3387"
+  ]
+ },
+ {
+  "address": "0x004726ca",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/ARCHITECTURE_REVIEW.md:346",
+   "docs/GAME_API.md:893",
+   "docs/GAME_API.md:911"
+  ]
+ },
+ {
+  "address": "0x0047336d",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/JOURNAL.md:398"
+  ]
+ },
+ {
+  "address": "0x00473731",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:3383"
+  ]
+ },
+ {
+  "address": "0x0047376d",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:3330",
+   "docs/GAME_API.md:3424",
+   "docs/JOURNAL.md:349",
+   "docs/JOURNAL.md:377"
+  ]
+ },
+ {
+  "address": "0x00473829",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:3386"
+  ]
+ },
+ {
+  "address": "0x00473968",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/JOURNAL.md:901"
+  ]
+ },
+ {
+  "address": "0x00474009",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/WIDESCREEN.md:255"
+  ]
+ },
+ {
+  "address": "0x004741b0",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "re/out/offsets.json:102"
+  ]
+ },
+ {
+  "address": "0x00474434",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/WIDESCREEN.md:256"
+  ]
+ },
+ {
+  "address": "0x004745f1",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/WIDESCREEN.md:256"
+  ]
+ },
+ {
+  "address": "0x0047626c",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/WIDESCREEN.md:256"
+  ]
+ },
+ {
+  "address": "0x0047a0c9",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1540",
+   "docs/JOURNAL.md:290"
+  ]
+ },
+ {
+  "address": "0x0047b3cb",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2965"
+  ]
+ },
+ {
+  "address": "0x0047b3d5",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2998"
+  ]
+ },
+ {
+  "address": "0x0047bc3c",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:3032",
+   "docs/GAME_API.md:3050",
+   "re/out/offsets.json:343"
+  ]
+ },
+ {
+  "address": "0x0047cba9",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/JOURNAL.md:815"
+  ]
+ },
+ {
+  "address": "0x0047dc0b",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/JOURNAL.md:844"
+  ]
+ },
+ {
+  "address": "0x0047de17",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2899",
+   "docs/JOURNAL.md:815"
+  ]
+ },
+ {
+  "address": "0x0047de91",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2899",
+   "docs/JOURNAL.md:815"
+  ]
+ },
+ {
+  "address": "0x0047df65",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2904",
+   "docs/JOURNAL.md:997"
+  ]
+ },
+ {
+  "address": "0x0047df75",
+  "region": "text",
+  "first_difference": 21,
+  "issues": [
+   "bytes differ at +21"
+  ],
+  "cited_at": [
+   "docs/GAME_API.md:2904",
+   "docs/JOURNAL.md:999"
+  ]
+ },
+ {
+  "address": "0x0047df76",
+  "region": "text",
+  "first_difference": 20,
+  "issues": [
+   "bytes differ at +20"
+  ],
+  "cited_at": [
+   "docs/JOURNAL.md:1027"
+  ]
+ },
+ {
+  "address": "0x0047e044",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2904",
+   "docs/JOURNAL.md:997",
+   "docs/JOURNAL.md:1025"
+  ]
+ },
+ {
+  "address": "0x0047e11b",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2899",
+   "docs/JOURNAL.md:815"
+  ]
+ },
+ {
+  "address": "0x0047e4e6",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2900",
+   "docs/JOURNAL.md:818"
+  ]
+ },
+ {
+  "address": "0x0047e56d",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2901",
+   "docs/JOURNAL.md:820",
+   "docs/JOURNAL.md:1000"
+  ]
+ },
+ {
+  "address": "0x0047e56e",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/JOURNAL.md:843"
+  ]
+ },
+ {
+  "address": "0x0047ebd7",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2801"
+  ]
+ },
+ {
+  "address": "0x0047ebdf",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2816"
+  ]
+ },
+ {
+  "address": "0x0047ebe2",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2790",
+   "docs/GAME_API.md:2801",
+   "docs/GAME_API.md:2968"
+  ]
+ },
+ {
+  "address": "0x0047ede3",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1540",
+   "docs/JOURNAL.md:290"
+  ]
+ },
+ {
+  "address": "0x0047ee97",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:3012"
+  ]
+ },
+ {
+  "address": "0x00480b26",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2904",
+   "docs/JOURNAL.md:999"
+  ]
+ },
+ {
+  "address": "0x00480c72",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2904"
+  ]
+ },
+ {
+  "address": "0x00483745",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2939",
+   "docs/JOURNAL.md:987"
+  ]
+ },
+ {
+  "address": "0x00483c7f",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2939",
+   "docs/JOURNAL.md:987"
+  ]
+ },
+ {
+  "address": "0x00486031",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2940",
+   "docs/JOURNAL.md:987"
+  ]
+ },
+ {
+  "address": "0x0048715e",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2940",
+   "docs/JOURNAL.md:987"
+  ]
+ },
+ {
+  "address": "0x004879f0",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/CREW_AND_OFFICERS.md:218",
+   "docs/GAME_API.md:231",
+   "docs/GAME_API.md:2306",
+   "docs/JOURNAL.md:685",
+   "re/out/offsets.json:77"
+  ]
+ },
+ {
+  "address": "0x00487cd5",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:247"
+  ]
+ },
+ {
+  "address": "0x00487e90",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2172",
+   "re/out/offsets.json:87"
+  ]
+ },
+ {
+  "address": "0x004888e0",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2152",
+   "re/out/offsets.json:92"
+  ]
+ },
+ {
+  "address": "0x00488a80",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:867",
+   "docs/GAME_API.md:879",
+   "docs/GAME_API.md:2804",
+   "ROADMAP.md:135"
+  ]
+ },
+ {
+  "address": "0x004a06c0",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2211",
+   "ROADMAP.md:132"
+  ]
+ },
+ {
+  "address": "0x004a07c0",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2211",
+   "ROADMAP.md:132"
+  ]
+ },
+ {
+  "address": "0x004aeb20",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:842"
+  ]
+ },
+ {
+  "address": "0x004b09ec",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/JOURNAL.md:746",
+   "docs/WIDESCREEN.md:252"
+  ]
+ },
+ {
+  "address": "0x004b1794",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/JOURNAL.md:525"
+  ]
+ },
+ {
+  "address": "0x004b2e8a",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/JOURNAL.md:114",
+   "docs/WIDESCREEN.md:200"
+  ]
+ },
+ {
+  "address": "0x004b3631",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/JOURNAL.md:202"
+  ]
+ },
+ {
+  "address": "0x004bb4b0",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "re/out/offsets.json:332"
+  ]
+ },
+ {
+  "address": "0x004bbc10",
+  "region": "text",
+  "first_difference": 16,
+  "issues": [
+   "bytes differ at +16"
+  ],
+  "cited_at": [
+   "docs/GAME_API.md:2990"
+  ]
+ },
+ {
+  "address": "0x004bbc80",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "re/out/offsets.json:289"
+  ]
+ },
+ {
+  "address": "0x004cce40",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/JOURNAL.md:105",
+   "docs/JOURNAL.md:1084"
+  ]
+ },
+ {
+  "address": "0x004cce74",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/JOURNAL.md:65"
+  ]
+ },
+ {
+  "address": "0x004d260f",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1407",
+   "re/out/offsets.json:356"
+  ]
+ },
+ {
+  "address": "0x004d2950",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:209"
+  ]
+ },
+ {
+  "address": "0x004d2a3f",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:211"
+  ]
+ },
+ {
+  "address": "0x004d2a49",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/JOURNAL.md:1165"
+  ]
+ },
+ {
+  "address": "0x004d2a53",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:212"
+  ]
+ },
+ {
+  "address": "0x004d3ab0",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/WIDESCREEN.md:37"
+  ]
+ },
+ {
+  "address": "0x004d3ae6",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/JOURNAL.md:626"
+  ]
+ },
+ {
+  "address": "0x004d3afd",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/JOURNAL.md:626"
+  ]
+ },
+ {
+  "address": "0x004d3bbb",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/JOURNAL.md:492"
+  ]
+ },
+ {
+  "address": "0x004d3e00",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/JOURNAL.md:116",
+   "docs/JOURNAL.md:755",
+   "docs/WIDESCREEN.md:273"
+  ]
+ },
+ {
+  "address": "0x004d4480",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "re/out/offsets.json:350"
+  ]
+ },
+ {
+  "address": "0x004d5ae2",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/JOURNAL.md:525"
+  ]
+ },
+ {
+  "address": "0x004d5fe1",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2940",
+   "docs/JOURNAL.md:988"
+  ]
+ },
+ {
+  "address": "0x004d975d",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/JOURNAL.md:446"
+  ]
+ },
+ {
+  "address": "0x004dcfee",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:473"
+  ]
+ },
+ {
+  "address": "0x004dd01f",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2829"
+  ]
+ },
+ {
+  "address": "0x004dd1dd",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/JOURNAL.md:526"
+  ]
+ },
+ {
+  "address": "0x004ddf07",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:473"
+  ]
+ },
+ {
+  "address": "0x004ddf23",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:451"
+  ]
+ },
+ {
+  "address": "0x004e4fa6",
+  "region": "text",
+  "first_difference": 11,
+  "issues": [
+   "bytes differ at +11"
+  ],
+  "cited_at": [
+   "docs/JOURNAL.md:286"
+  ]
+ },
+ {
+  "address": "0x004e596d",
+  "region": "text",
+  "first_difference": 19,
+  "issues": [
+   "bytes differ at +19"
+  ],
+  "cited_at": [
+   "docs/JOURNAL.md:286"
+  ]
+ },
+ {
+  "address": "0x004edac0",
+  "region": "text",
+  "first_difference": 0,
+  "issues": [
+   "bytes differ at +0"
+  ],
+  "cited_at": [
+   "docs/GAME_API.md:3243",
+   "docs/JOURNAL.md:1089"
+  ]
+ },
+ {
+  "address": "0x004edb60",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:3244",
+   "docs/JOURNAL.md:1090"
+  ]
+ },
+ {
+  "address": "0x004f3000",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "re/out/offsets.json:151"
+  ]
+ },
+ {
+  "address": "0x004f4000",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "re/out/offsets.json:156"
+  ]
+ },
+ {
+  "address": "0x004f4ed0",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1003"
+  ]
+ },
+ {
+  "address": "0x004f5870",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:176"
+  ]
+ },
+ {
+  "address": "0x004f6090",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:215",
+   "docs/GAME_API.md:228",
+   "docs/GAME_API.md:2305",
+   "docs/JOURNAL.md:684",
+   "re/out/offsets.json:16",
+   "re/out/offsets.json:137"
+  ]
+ },
+ {
+  "address": "0x004f60b0",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:216",
+   "docs/GAME_API.md:229",
+   "docs/GAME_API.md:2307",
+   "docs/JOURNAL.md:684",
+   "re/out/offsets.json:22"
+  ]
+ },
+ {
+  "address": "0x004f60d0",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:212",
+   "docs/GAME_API.md:230",
+   "re/out/offsets.json:28"
+  ]
+ },
+ {
+  "address": "0x004f61a0",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:181"
+  ]
+ },
+ {
+  "address": "0x004f6fa0",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:220"
+  ]
+ },
+ {
+  "address": "0x004ff6b0",
+  "region": "text",
+  "first_difference": 2,
+  "issues": [
+   "bytes differ at +2"
+  ],
+  "cited_at": [
+   "docs/JOURNAL.md:493"
+  ]
+ },
+ {
+  "address": "0x00500850",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1004"
+  ]
+ },
+ {
+  "address": "0x005038ed",
+  "region": "text",
+  "first_difference": 2,
+  "issues": [
+   "bytes differ at +2"
+  ],
+  "cited_at": [
+   "docs/WIDESCREEN.md:113"
+  ]
+ },
+ {
+  "address": "0x00503985",
+  "region": "text",
+  "first_difference": 2,
+  "issues": [
+   "bytes differ at +2"
+  ],
+  "cited_at": [
+   "docs/WIDESCREEN.md:113"
+  ]
+ },
+ {
+  "address": "0x00503dc2",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/JOURNAL.md:493"
+  ]
+ },
+ {
+  "address": "0x00504310",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/WIDESCREEN.md:94",
+   "docs/WIDESCREEN.md:168"
+  ]
+ },
+ {
+  "address": "0x0050436d",
+  "region": "text",
+  "first_difference": 2,
+  "issues": [
+   "bytes differ at +2"
+  ],
+  "cited_at": [
+   "docs/WIDESCREEN.md:97",
+   "docs/WIDESCREEN.md:112"
+  ]
+ },
+ {
+  "address": "0x005043c8",
+  "region": "text",
+  "first_difference": 2,
+  "issues": [
+   "bytes differ at +2"
+  ],
+  "cited_at": [
+   "docs/WIDESCREEN.md:98",
+   "docs/WIDESCREEN.md:112"
+  ]
+ },
+ {
+  "address": "0x00509500",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2170",
+   "re/out/offsets.json:82"
+  ]
+ },
+ {
+  "address": "0x0050c7ef",
+  "region": "text",
+  "first_difference": 2,
+  "issues": [
+   "bytes differ at +2"
+  ],
+  "cited_at": [
+   "docs/WIDESCREEN.md:114",
+   "docs/WIDESCREEN.md:119"
+  ]
+ },
+ {
+  "address": "0x0050c841",
+  "region": "text",
+  "first_difference": 2,
+  "issues": [
+   "bytes differ at +2"
+  ],
+  "cited_at": [
+   "docs/WIDESCREEN.md:114"
+  ]
+ },
+ {
+  "address": "0x0050cafc",
+  "region": "text",
+  "first_difference": 2,
+  "issues": [
+   "bytes differ at +2"
+  ],
+  "cited_at": [
+   "docs/WIDESCREEN.md:115",
+   "docs/WIDESCREEN.md:119"
+  ]
+ },
+ {
+  "address": "0x0050cb40",
+  "region": "text",
+  "first_difference": 2,
+  "issues": [
+   "bytes differ at +2"
+  ],
+  "cited_at": [
+   "docs/WIDESCREEN.md:115"
+  ]
+ },
+ {
+  "address": "0x00528e70",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2211",
+   "ROADMAP.md:132"
+  ]
+ },
+ {
+  "address": "0x00528ee0",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2211",
+   "ROADMAP.md:132"
+  ]
+ },
+ {
+  "address": "0x0052c000",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2194"
+  ]
+ },
+ {
+  "address": "0x0052cdc0",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2212",
+   "docs/GAME_API.md:2262",
+   "docs/GAME_API.md:2276"
+  ]
+ },
+ {
+  "address": "0x0052d6d0",
+  "region": "text",
+  "first_difference": 15,
+  "issues": [
+   "bytes differ at +15"
+  ],
+  "cited_at": [
+   "docs/GAME_API.md:2213"
+  ]
+ },
+ {
+  "address": "0x0052d880",
+  "region": "text",
+  "first_difference": 9,
+  "issues": [
+   "bytes differ at +9"
+  ],
+  "cited_at": [
+   "docs/GAME_API.md:2215"
+  ]
+ },
+ {
+  "address": "0x0052d950",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2216"
+  ]
+ },
+ {
+  "address": "0x0052dd30",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2214"
+  ]
+ },
+ {
+  "address": "0x0052f700",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2210",
+   "docs/GAME_API.md:2211",
+   "docs/GAME_API.md:2258",
+   "ROADMAP.md:130"
+  ]
+ },
+ {
+  "address": "0x0052f800",
+  "region": "text",
+  "first_difference": 8,
+  "issues": [
+   "bytes differ at +8"
+  ],
+  "cited_at": [
+   "docs/GAME_API.md:2194"
+  ]
+ },
+ {
+  "address": "0x00533c9d",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/JOURNAL.md:200"
+  ]
+ },
+ {
+  "address": "0x00533d10",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/JOURNAL.md:493"
+  ]
+ },
+ {
+  "address": "0x00535e20",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/JOURNAL.md:486"
+  ]
+ },
+ {
+  "address": "0x00536500",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/JOURNAL.md:486"
+  ]
+ },
+ {
+  "address": "0x00536f80",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/JOURNAL.md:85"
+  ]
+ },
+ {
+  "address": "0x005374ee",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/JOURNAL.md:487"
+  ]
+ },
+ {
+  "address": "0x00538400",
+  "region": "text",
+  "first_difference": 2,
+  "issues": [
+   "bytes differ at +2"
+  ],
+  "cited_at": [
+   "docs/JOURNAL.md:1108"
+  ]
+ },
+ {
+  "address": "0x005668a3",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/JOURNAL.md:487"
+  ]
+ },
+ {
+  "address": "0x005f0ddc",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2171"
+  ]
+ },
+ {
+  "address": "0x006c0000",
+  "region": "rdata",
+  "first_difference": 0,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:3241"
+  ]
+ },
+ {
+  "address": "0x006c0430",
+  "region": "rdata",
+  "first_difference": 0,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:87"
+  ]
+ },
+ {
+  "address": "0x006c0470",
+  "region": "rdata",
+  "first_difference": 0,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2191"
+  ]
+ },
+ {
+  "address": "0x006c04b4",
+  "region": "rdata",
+  "first_difference": 0,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2191"
+  ]
+ },
+ {
+  "address": "0x006c04e4",
+  "region": "rdata",
+  "first_difference": 0,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2191"
+  ]
+ },
+ {
+  "address": "0x006c0504",
+  "region": "rdata",
+  "first_difference": 0,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2191"
+  ]
+ },
+ {
+  "address": "0x006c0588",
+  "region": "rdata",
+  "first_difference": 0,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2191"
+  ]
+ },
+ {
+  "address": "0x006f5898",
+  "region": "rdata",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/CREW_AND_OFFICERS.md:65",
+   "docs/GAME_API.md:2767"
+  ]
+ },
+ {
+  "address": "0x006f5900",
+  "region": "rdata",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2769"
+  ]
+ },
+ {
+  "address": "0x006f5a68",
+  "region": "rdata",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2418"
+  ]
+ },
+ {
+  "address": "0x006f5a98",
+  "region": "rdata",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2417"
+  ]
+ },
+ {
+  "address": "0x006f5aec",
+  "region": "rdata",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2321",
+   "docs/GAME_API.md:2402"
+  ]
+ },
+ {
+  "address": "0x006f5afc",
+  "region": "rdata",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2403"
+  ]
+ },
+ {
+  "address": "0x006f5b0c",
+  "region": "rdata",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2404"
+  ]
+ },
+ {
+  "address": "0x006f5b1c",
+  "region": "rdata",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2405"
+  ]
+ },
+ {
+  "address": "0x006f5b34",
+  "region": "rdata",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2401"
+  ]
+ },
+ {
+  "address": "0x006f5b40",
+  "region": "rdata",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2320"
+  ]
+ },
+ {
+  "address": "0x006f5b50",
+  "region": "rdata",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2317"
+  ]
+ },
+ {
+  "address": "0x006f5bcc",
+  "region": "rdata",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2318"
+  ]
+ },
+ {
+  "address": "0x006f5c04",
+  "region": "rdata",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2319"
+  ]
+ },
+ {
+  "address": "0x006f5d78",
+  "region": "rdata",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2615"
+  ]
+ },
+ {
+  "address": "0x006f5ffc",
+  "region": "rdata",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2600"
+  ]
+ },
+ {
+  "address": "0x006fae1c",
+  "region": "rdata",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:483"
+  ]
+ },
+ {
+  "address": "0x006fd8d4",
+  "region": "rdata",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2732"
+  ]
+ },
+ {
+  "address": "0x006fd8ec",
+  "region": "rdata",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2733"
+  ]
+ },
+ {
+  "address": "0x006fd904",
+  "region": "rdata",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2734"
+  ]
+ },
+ {
+  "address": "0x006fd91c",
+  "region": "rdata",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2735"
+  ]
+ },
+ {
+  "address": "0x006fdd84",
+  "region": "rdata",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1186",
+   "re/out/offsets.json:246"
+  ]
+ },
+ {
+  "address": "0x006fdd90",
+  "region": "rdata",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1187",
+   "re/out/offsets.json:241"
+  ]
+ },
+ {
+  "address": "0x00707a40",
+  "region": "rdata",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1648",
+   "re/out/offsets.json:220"
+  ]
+ },
+ {
+  "address": "0x00707a60",
+  "region": "rdata",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1723",
+   "re/out/offsets.json:182"
+  ]
+ },
+ {
+  "address": "0x0070851c",
+  "region": "rdata",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2824"
+  ]
+ },
+ {
+  "address": "0x00708b90",
+  "region": "rdata",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2823"
+  ]
+ },
+ {
+  "address": "0x00709e20",
+  "region": "rdata",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2141",
+   "re/out/offsets.json:94"
+  ]
+ },
+ {
+  "address": "0x0070ab88",
+  "region": "rdata",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2234"
+  ]
+ },
+ {
+  "address": "0x0070b814",
+  "region": "rdata",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1498",
+   "re/out/offsets.json:303"
+  ]
+ },
+ {
+  "address": "0x0070c948",
+  "region": "rdata",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1409",
+   "re/out/offsets.json:356"
+  ]
+ },
+ {
+  "address": "0x0070d594",
+  "region": "rdata",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2938",
+   "docs/GAME_API.md:2940",
+   "docs/JOURNAL.md:989",
+   "docs/JOURNAL.md:989"
+  ]
+ },
+ {
+  "address": "0x0070d598",
+  "region": "rdata",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/JOURNAL.md:1020"
+  ]
+ },
+ {
+  "address": "0x0070f54c",
+  "region": "rdata",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2830"
+  ]
+ },
+ {
+  "address": "0x007107e0",
+  "region": "rdata",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:483"
+  ]
+ },
+ {
+  "address": "0x00712e6c",
+  "region": "rdata",
+  "first_difference": 0,
+  "issues": [
+   "bytes differ at +0"
+  ],
+  "cited_at": [
+   "docs/GAME_API.md:2236"
+  ]
+ },
+ {
+  "address": "0x00712e74",
+  "region": "rdata",
+  "first_difference": 0,
+  "issues": [
+   "bytes differ at +0",
+   ".rdata item is at 0x00712e6c on Steam"
+  ],
+  "cited_at": [
+   "docs/GAME_API.md:2235"
+  ]
+ },
+ {
+  "address": "0x00712f60",
+  "region": "rdata",
+  "first_difference": 0,
+  "issues": [
+   "bytes differ at +0"
+  ],
+  "cited_at": [
+   "docs/GAME_API.md:2236"
+  ]
+ },
+ {
+  "address": "0x00712f68",
+  "region": "rdata",
+  "first_difference": 0,
+  "issues": [
+   "bytes differ at +0",
+   ".rdata item is at 0x00712f60 on Steam"
+  ],
+  "cited_at": [
+   "docs/GAME_API.md:2235"
+  ]
+ },
+ {
+  "address": "0x007135bc",
+  "region": "rdata",
+  "first_difference": 2,
+  "issues": [
+   "bytes differ at +2",
+   ".rdata item is at 0x007135b4 on Steam"
+  ],
+  "cited_at": [
+   "docs/JOURNAL.md:1096",
+   "docs/WIDESCREEN.md:20"
+  ]
+ },
+ {
+  "address": "0x007135c0",
+  "region": "rdata",
+  "first_difference": 2,
+  "issues": [
+   "bytes differ at +2",
+   ".rdata item is at 0x007135b8 on Steam"
+  ],
+  "cited_at": [
+   "docs/WIDESCREEN.md:20"
+  ]
+ },
+ {
+  "address": "0x007135c4",
+  "region": "rdata",
+  "first_difference": 2,
+  "issues": [
+   "bytes differ at +2",
+   ".rdata item is at 0x007135bc on Steam"
+  ],
+  "cited_at": [
+   "docs/JOURNAL.md:1096",
+   "docs/WIDESCREEN.md:20"
+  ]
+ },
+ {
+  "address": "0x007135c8",
+  "region": "rdata",
+  "first_difference": 0,
+  "issues": [
+   "bytes differ at +0",
+   ".rdata item is at 0x007135c0 on Steam"
+  ],
+  "cited_at": [
+   "docs/WIDESCREEN.md:20"
+  ]
+ },
+ {
+  "address": "0x007135f8",
+  "region": "rdata",
+  "first_difference": 0,
+  "issues": [
+   "bytes differ at +0",
+   ".rdata item is at 0x007135f0 on Steam"
+  ],
+  "cited_at": [
+   "docs/GAME_API.md:849",
+   "docs/JOURNAL.md:1093"
+  ]
+ },
+ {
+  "address": "0x00713600",
+  "region": "rdata",
+  "first_difference": 0,
+  "issues": [
+   "bytes differ at +0",
+   ".rdata item is at 0x007135f8 on Steam"
+  ],
+  "cited_at": [
+   "docs/GAME_API.md:833",
+   "docs/GAME_API.md:849",
+   "docs/GAME_API.md:850",
+   "docs/JOURNAL.md:1093"
+  ]
+ },
+ {
+  "address": "0x00716fff",
+  "region": "rdata",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:3241"
+  ]
+ },
+ {
+  "address": "0x007177e0",
+  "region": "data",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/JOURNAL.md:100"
+  ]
+ },
+ {
+  "address": "0x007177e4",
+  "region": "data",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/JOURNAL.md:99"
+  ]
+ },
+ {
+  "address": "0x00722a08",
+  "region": "data",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1705",
+   "docs/GAME_API.md:1815"
+  ]
+ },
+ {
+  "address": "0x00723b0c",
+  "region": "data",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1509",
+   "docs/JOURNAL.md:271"
+  ]
+ },
+ {
+  "address": "0x007242d0",
+  "region": "data",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2917",
+   "docs/JOURNAL.md:975"
+  ]
+ },
+ {
+  "address": "0x007252d0",
+  "region": "data",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1759"
+  ]
+ },
+ {
+  "address": "0x007252f0",
+  "region": "data",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2934"
+  ]
+ },
+ {
+  "address": "0x00725350",
+  "region": "data",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2934"
+  ]
+ },
+ {
+  "address": "0x00725408",
+  "region": "data",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/JOURNAL.md:691"
+  ]
+ },
+ {
+  "address": "0x00725678",
+  "region": "data",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1247",
+   "re/out/offsets.json:294"
+  ]
+ },
+ {
+  "address": "0x0072568c",
+  "region": "data",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/JOURNAL.md:750",
+   "docs/WIDESCREEN.md:258"
+  ]
+ },
+ {
+  "address": "0x0072581c",
+  "region": "data",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/WIDESCREEN.md:239"
+  ]
+ },
+ {
+  "address": "0x00725828",
+  "region": "data",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/JOURNAL.md:750",
+   "docs/WIDESCREEN.md:258"
+  ]
+ },
+ {
+  "address": "0x00726238",
+  "region": "data",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/JOURNAL.md:199"
+  ]
+ },
+ {
+  "address": "0x0072637c",
+  "region": "data",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/JOURNAL.md:628",
+   "docs/JOURNAL.md:744",
+   "docs/JOURNAL.md:746",
+   "docs/WIDESCREEN.md:19",
+   "docs/WIDESCREEN.md:29",
+   "docs/WIDESCREEN.md:251"
+  ]
+ },
+ {
+  "address": "0x00726380",
+  "region": "data",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/JOURNAL.md:628",
+   "docs/WIDESCREEN.md:19",
+   "docs/WIDESCREEN.md:29"
+  ]
+ },
+ {
+  "address": "0x00726388",
+  "region": "data",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1401",
+   "re/out/offsets.json:352"
+  ]
+ },
+ {
+  "address": "0x0072638c",
+  "region": "data",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1394",
+   "docs/GAME_API.md:1402",
+   "docs/GAME_API.md:1408",
+   "re/out/offsets.json:349"
+  ]
+ },
+ {
+  "address": "0x00726390",
+  "region": "data",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1403",
+   "re/out/offsets.json:353"
+  ]
+ },
+ {
+  "address": "0x00726394",
+  "region": "data",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1404",
+   "re/out/offsets.json:354"
+  ]
+ },
+ {
+  "address": "0x007263bc",
+  "region": "data",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:634"
+  ]
+ },
+ {
+  "address": "0x007268dc",
+  "region": "data",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2904",
+   "docs/JOURNAL.md:999"
+  ]
+ },
+ {
+  "address": "0x00726a84",
+  "region": "data",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:634"
+  ]
+ },
+ {
+  "address": "0x00726a88",
+  "region": "data",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1016"
+  ]
+ },
+ {
+  "address": "0x00726a8c",
+  "region": "data",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1017"
+  ]
+ },
+ {
+  "address": "0x00726a90",
+  "region": "data",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1018"
+  ]
+ },
+ {
+  "address": "0x00726aa8",
+  "region": "data",
+  "first_difference": 24,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1019"
+  ]
+ },
+ {
+  "address": "0x00726b8c",
+  "region": "data",
+  "first_difference": 24,
+  "issues": [],
+  "cited_at": [
+   "docs/JOURNAL.md:120"
+  ]
+ },
+ {
+  "address": "0x007272b4",
+  "region": "data",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1108",
+   "docs/GAME_API.md:2938"
+  ]
+ },
+ {
+  "address": "0x00727444",
+  "region": "data",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/JOURNAL.md:1109"
+  ]
+ },
+ {
+  "address": "0x00727c30",
+  "region": "data",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/DEVELOPER.md:103",
+   "docs/GAME_API.md:705",
+   "docs/JOURNAL.md:92",
+   "docs/README.md:222",
+   "docs/README.md:225"
+  ]
+ },
+ {
+  "address": "0x0072c6b8",
+  "region": "data",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1167"
+  ]
+ },
+ {
+  "address": "0x008142f8",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1060",
+   "docs/GAME_API.md:1169",
+   "docs/GAME_API.md:1679",
+   "docs/GAME_API.md:1849",
+   "docs/GAME_API.md:1862",
+   "re/out/offsets.json:162"
+  ]
+ },
+ {
+  "address": "0x008142fa",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1853",
+   "re/out/offsets.json:171"
+  ]
+ },
+ {
+  "address": "0x008142fc",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1061",
+   "docs/GAME_API.md:1850"
+  ]
+ },
+ {
+  "address": "0x00814300",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1599",
+   "re/out/offsets.json:165"
+  ]
+ },
+ {
+  "address": "0x00814304",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:373",
+   "docs/GAME_API.md:1062",
+   "docs/GAME_API.md:1851"
+  ]
+ },
+ {
+  "address": "0x00814308",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:374",
+   "docs/GAME_API.md:1063",
+   "docs/GAME_API.md:1852"
+  ]
+ },
+ {
+  "address": "0x0081430c",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1855",
+   "docs/JOURNAL.md:532"
+  ]
+ },
+ {
+  "address": "0x00814318",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1511",
+   "docs/JOURNAL.md:274"
+  ]
+ },
+ {
+  "address": "0x0081431a",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1565",
+   "docs/JOURNAL.md:542"
+  ]
+ },
+ {
+  "address": "0x00814322",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1854",
+   "re/out/offsets.json:186"
+  ]
+ },
+ {
+  "address": "0x00814336",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1857",
+   "re/out/offsets.json:191"
+  ]
+ },
+ {
+  "address": "0x00814338",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1858",
+   "re/out/offsets.json:197"
+  ]
+ },
+ {
+  "address": "0x0081433c",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1856",
+   "docs/JOURNAL.md:532"
+  ]
+ },
+ {
+  "address": "0x00814350",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1064",
+   "docs/GAME_API.md:1859",
+   "re/out/offsets.json:202"
+  ]
+ },
+ {
+  "address": "0x00814354",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "re/out/offsets.json:207"
+  ]
+ },
+ {
+  "address": "0x00814358",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "re/out/offsets.json:213"
+  ]
+ },
+ {
+  "address": "0x00859ef8",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1679"
+  ]
+ },
+ {
+  "address": "0x00859efa",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:3392"
+  ]
+ },
+ {
+  "address": "0x00859f50",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:3392"
+  ]
+ },
+ {
+  "address": "0x0085a0f8",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1272",
+   "docs/GAME_API.md:1274",
+   "docs/GAME_API.md:1381",
+   "docs/GAME_API.md:1386",
+   "docs/GAME_API.md:1516",
+   "docs/GAME_API.md:3018",
+   "docs/GAME_API.md:3024",
+   "docs/GAME_API.md:3032",
+   "docs/GAME_API.md:3034",
+   "docs/GAME_API.md:3037",
+   "docs/JOURNAL.md:1128",
+   "re/out/offsets.json:312",
+   "re/out/offsets.json:345",
+   "re/out/offsets.json:346"
+  ]
+ },
+ {
+  "address": "0x0085a11c",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:856",
+   "docs/GAME_API.md:928"
+  ]
+ },
+ {
+  "address": "0x0085a124",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1985"
+  ]
+ },
+ {
+  "address": "0x0085a128",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1985"
+  ]
+ },
+ {
+  "address": "0x0085a150",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1784"
+  ]
+ },
+ {
+  "address": "0x0085a154",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:3293",
+   "docs/GAME_API.md:3344",
+   "docs/GAME_API.md:3369",
+   "docs/GAME_API.md:3393"
+  ]
+ },
+ {
+  "address": "0x0085a158",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/CREW_AND_OFFICERS.md:332",
+   "docs/GAME_API.md:358",
+   "docs/GAME_API.md:1563",
+   "docs/GAME_API.md:2666",
+   "docs/GAME_API.md:3150",
+   "docs/GAME_API.md:3294",
+   "docs/GAME_API.md:3344",
+   "docs/GAME_API.md:3401",
+   "docs/JOURNAL.md:541",
+   "re/out/offsets.json:65"
+  ]
+ },
+ {
+  "address": "0x0085a164",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:848",
+   "docs/GAME_API.md:1511",
+   "docs/GAME_API.md:1564",
+   "docs/GAME_API.md:1646",
+   "docs/GAME_API.md:3345",
+   "docs/JOURNAL.md:275",
+   "docs/JOURNAL.md:541",
+   "re/out/offsets.json:109"
+  ]
+ },
+ {
+  "address": "0x0085a168",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1086",
+   "docs/GAME_API.md:1168",
+   "docs/GAME_API.md:2933",
+   "docs/SUSPICION.md:159",
+   "docs/SUSPICION.md:178",
+   "ROADMAP.md:357"
+  ]
+ },
+ {
+  "address": "0x0085a268",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:360",
+   "docs/JOURNAL.md:627"
+  ]
+ },
+ {
+  "address": "0x0085a26c",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:359",
+   "docs/JOURNAL.md:627",
+   "docs/WIDESCREEN.md:249"
+  ]
+ },
+ {
+  "address": "0x0085b170",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:397",
+   "docs/GAME_API.md:440",
+   "docs/GAME_API.md:2934"
+  ]
+ },
+ {
+  "address": "0x0085bf7e",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1563",
+   "docs/JOURNAL.md:540"
+  ]
+ },
+ {
+  "address": "0x0085bfb4",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1931",
+   "docs/JOURNAL.md:799"
+  ]
+ },
+ {
+  "address": "0x0085bff6",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2934",
+   "docs/JOURNAL.md:983"
+  ]
+ },
+ {
+  "address": "0x00860b40",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1045"
+  ]
+ },
+ {
+  "address": "0x00860b44",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1046"
+  ]
+ },
+ {
+  "address": "0x00860b48",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1047"
+  ]
+ },
+ {
+  "address": "0x00860b4c",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1048"
+  ]
+ },
+ {
+  "address": "0x00860b50",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1049"
+  ]
+ },
+ {
+  "address": "0x00860b54",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1045",
+   "docs/GAME_API.md:3349"
+  ]
+ },
+ {
+  "address": "0x00860b58",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1046"
+  ]
+ },
+ {
+  "address": "0x00860b5c",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1047"
+  ]
+ },
+ {
+  "address": "0x00860b60",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1048"
+  ]
+ },
+ {
+  "address": "0x00860b64",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1049"
+  ]
+ },
+ {
+  "address": "0x00860b68",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1170",
+   "docs/GAME_API.md:2917",
+   "docs/GAME_API.md:2934",
+   "docs/GAME_API.md:3408",
+   "docs/GAME_API.md:3409",
+   "docs/JOURNAL.md:975",
+   "docs/SUSPICION.md:176"
+  ]
+ },
+ {
+  "address": "0x00860b6c",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:3409"
+  ]
+ },
+ {
+  "address": "0x00860b70",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:398",
+   "docs/GAME_API.md:428",
+   "docs/GAME_API.md:585",
+   "docs/GAME_API.md:609",
+   "docs/GAME_API.md:1579",
+   "docs/GAME_API.md:3408",
+   "docs/GAME_API.md:3410",
+   "docs/JOURNAL.md:361"
+  ]
+ },
+ {
+  "address": "0x00860b74",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:140",
+   "docs/GAME_API.md:2477",
+   "docs/GAME_API.md:2595",
+   "docs/SUSPICION.md:95",
+   "docs/SUSPICION.md:176"
+  ]
+ },
+ {
+  "address": "0x00860b75",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1932",
+   "docs/JOURNAL.md:800"
+  ]
+ },
+ {
+  "address": "0x00860b76",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1933"
+  ]
+ },
+ {
+  "address": "0x00860b7c",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1933",
+   "docs/GAME_API.md:2612",
+   "docs/JOURNAL.md:801"
+  ]
+ },
+ {
+  "address": "0x00860b80",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:141",
+   "docs/GAME_API.md:2604",
+   "docs/JOURNAL.md:693"
+  ]
+ },
+ {
+  "address": "0x00861b70",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1933",
+   "docs/JOURNAL.md:801"
+  ]
+ },
+ {
+  "address": "0x00861b74",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1933"
+  ]
+ },
+ {
+  "address": "0x00861ff8",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/CREW_AND_OFFICERS.md:113",
+   "docs/CREW_AND_OFFICERS.md:234",
+   "docs/GAME_API.md:2836",
+   "docs/GAME_API.md:2840",
+   "docs/GAME_API.md:2848",
+   "docs/GAME_API.md:2852",
+   "docs/GAME_API.md:2858",
+   "docs/GAME_API.md:2866",
+   "docs/GAME_API.md:2891",
+   "ROADMAP.md:453"
+  ]
+ },
+ {
+  "address": "0x00869a70",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1166"
+  ]
+ },
+ {
+  "address": "0x00869a76",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/CREW_AND_OFFICERS.md:332",
+   "docs/GAME_API.md:357",
+   "docs/GAME_API.md:2667",
+   "docs/GAME_API.md:3150",
+   "re/out/offsets.json:60"
+  ]
+ },
+ {
+  "address": "0x00869a78",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1099",
+   "docs/GAME_API.md:1105",
+   "docs/SUSPICION.md:94",
+   "docs/SUSPICION.md:179"
+  ]
+ },
+ {
+  "address": "0x00869a88",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1099",
+   "docs/GAME_API.md:1106",
+   "docs/JOURNAL.md:640",
+   "docs/JOURNAL.md:894",
+   "docs/SUSPICION.md:94",
+   "docs/SUSPICION.md:179"
+  ]
+ },
+ {
+  "address": "0x00869aa8",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1144",
+   "docs/GAME_API.md:2932",
+   "docs/GAME_API.md:2936",
+   "docs/JOURNAL.md:896",
+   "docs/JOURNAL.md:923",
+   "docs/JOURNAL.md:981",
+   "docs/JOURNAL.md:984",
+   "docs/SUSPICION.md:177",
+   "ROADMAP.md:351"
+  ]
+ },
+ {
+  "address": "0x00869ab0",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:352",
+   "docs/GAME_API.md:2664",
+   "re/out/offsets.json:36"
+  ]
+ },
+ {
+  "address": "0x00869ab4",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:353",
+   "docs/GAME_API.md:450",
+   "docs/GAME_API.md:452",
+   "docs/GAME_API.md:457",
+   "docs/GAME_API.md:2657",
+   "docs/GAME_API.md:2663",
+   "docs/GAME_API.md:2784",
+   "docs/GAME_API.md:2805",
+   "docs/GAME_API.md:2807",
+   "docs/GAME_API.md:2834",
+   "docs/GAME_API.md:2837",
+   "docs/JOURNAL.md:688",
+   "re/out/offsets.json:40",
+   "ROADMAP.md:280"
+  ]
+ },
+ {
+  "address": "0x00869ab8",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:458"
+  ]
+ },
+ {
+  "address": "0x00869abc",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:459"
+  ]
+ },
+ {
+  "address": "0x00869ac0",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:460"
+  ]
+ },
+ {
+  "address": "0x00869ac4",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:461"
+  ]
+ },
+ {
+  "address": "0x00869ac8",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:462"
+  ]
+ },
+ {
+  "address": "0x00869acc",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:453",
+   "docs/GAME_API.md:463"
+  ]
+ },
+ {
+  "address": "0x00869ad0",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:467"
+  ]
+ },
+ {
+  "address": "0x00869b1a",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:354",
+   "re/out/offsets.json:45"
+  ]
+ },
+ {
+  "address": "0x00869b20",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/JOURNAL.md:689"
+  ]
+ },
+ {
+  "address": "0x00869b26",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/JOURNAL.md:276",
+   "docs/JOURNAL.md:326"
+  ]
+ },
+ {
+  "address": "0x00869b27",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/CREW_AND_OFFICERS.md:38",
+   "docs/GAME_API.md:355",
+   "docs/GAME_API.md:2665",
+   "docs/GAME_API.md:2670",
+   "docs/GAME_API.md:2676",
+   "docs/GAME_API.md:3150",
+   "re/out/offsets.json:50",
+   "ROADMAP.md:445"
+  ]
+ },
+ {
+  "address": "0x00869b34",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/CREW_AND_OFFICERS.md:332",
+   "docs/GAME_API.md:356",
+   "docs/GAME_API.md:2668",
+   "re/out/offsets.json:55"
+  ]
+ },
+ {
+  "address": "0x00869b48",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/ARCHITECTURE_REVIEW.md:567",
+   "docs/ARCHITECTURE_REVIEW.md:619",
+   "docs/ARCHITECTURE_REVIEW.md:629",
+   "docs/DEVELOPER.md:134",
+   "docs/GAME_API.md:210",
+   "docs/GAME_API.md:260",
+   "docs/GAME_API.md:263",
+   "docs/GAME_API.md:665",
+   "docs/GAME_API.md:801",
+   "docs/GAME_API.md:828",
+   "docs/GAME_API.md:828",
+   "docs/GAME_API.md:2101",
+   "docs/GAME_API.md:2132",
+   "docs/GAME_API.md:2679",
+   "docs/SUSPICION.md:330"
+  ]
+ },
+ {
+  "address": "0x0086bb60",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/WIDESCREEN.md:261"
+  ]
+ },
+ {
+  "address": "0x0086bcf0",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/WIDESCREEN.md:260"
+  ]
+ },
+ {
+  "address": "0x0086be80",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/WIDESCREEN.md:260"
+  ]
+ },
+ {
+  "address": "0x0086c010",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/WIDESCREEN.md:260"
+  ]
+ },
+ {
+  "address": "0x0086c1a0",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/WIDESCREEN.md:260"
+  ]
+ },
+ {
+  "address": "0x0086c330",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/JOURNAL.md:751",
+   "docs/WIDESCREEN.md:259"
+  ]
+ },
+ {
+  "address": "0x0086c33c",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/WIDESCREEN.md:268"
+  ]
+ },
+ {
+  "address": "0x0086c340",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/WIDESCREEN.md:268"
+  ]
+ },
+ {
+  "address": "0x00876be0",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2918",
+   "docs/JOURNAL.md:966"
+  ]
+ },
+ {
+  "address": "0x00876bf8",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2052",
+   "docs/GAME_API.md:2101",
+   "docs/GAME_API.md:2127",
+   "docs/GAME_API.md:3133",
+   "re/out/offsets.json:125"
+  ]
+ },
+ {
+  "address": "0x00876cf8",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2068",
+   "docs/GAME_API.md:3134",
+   "re/out/offsets.json:127"
+  ]
+ },
+ {
+  "address": "0x008b96b0",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1526",
+   "docs/GAME_API.md:1557",
+   "docs/JOURNAL.md:535"
+  ]
+ },
+ {
+  "address": "0x008b96b4",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1301",
+   "docs/GAME_API.md:1526",
+   "docs/GAME_API.md:1557",
+   "docs/JOURNAL.md:535"
+  ]
+ },
+ {
+  "address": "0x008b98d4",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:3296",
+   "docs/GAME_API.md:3344",
+   "docs/GAME_API.md:3370",
+   "docs/GAME_API.md:3426",
+   "docs/JOURNAL.md:349"
+  ]
+ },
+ {
+  "address": "0x008b98d8",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:834",
+   "docs/GAME_API.md:834"
+  ]
+ },
+ {
+  "address": "0x008b98e4",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1232",
+   "docs/GAME_API.md:1305",
+   "docs/GAME_API.md:1354",
+   "re/out/offsets.json:274",
+   "re/out/offsets.json:281",
+   "re/out/offsets.json:338"
+  ]
+ },
+ {
+  "address": "0x008b98f0",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1233",
+   "docs/GAME_API.md:1304",
+   "docs/GAME_API.md:1354",
+   "docs/GAME_API.md:1472",
+   "docs/JOURNAL.md:298",
+   "re/out/offsets.json:274",
+   "re/out/offsets.json:285",
+   "re/out/offsets.json:337"
+  ]
+ },
+ {
+  "address": "0x008b996c",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1299",
+   "docs/GAME_API.md:1306",
+   "docs/GAME_API.md:1311",
+   "re/out/offsets.json:321"
+  ]
+ },
+ {
+  "address": "0x008b99d8",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2899",
+   "docs/JOURNAL.md:812"
+  ]
+ },
+ {
+  "address": "0x008ba668",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2900",
+   "docs/JOURNAL.md:817"
+  ]
+ },
+ {
+  "address": "0x008ba670",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2906"
+  ]
+ },
+ {
+  "address": "0x008bc468",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1959",
+   "docs/GAME_API.md:3050",
+   "docs/GAME_API.md:3061"
+  ]
+ },
+ {
+  "address": "0x008bc474",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:3050",
+   "docs/GAME_API.md:3061"
+  ]
+ },
+ {
+  "address": "0x008bc4b0",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1996"
+  ]
+ },
+ {
+  "address": "0x008bd708",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1974"
+  ]
+ },
+ {
+  "address": "0x008bd70c",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1975"
+  ]
+ },
+ {
+  "address": "0x008bd710",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1975"
+  ]
+ },
+ {
+  "address": "0x008c8494",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2902",
+   "docs/JOURNAL.md:822"
+  ]
+ },
+ {
+  "address": "0x008c9560",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:970"
+  ]
+ },
+ {
+  "address": "0x008c9564",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:971"
+  ]
+ },
+ {
+  "address": "0x008c9dd8",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:855"
+  ]
+ },
+ {
+  "address": "0x008ca9e8",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2053",
+   "docs/GAME_API.md:2055",
+   "docs/GAME_API.md:2059",
+   "docs/GAME_API.md:2063",
+   "docs/GAME_API.md:2116",
+   "docs/GAME_API.md:2128",
+   "docs/GAME_API.md:3133",
+   "re/out/offsets.json:130"
+  ]
+ },
+ {
+  "address": "0x008cab70",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2902",
+   "docs/JOURNAL.md:821"
+  ]
+ },
+ {
+  "address": "0x008cab88",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2902",
+   "docs/JOURNAL.md:821"
+  ]
+ },
+ {
+  "address": "0x008cabf0",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/JOURNAL.md:200"
+  ]
+ },
+ {
+  "address": "0x008cac18",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/JOURNAL.md:119",
+   "docs/JOURNAL.md:628"
+  ]
+ },
+ {
+  "address": "0x008cac1c",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/JOURNAL.md:119",
+   "docs/JOURNAL.md:628"
+  ]
+ },
+ {
+  "address": "0x008cac44",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2476"
+  ]
+ },
+ {
+  "address": "0x008cacd0",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/DEVELOPER.md:455",
+   "docs/GAME_API.md:261"
+  ]
+ },
+ {
+  "address": "0x008cad04",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:220"
+  ]
+ },
+ {
+  "address": "0x008cc498",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1186",
+   "docs/GAME_API.md:2965",
+   "docs/GAME_API.md:2988",
+   "re/out/offsets.json:245",
+   "ROADMAP.md:157"
+  ]
+ },
+ {
+  "address": "0x008ccb58",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:1187",
+   "docs/GAME_API.md:2964",
+   "re/out/offsets.json:240",
+   "ROADMAP.md:156"
+  ]
+ },
+ {
+  "address": "0x008dbd08",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:139"
+  ]
+ },
+ {
+  "address": "0x008dc30c",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/JOURNAL.md:756",
+   "docs/WIDESCREEN.md:267"
+  ]
+ },
+ {
+  "address": "0x008dc310",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/JOURNAL.md:756",
+   "docs/WIDESCREEN.md:267"
+  ]
+ },
+ {
+  "address": "0x008dc920",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:571",
+   "docs/GAME_API.md:573"
+  ]
+ },
+ {
+  "address": "0x008dc924",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:574"
+  ]
+ },
+ {
+  "address": "0x008e66b4",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2904",
+   "docs/JOURNAL.md:998"
+  ]
+ },
+ {
+  "address": "0x008e8fb0",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:988"
+  ]
+ },
+ {
+  "address": "0x008e8fb4",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:989",
+   "docs/GAME_API.md:993",
+   "ROADMAP.md:321"
+  ]
+ },
+ {
+  "address": "0x008e8fb8",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:990"
+  ]
+ },
+ {
+  "address": "0x008e8fbc",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:991"
+  ]
+ },
+ {
+  "address": "0x008e9f58",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:210",
+   "docs/GAME_API.md:238",
+   "docs/GAME_API.md:259",
+   "docs/GAME_API.md:2463",
+   "re/out/offsets.json:14",
+   "re/out/offsets.json:31"
+  ]
+ },
+ {
+  "address": "0x008e9fd8",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/JOURNAL.md:85"
+  ]
+ },
+ {
+  "address": "0x008e9fe0",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/JOURNAL.md:109",
+   "docs/JOURNAL.md:492",
+   "docs/JOURNAL.md:527",
+   "docs/JOURNAL.md:654"
+  ]
+ },
+ {
+  "address": "0x008ea08c",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/JOURNAL.md:91"
+  ]
+ },
+ {
+  "address": "0x008ecd78",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:868",
+   "docs/GAME_API.md:2146",
+   "docs/GAME_API.md:2198"
+  ]
+ },
+ {
+  "address": "0x008ed4a0",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "docs/GAME_API.md:2199",
+   "docs/GAME_API.md:2210",
+   "docs/GAME_API.md:3140"
+  ]
+ }
+]

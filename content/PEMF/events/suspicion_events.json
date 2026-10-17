@@ -1,0 +1,47 @@
+{
+  "_comment": [
+    "PEMF -- false colours: the challenge.",
+    "",
+    "field 'suspicion' is how far the flag you are wearing has been seen",
+    "through, 0..100 (0 under your true colours). At 100 you are unmasked:",
+    "reputation drops and, if they no longer tolerate you, hunters sail.",
+    "This card comes first, at the threshChallenge rung of suspicion.ini.",
+    "",
+    "Effects for false colours:",
+    "  holdRuse      value = base chance in percent. A discreet officer",
+    "                improves it, a loose tongue spoils it. Carried off, the",
+    "                meter drops below the first rung. Failed, you are unmasked.",
+    "  strikeColours value = reputation it costs (0 = none). The false flag",
+    "                comes down and the matter ends. No hunter is sent for it.",
+    "  run           keep the flag and crowd on sail. Out of sight, suspicion",
+    "                cools at the fast rate at once. Reach 100 and you are",
+    "                unmasked all the same.",
+    "",
+    "Delete this file and the ladder says 'She's coming about' instead."
+  ],
+
+  "events": [
+    {
+      "id": "suspicion_challenge",
+      "trigger": { "type": "stateCrosses", "field": "suspicion", "above": 89, "cooldown": 90 },
+      "body": "A ship has come about and is standing toward you, signal flags snapping at her yard. She is asking who you are, and she does not sound inclined to take your word for it.",
+      "options": [
+        {
+          "text": "Hold the ruse. Answer her signal and keep the gunports shut.",
+          "effects": [ { "op": "holdRuse", "value": 50 } ],
+          "outcome": "You run up the reply as cool as you like, and wait to see whether she believes it."
+        },
+        {
+          "text": "Strike the false colours before she makes us.",
+          "effects": [ { "op": "strikeColours", "value": 0 } ],
+          "outcome": "Down comes the borrowed flag and up go your own. Her captain makes a note of you. That is all, this time."
+        },
+        {
+          "text": "Crowd on sail and run for it.",
+          "effects": [ { "op": "run", "value": 0 } ],
+          "outcome": "Every scrap of canvas goes up. Get out of her sight, and the story goes no further."
+        }
+      ]
+    }
+  ]
+}

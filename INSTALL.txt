@@ -55,8 +55,19 @@ capitals on the third line - see below.
 CHECKING IT WORKED
 ------------------
 
-A file called pemf.log appears in the game folder the first time you run it.
-Open it. The first lines tell you:
+Two log files appear in the game folder the first time you run it, and which of
+them turns up is the fastest way to tell what happened:
+
+    pemf_proxy.log    written by version.dll, the moment Windows loads it
+    pemf.log          written by pemf_core.dll, once PEMF is up
+
+Both there, and PEMF is running. Only the first, and Windows loaded the mod but
+something refused the core - the last line of pemf_proxy.log carries the error
+number. NEITHER there, and version.dll was never loaded at all: the game did not
+read the files you installed, and nothing of ours has run yet. That last case is
+almost always the wrong folder - see docs/TROUBLESHOOTING.md.
+
+Open pemf.log. The first lines tell you:
 
     - which version of PEMF is running, and when it was built
     - whether version.dll and pemf_core.dll are the same version
@@ -170,8 +181,12 @@ writing anything.
 REPORTING A PROBLEM
 -------------------
 
-Send pemf.log along with a sentence about what you were doing. The log is
-where everything useful is.
+Send pemf.log and pemf_proxy.log along with a sentence about what you were
+doing. The logs are where everything useful is.
+
+If neither file exists, say so - that is not a missing detail, it is the single
+most useful thing you can tell us, and it points at a completely different
+cause than a log full of errors does.
 
 
 BOTH STORE VERSIONS ARE SUPPORTED
@@ -183,6 +198,27 @@ uses at runtime.
 
 The Challenge Pack executable is a DIFFERENT build of the game and is not
 supported. PEMF detects it and disables itself rather than risk your save.
+
+
+LINUX, PROTON AND THE STEAM DECK
+--------------------------------
+
+Not tested by us, but one tester's report has been acted on and there are two
+things you need to know.
+
+Wine provides its own version.dll and prefers it over ours, so nothing of PEMF
+loads and NO log file is written at all. Fix that in Steam with
+right-click -> Properties -> Launch Options:
+
+    WINEDLLOVERRIDES="version=n,b" %command%
+
+Keep %command% on the end. Start the game, quit, and check for pemf_proxy.log
+in the game folder.
+
+Second: releases up to and including 0.2.6 were zipped in a way that Linux
+unpacks as files literally named "PEMF\events\core_events.json" rather than as
+folders. That is fixed from this release on. If you are on an older one, see
+docs/TROUBLESHOOTING.md for a one-line command that repairs the tree.
 
 
 PEMF is free to use and redistribute.

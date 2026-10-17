@@ -2,7 +2,9 @@
 
 A modding framework for **Sid Meier's Pirates! (2004)**, built as a DLL that runs
 inside the game. Narrative events authored in JSON, with real choices and real
-consequences — and, in time, named officers and a crew with opinions.
+consequences; false colours you can be hunted for; weather worth steering around;
+named officers with talents and flaws, and a crew whose temper follows what you
+do to them.
 
 The game executable is never modified.
 
@@ -18,18 +20,22 @@ The game executable is never modified.
 | **[DEVELOPER.md](DEVELOPER.md)** | Developers | Architecture, build, RE workflow, conventions, roadmap, lessons |
 | **[GAME_API.md](GAME_API.md)** | Developers | Reverse-engineered engine reference: functions, addresses, conventions |
 | **[WINDOWS_SECURITY.md](WINDOWS_SECURITY.md)** | Players | Defender flagged the download, or the game won't start: which one you're looking at, published hashes, and what we've ruled out |
-| **[CREW_AND_OFFICERS.md](CREW_AND_OFFICERS.md)** | Developers | The plan for expanded morale and named officers: what the engine gives us, how our morale reaches the game, and what is still unknown |
+| **[TROUBLESHOOTING.md](TROUBLESHOOTING.md)** | Players | PEMF does not seem to be running at all: what the two logs tell you, the checks in order, and the two causes people reach for that aren't it |
+| **[CREW_AND_OFFICERS.md](CREW_AND_OFFICERS.md)** | Developers | Named officers and PEMF's own morale: what the engine gives us, how our morale reaches the game, what a skill can actually touch, and what is still to build |
 | **[SUSPICION.md](SUSPICION.md)** | Developers | False colours: what raises suspicion, what being unmasked costs, tuning, and the faults playing it exposed |
 | **[ASSETS.md](ASSETS.md)** | Modders | `.FPK` archives, byte-exact round-tripping, and which files the game will read loose from disk (it varies per subsystem — probe, don't assume) |
 | **[WIDESCREEN.md](WIDESCREEN.md)** | Developers | The 16:9 work: why the UI is two fixed 4:3 virtual spaces rather than the real resolution |
+| **[JOURNAL.md](JOURNAL.md)** | Developers | Dated session log: what was tried, found and changed, and what is open — read the last entry first |
 | **[ARCHITECTURE_REVIEW.md](ARCHITECTURE_REVIEW.md)** | Developers | Nine passes: hazards found, fixed, and the invariants they establish |
+| **[RELEASE_NOTES_NEXT.md](RELEASE_NOTES_NEXT.md)** | Everyone | Everything since 0.2.6, not yet released: pirate start, earned flags, suspicion V2, the waterfront and market, louder battles, weather, widescreen; Steam checked statically; the text system mapped |
 | **[RELEASE_NOTES_0.2.6.md](RELEASE_NOTES_0.2.6.md)** | Everyone | Steering: `a`/`s` were loading and saving the game as well as steering, Attack moves off Space, ports get their records back |
-| **[RELEASE_NOTES_0.2.5.md](RELEASE_NOTES_0.2.5.md)** | Everyone | Alt-tab: the R6025 crash on returning to the game, and PEMF no longer burning a core while you are away |
-| **[RELEASE_NOTES_0.2.4.md](RELEASE_NOTES_0.2.4.md)** | Everyone | Officers and crew: named officers with talents and flaws, PEMF's own morale, town-menu rows, the plugin SDK, and the alt-tab crash fix |
+| **[RELEASE_NOTES_0.2.5.md](RELEASE_NOTES_0.2.5.md)** | Everyone | Alt-tab, second attempt: the R6025 crash on returning to the game, PEMF no longer burning a core while you are away, and the hard lockup that is still open |
+| **[RELEASE_NOTES_0.2.4.md](RELEASE_NOTES_0.2.4.md)** | Everyone | Officers and crew: named officers with talents and flaws, PEMF's own morale, town-menu rows, the plugin SDK, and a first attempt at the alt-tab crash |
 | **[RELEASE_NOTES_0.2.3.md](RELEASE_NOTES_0.2.3.md)** | Everyone | Launch fix: the Steam "Application corrupt." race, and mixed-install detection |
 | **[RELEASE_NOTES_0.2.2.md](RELEASE_NOTES_0.2.2.md)** | Everyone | Fixes: the profile folder that broke WASD on GOG, notice wrapping, storms clearing behind cards |
 | **[RELEASE_NOTES_0.2.1.md](RELEASE_NOTES_0.2.1.md)** | Everyone | The Weather release: storm systems, cargo losses, storm music |
 | **[RELEASE_NOTES_0.2.0.md](RELEASE_NOTES_0.2.0.md)** | Everyone | The False Flag release: what it is, how to install, how to play |
+| **[`re/experiments/steam_static_verification/`](../re/experiments/steam_static_verification/README.md)** | Developers | Every address, signature and patch site checked against the unpacked Steam executable; what differs between the Steam and GOG builds; how to re-run it |
 | **[`re/experiments/`](../re/experiments/)** | Developers | Write-ups of specific investigations — the question, the method, what the numbers said, and what was concluded (including the answers that were "no") |
 
 ---
@@ -41,22 +47,30 @@ The game executable is never modified.
 ├── Pirates!.exe           stock, untouched
 ├── version.dll            PEMF loader
 ├── pemf_core.dll          PEMF
+├── INSTALL.txt            ships in the archive, not needed by the game
 └── PEMF/
     ├── events/
     │   └── core_events.json
+    ├── officers/
+    │   └── roster.json      names, bios, traits, posts, standings, costs
     ├── audio/
     │   └── storm.mp3        the storm bed, on PEMF's own mixer
     ├── KeyMap_WASD.ini
     ├── suspicion.ini        false colours, hunters, standing
     ├── storms.ini           everything about weather
+    ├── crew.ini             the crew and officer systems
     ├── plugins/             third-party plugin DLLs go here
     ├── sdk/                 pemf_sdk.h, so a plugin can be written from the release
     └── docs/                player manual, event authoring, plugins, security
 ```
 
-The two `.ini` files are **never overwritten** by an install if they are already
-there — a player's balance pass survives an update. Everything else is ours and
-is replaced.
+The tuning `.ini` files are replaced by an install only if the player never
+edited them (a copy of each as installed is kept in `PEMF\defaults` to tell);
+an edited one is kept and the new one is put beside it as `<name>.ini.new` — a
+player's balance pass survives an update, and an untouched file still gets the
+new settings. Everything else is
+ours and is replaced, `roster.json` included, so a player who has rewritten the
+officer content should keep their copy somewhere else.
 
 **Every `.json` in `PEMF\events\` is loaded.** Add-ons ship their own file and sit
 side by side; a broken one is skipped with a reason rather than taking the others
@@ -72,12 +86,13 @@ Build a release archive with `.\build.ps1 -Package`.
 PiratesMod/
 ├── build.ps1              build, install, package
 ├── INSTALL.txt            ships in the release archive
-├── content/PEMF/         authored content + suspicion.ini tuning
+├── content/PEMF/         authored content + the .ini tuning files
 ├── docs/                  you are here
 ├── dist/                  release archives
 ├── src/
 │   ├── proxy/             version.dll loader (+ gen_proxy.py)
 │   ├── core/              pemf_core.dll
+│   │   ├── log.h          the one logging entry point
 │   │   ├── game.h         raw addresses + calling shims
 │   │   ├── state.h        validated state mutation
 │   │   ├── session.h      career lifecycle, save/load, persistence
@@ -86,8 +101,21 @@ PiratesMod/
 │   │   ├── triggers.h     when events fire (world sampling)
 │   │   ├── d3d9hook.h     the device vtable hook
 │   │   ├── render.h       the render phase (where things are shown)
-│   │   ├── nations.h      relations, standing, the crown you serve
+│   │   ├── nations.h      relations, and the crown you serve
+│   │   ├── standing.h     reputation and rank, derived not stored
 │   │   ├── suspicion.h    false colours, hunters, the panel
+│   │   ├── storms.h       weather: scale, drift, cargo loss
+│   │   ├── stormaudio.h   the storm bed, and when it comes up
+│   │   ├── audiomix.h     PEMF's own mixer (Media Foundation + XAudio2)
+│   │   ├── morale.h       the engine's own crew-happiness math
+│   │   ├── crewmorale.h   PEMF's morale scale, and the solver that drives the engine
+│   │   ├── crewwatch.h    crew losses, sampled -- what a surgeon acts on
+│   │   ├── officers.h     named officers, hiring, the roster, persistence
+│   │   ├── officerfx.h    the roster's totals, as plain integers
+│   │   ├── loot.h         PEMF's share of what is plundered
+│   │   ├── townmenu.h     our own rows and menus in the game's port menu
+│   │   ├── sailkeys.h     the WASD layout, and the keys the sailing view steals
+│   │   ├── plugin.h       the plugin host: loading, the call table, fault containment
 │   │   └── core.cpp       hooks and wiring
 │   └── vendor/            nlohmann/json
 ├── sdk/
@@ -129,15 +157,14 @@ levels are used throughout the docs:
 | `CreateFileW` save path | **Built** — hook installs; no save has been observed using it |
 | Trigger layer — loads, arms, evaluates at the safe point | **Verified** |
 | `elapsedSailing` trigger firing during play | **Verified** — fired at 120 s and 300 s |
-| `nearPort` trigger firing during play | **Built** — retuned twice; thresholds vary a lot by route |
 | "Am I sailing" detection | **Verified** — heuristic, but correct across a full session |
 | Firing a JSON event — card observed on screen | **Verified** |
-| `nearPort` trigger firing during play | **Verified** — fired at distance 3000, and re-armed correctly |
+| `nearPort` trigger firing during play | **Verified** — fired at distance 3000 and re-armed correctly, after two retunings; thresholds vary a lot by route |
 | `notice` event kind — schema, validation, triggering | **Verified** |
 | Render-phase hook — the game's own D3D9 device | **Verified** — live on GOG and Steam |
 | `notice` event kind — visible on screen | **Verified** — drawn from inside the frame |
 | Notices anchored to the player's ship | **Verified** — hangs over the vessel and follows it as you sail |
-| `stateCrosses` trigger — crew / gold / morale / months | **Built** |
+| `stateCrosses` trigger — crew / gold / morale / months | **Built** — loads, arms and edge-triggers; not yet watched firing in play |
 | City tokens — `@CITYNAME` / `@NATIONALITY` / `@LOCTYPE` | **Verified** — "Land ho! Nevis off the bow!" |
 | `{placeholder}` authoring layer | **Verified** — every shipped event uses it |
 | Notices confined to the sailing view | **Verified** |
@@ -160,10 +187,30 @@ levels are used throughout the docs:
 | Denser rain | **Not found** — the available dial changes drop SIZE and wind, not count |
 | Storms that drift and persist | **Verified** — PEMF draws its own system: born to windward off screen, drifting west at the measured 350 units/sec, living as long as it likes |
 | Weather that costs cargo, with music that comes up with it | **Verified** — both read the same curve as the rain, so they agree with the clouds on screen |
+| A battle keeping the weather it began in | **Built** — the storm prefab is swapped into the battle's cloud draw and the system is frozen while off the overworld |
+| Rain inside a battle | **Built, and off by default** — it draws heavy, static and across only part of the screen, which does not read as weather |
 | A true fade on a storm | **Ruled out** — no opacity argument exists on the draw; scale is size, and ramping it inflates or shrinks |
 | More than 3 weather slots | **Ruled out** — the position arrays hold exactly 3; a 4th writes off the end |
-| Playing a named game sound with an event | **Verified** |
-| Officer simulation | Not started |
+| Playing a named game sound with a card | **Verified** — the dialog's own cue, named to the engine's routine. An author cannot name one: there is no `sound` field in the event schema |
+| PEMF's own audio mixer — decode once, loop with real gain | **Verified** — it is what the storm bed runs on |
+| Calling the game's own sound routines | **Not started** — the play-by-id routine and the positional one are both located and documented; PEMF calls neither |
+| Named officers — six posts, three standings, hiring against a roll | **Verified** — shipped in 0.2.4 and played |
+| Officer traits and flaws changing real outcomes | **Verified** — plunder, storm cargo, suspicion rate and the crew's temper all read the roster's totals |
+| Men a surgeon puts back | **Built** — crew losses are sampled the same way loot is; the saving has not been watched happen |
+| The roster — a card per officer, spoken to or examined | **Verified** |
+| Officers and morale travelling in the save sidecar | **Verified** — written as authored ids, so an edited `roster.json` does not rewrite who is aboard |
+| PEMF's own crew morale — seven tiers, −100…100 | **Verified** — moves on the plunder divided, men lost, months at sea, and the officers kept |
+| Driving the engine's morale by solving its formula backwards | **Verified** — and honest where it cannot: an unreachable level is logged as expected |
+| PEMF's share of what is plundered | **Verified** — 660 plundered became 990 at +50%, through the validated layer |
+| Our own rows in the game's own town menu | **Verified** — placed above the row that leaves, so every stock option keeps its position |
+| Authored menus, nested, drawn against the port | **Verified** |
+| The plugin ABI — loading, the call table, fault containment | **Built** — nothing in the repository exercises it, so it has not been observed carrying a real plugin |
+| WASD steering, installed into the player's own keymap | **Verified** — and the folder it chose is named in the log |
+| The two keys the sailing view reads past `KeyMap.ini` | **Verified** — `a`/`s` steered and also loaded and saved until 0.2.6 |
+| Surviving a quick alt-tab | **Open** — alt-tabbing back before Windows has finished restoring the desktop resolution can lock the game on a black screen. Ours, not the game's; windowed play avoids it entirely |
+| Widescreen — a true 16:9 UI | Not started — the frustum mapping and the mouse mistake are worked out in [`WIDESCREEN.md`](WIDESCREEN.md), and none of the four stages is built |
+| Mutiny, splintering, marooning | Not started |
+| Officers with loyalties and opinions of each other | Not started |
 | Factions and divisions | Not started |
 
 ### The render hook — solved
@@ -213,8 +260,13 @@ device, so a counter reset only there never resets, and anchored text stops
 drawing after the first frame. The top of the game's own main loop runs once
 per iteration and is the reliable boundary.
 
-Stage 3 — presenting event cards from inside the frame, which fixes the
-half-drawn background behind dialogs — is the next step.
+Stage 3 — presenting event cards from inside the frame — is the next step, and
+it is about presenting them natively rather than about repairing anything. The
+half-drawn background behind a card **is already fixed**: the draw paths lacked
+an `events::Busy()` guard, and the 250 ms overworld gate went stale during a
+card's nested loop. What stage 3 still needs is a re-entrancy guard, because the
+game's dialog is modal and blocking, so presenting it from the frame hook
+re-enters `BeginScene`/`EndScene` from the dialog's own message loop.
 
 The single most important verified result: **a custom event, written by us,
 rendered natively in-game with live state substituted into it** —

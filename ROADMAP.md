@@ -13,6 +13,7 @@ Status is honest here on purpose — including the things that don't work yet.
 | Mark | Meaning |
 |------|---------|
 | ✅ | Done and verified in-game |
+| ⚙️ | Built and wired, but not yet watched working in a live game |
 | 🟡 | Partially working / needs polish |
 | 🚧 | In progress |
 | ⛔ | Blocked — needs a prerequisite solved first |
@@ -20,6 +21,26 @@ Status is honest here on purpose — including the things that don't work yet.
 | 💡 | Idea / under consideration, not committed |
 
 ---
+
+## Built 2026-10-16/17, awaiting playtest
+
+Each is written up in [`docs/JOURNAL.md`](docs/JOURNAL.md); all of them add to
+the game and replace nothing of its own.
+
+- ⚙️ **Flags are earned** — a letter of marque gives that crown's colours; the
+  tavern trader sometimes sells one (`flagtrader.h`).
+- ⚙️ **Three kinds of suspicion** — deceit, enemy colours, the black flag;
+  distance matters; the panel in the true top-right corner.
+- ⚙️ **Hostile crowns** — hunters that truly chase (the stock leash lifted for
+  PEMF's hunters only); their governor, merchant and shipwright refuse you.
+- ⚙️ **The waterfront** — bribe the harbourmaster, dockside gossip, dockhands,
+  the chandler (`waterfront.json`).
+- ⚙️ **A moving market** — shortages and gluts announced by port, a war premium
+  (`market.h`, `market.ini`).
+- ⚙️ **A louder sea battle** — more flying wreckage, a camera kick on your
+  broadside, bigger gun smoke (`combatfx.h`, `combat.ini`).
+- ⚙️ **The HUD in the screen corners** at any aspect (`hudcorners.h`).
+- 📐 **Clothing at character creation** — not started; needs its own research.
 
 ## Foundations (the plumbing)
 
@@ -80,11 +101,13 @@ These are the load-bearing pieces everything else stands on. They work.
 - ✅ **Live world values in authored text** — `{port}`, `{portNation}`,
   `{portType}` name the nearest settlement, so an event can say
   *"Land ho! Nevis off the bow!"* Verified in-game.
-- ✅ **Triggers beyond time and place** — `stateCrosses` fires when a live value
+- ⚙️ **Triggers beyond time and place** — `stateCrosses` fires when a live value
   crosses a threshold: crew, gold, morale or months at sea. Edge-triggered, so
   it fires on crossing and re-arms on crossing back, rather than repeating while
   a value sits past the line. One shape covers every readable value, so adding
-  the next one is a line of code rather than a new concept for authors.
+  the next one is a line of code rather than a new concept for authors. Built and
+  loading; **not yet watched firing in play**, which is the only thing keeping it
+  off the list above.
 
 ## Audio
 
@@ -146,6 +169,14 @@ Shipped in 0.2.1 and refined in 0.2.2. Tunable throughout from
 - ✅ **A storm you can hear** — a music bed with real fades, on PEMF's own mixer,
   ducking the game's music. See Audio above for why it is our mixer and not the
   game's.
+- 🟡 **A battle keeps the weather it began in** — the sailing view's storm does not
+  follow you into a fight, so PEMF swaps the storm prefab into the battle's own
+  cloud draw and freezes the system while you are off the overworld. You come back
+  out into the same weather you left. On by default (`battleWeather`). 🟡 for the
+  half that does not work: the battle's own **rain** draws heavy, static, and
+  across only part of the screen, so `battleIntensity` is **off by default** and
+  left in the ini to experiment with. It is the cloud that reads as weather here,
+  not the rain.
 - ⛔ **Three weather slots is a hard ceiling.** The loop at `0x0046354A` indexes
   two parallel position arrays that are **twelve bytes apart** — exactly three
   dwords. A count of four writes the x array into the y array. This knob looks
@@ -153,6 +184,56 @@ Shipped in 0.2.1 and refined in 0.2.2. Tunable throughout from
   we go", so it is clamped.
 - 💡 **Weather that changes how the sea behaves** — waves, handling, visibility.
   Not located, and possibly not there to find.
+
+- 🚧 **One storm, seen and felt** — the game's own storm rules (found
+  2026-10-16: storms push the ship along, damage the fleet in their core, and
+  drive the HUD's knots) now measure from the storm PEMF draws, instead of an
+  invisible one elsewhere. Built; awaiting a playtest.
+- 🚧 **Dynamic wind** — the trade wind still prevails, but it backs and veers,
+  and fronts swing it right round. Storms make up to windward and drift
+  downwind from any quarter, and every ship's sailing speed follows the same
+  wind. Sea battles keep the game's own. Built; awaiting a playtest.
+- 🚧 **Storm events** — `stateCrosses` on `storm` (0–3) and `wind` (knots);
+  four starter events in `storm_events.json`, including a man overboard.
+
+## Display & resolution
+
+Full write-up in [`docs/WIDESCREEN.md`](docs/WIDESCREEN.md); session record in
+[`docs/JOURNAL.md`](docs/JOURNAL.md).
+
+- ✅ **Every resolution in Options** — the stock list kept only 4:3 modes. PEMF
+  builds it instead: each size once, smallest to largest, at the desktop's
+  refresh rate.
+- ✅ **Widescreen without stretching** — the 3D world shows more at the sides
+  (vertical view kept); the 4:3 interface stays whole and centred; painted
+  screens are scaled evenly to fill the width; cutscene letterbox, fades and
+  frame-copy effects run full width; town scenes fill the screen. Corrected at
+  the camera choke point, so shader-drawn ships no longer split as they did in
+  the first attempt. Verified in game on Steam at 1920×1080.
+- ✅ **Mouse follows the centred interface** — one correction at the window,
+  before the game reads the cursor.
+- ✅ **In-game screenshots** — Ctrl+Shift+X (or `autoShots`) saves the finished
+  frame to `PEMF\shots`, for bug reports from a game that minimises on every
+  outside capture tool.
+- 📐 **HUD at the screen corners** — the Fame dial and key pad sit at the 4:3
+  edges; moving them means moving their click areas with them.
+- 💡 **Upscaling** — MSAA and anisotropic filtering at the device; higher-
+  resolution textures are an asset question.
+
+## Controls
+
+- ✅ **A WASD layout, installed for you** — written into the player's real
+  `KeyMap.ini` under `My Games` once, with the original kept beside it as
+  `.pemf-backup`, and never touched again, so anything rebound afterwards stays
+  put. If the file cannot be backed up it is not replaced. The folder name
+  differs between the GOG and Steam installs, which is why the one PEMF chose is
+  named in the log rather than assumed.
+- ✅ **The keys the sailing view reads past the keymap** — `a` and `s` were
+  steering *and* loading and saving, because the sailing view reads those two
+  straight from the keyboard rather than from `KeyMap.ini`, so rebinding them in
+  the file never had any effect. Steering left would load the last save. They now
+  steer and nothing else. Attack moved off Space for the same class of reason:
+  Space is the game's own "enter the nearest port".
 
 ## Standing
 
@@ -255,11 +336,15 @@ Findings in [`re/experiments/flags/`](re/experiments/flags/README.md).
   [`re/experiments/career_state/`](re/experiments/career_state/README.md).
 - 📐 **Your captain's own colours** — a flag chosen per captain at career start,
   rather than inherited from the one global setting every captain shares.
-- ✅ **Suspicion** — BUILT and playing. Rises on being observed, falls in open water, per-nation with a memory of where it was earned. Being unmasked drops reputation, strikes your colours and dispatches hunters whose strength and number scale with how badly that crown wants you. Tunable in `PEMF\suspicion.ini`. See [`docs/SUSPICION.md`](docs/SUSPICION.md).
-- 📐 *(original design note)* the system that gives a false flag stakes: rising with
-  proximity to warships and ports, with time spent under false colours, and with
-  infamy; falling with distance and time. Thresholds drive hails, challenges and
-  being unmasked. Without it a disguise is a cheat rather than a gamble.
+- ✅ **Suspicion** — what gives a false flag stakes, and it is playing. It rises
+  while that crown's ships and ports can **see** you and falls in open water,
+  per-nation and with a memory of *where* it was earned, so running for the far
+  side of the map cools it faster than waiting does. Thresholds drive the signal
+  for your colours, the study of your rigging, and finally being unmasked — which
+  drops your reputation with that crown, strikes your colours, and dispatches
+  hunters whose strength and number scale with how badly they already want you.
+  Tunable throughout from `PEMF\suspicion.ini`. See
+  [`docs/SUSPICION.md`](docs/SUSPICION.md).
 - 💡 **Custom nation art at runtime** — retexture the five nation flag nodes in
   memory instead of replacing files. Additive, reversible, and immune to the
   "pink flags" trap that catches people who install a partial flag pack.
@@ -283,10 +368,14 @@ Findings in [`re/experiments/flags/`](re/experiments/flags/README.md).
   *game* reacts when a crown decides you are a problem — it dispatches a ship
   rather than flagging one. See
   [`re/experiments/shipyard/`](re/experiments/shipyard/README.md).
-- 📐 **A hunter that chases rather than travels.** A spawned ship sails to a
-  *place*; pointing it past the player reads as pursuit, but true target-chasing
-  has not been found. Re-aiming the destination as the player moves is the
-  fallback.
+- ⚙️ **A hunter that truly chases** — built 2026-10-16, awaiting playtest. The
+  decompiled sailing update shows pirate-hunters (purpose 1) already steer for
+  the player every tick; what made them give up was a leash to their home port.
+  PEMF lifts it for its own hunters only (one redirected call) and ends hunts on
+  its own terms. The earlier "aim beyond the player" re-aim is gone. See
+  [`docs/SUSPICION.md`](docs/SUSPICION.md#how-a-hunt-actually-works).
+- ⚙️ **The challenge card** at suspicion 90 — hold the ruse, strike your
+  colours, or run. Built 2026-10-16 as a content event, awaiting playtest.
 - 📐 **Starting on your faction's colours.** A custom flag in `Config.ini`
   overrides the faction flag on every career — that is the game's own behaviour,
   not a PEMF effect. Now unblocked: the chosen nation can be read directly.
@@ -308,30 +397,84 @@ true rather than aspirational.
 - ✅ **Menus of our own, authored as a tree** — a title, options, and each
   option opens another menu, fires an event, or ends on a card. Drawn with the
   engine's own renderer against the port you are standing in.
-- ✅ **A plugin ABI for code mods** — a 32-bit DLL in `PEMF\plugins\` exporting
+- ⚙️ **A plugin ABI for code mods** — a 32-bit DLL in `PEMF\plugins\` exporting
   `PemfPluginInit`, handed a table of function pointers. A **C ABI**, so a
   plugin built with another compiler keeps working and a PEMF rebuild does not
   break every plugin in the wild. Faults are contained: a plugin that crashes
   is disabled for the session with its name in the log and the game carries on.
   One header, `sdk/pemf_sdk.h`, which ships inside the release.
-  See [`docs/PLUGINS.md`](docs/PLUGINS.md).
+  See [`docs/PLUGINS.md`](docs/PLUGINS.md). Short of ✅ for one reason: the host
+  and the SDK both ship, but **no plugin exists yet**, so nothing has been
+  observed loading through it in a live game.
 - 📐 **Plugin hooks beyond menu rows** — per-frame, on entering a port, on a
   battle ending. Menu rows are the only entry point today; the ABI is built to
   grow.
 - 📐 **Plugin persistence** — PEMF's own state travels in a sidecar beside each
   save; a plugin has nowhere to put anything yet.
 
-## Crew & morale
+## Crew & officers
+
+Shipped in 0.2.4. Tunable from `PEMF\crew.ini`, and all the content — names,
+histories, traits, posts, standings, costs — is authored in
+`PEMF\officers\roster.json`. The design and the measurements behind it are in
+[`docs/CREW_AND_OFFICERS.md`](docs/CREW_AND_OFFICERS.md).
 
 - ✅ **Morale model understood** — the game's own crew-happiness math is mapped
-  and readable, so events can react to a genuinely unhappy crew.
-- 📐 **Named officers** — limited roster slots, each a persistent character with
-  identity, history, needs, wants, and opinions. The headline feature after the
-  engine is solid. Not built yet.
-- 📐 **Crew as a living resource** — the rank-and-file as a body with morale,
-  needs, and opinions that generate events rather than just a number.
+  and readable, so events can react to a genuinely unhappy crew. There is no
+  morale *variable*: `GetMoraleLevel` derives a 0–4 level on every call from the
+  crew's share against what they expect.
+- ✅ **Named officers** — six posts, three standings, and a card for the man who
+  turns up: his name, his history, one to three talents, and possibly a flaw.
+  **Paying buys the search, not the officer** — the gold sends the crew ashore to
+  ask after somebody, and whether anyone is found is a roll. An interactive
+  roster where each man can be spoken to or examined, and every officer travels
+  in the save sidecar, written as authored ids so an edited `roster.json` does
+  not silently turn him into a different man.
+- ✅ **Officer talents that change the real game** — a trait names a `target`,
+  and PEMF only offers targets it can actually deliver: what is plundered, the
+  crew's temper, cargo saved in a blow, how long false colours hold, and how
+  many of the wounded live. A trait naming anything else is **refused at load
+  with the supported list**, because a framework that silently accepts a target
+  it cannot honour teaches authors to distrust the whole schema. Flaws are the
+  same mechanism with a negative value.
+- ✅ **PEMF's own crew morale** — a signed −100…100 scale with seven tiers of its
+  own, because the engine's five have no negative, no resolution, and names that
+  live in `text.ini` where they cannot be extended. It moves on the plunder being
+  divided, men going over the side, months at sea, and the officers kept, and it
+  moves **slowly**, so it reads as a voyage rather than a bar that twitches.
+- ✅ **Our morale drives the engine's** — one byte at `0x00869B27` has exactly one
+  cross reference and no engine writer, so PEMF **solves the engine's own formula
+  backwards** for the value that produces the level it wants. The HUD icon and
+  the engine's own desertion behaviour then follow our number. Measured, and the
+  measurement shaped the code: the byte reaches every level but in only about
+  four usable notches, and some levels are unreachable at some wealths — so the
+  solver searches, keeps the byte it has when an alternative is only equally
+  good, and logs a mismatch as expected rather than letting it read as a bug.
+- ✅ **PEMF's share of the plunder** — `0x00861FF8` is a running total that rises
+  when plunder is *earned* and never when it is *spent*, so a share is applied by
+  watching it move rather than by hooking any award site. That covers combat,
+  sacking a town and digging up treasure at once, with no `.text` write.
+  Measured: 660 plundered became 990 at +50%. Off by default.
+- ⚙️ **Men a surgeon puts back** — crew losses are sampled the same way, and a
+  fall in the crew count is read as men lost. Built and wired, but the saving has
+  not been watched happen in a live game. The known cost of sampling is that PEMF
+  cannot tell *why* men were lost, so a surgeon saves them from disease and from
+  a cutlass alike.
+- 📐 **Officers with opinions** — an officer today has a name, a history, a
+  tenure and his talents. He has no view of the other five and no loyalty of his
+  own that can be lost. Relationships were always the second half of "named
+  officers" and none of it is built.
+- 📐 **Paying an officer off** — one post holds one man, and the refusal to hire a
+  second tells the player to pay the first off. There is no row that does it yet.
+- 📐 **Crew as a living resource** — the rank-and-file have a temper now, but it
+  rarely says anything of its own. `stateCrosses` can fire an event on morale
+  crossing a line, which is the hook; the authored content that grows events out
+  of crew state is missing.
 - 📐 **Mutiny & splintering** — unhappy crews break off; outcomes like being
-  marooned at the next port with your ship stolen, or worse. Designed, not built.
+  marooned at the next port with your ship stolen, or worse. PEMF's scale already
+  reaches MUTINOUS and the engine's own desertion follows our byte, so an
+  unhappy crew thins out — but nothing takes the ship off the player. Designed,
+  not built.
 
 ---
 
@@ -413,16 +556,27 @@ Rough order, subject to change:
    paths lacked an `events::Busy()` guard, and the 250ms overworld gate went
    stale during a card's nested loop, which was the leak. Stage 3 is now about
    presenting cards natively, not about repairing a visible artifact.
-2. **Crew, named officers, and relationships** — the headline feature, and the
-   current focus. Data model first. See *Crew & morale* above.
-3. **Labels on world objects** — the world-text facility takes any map
+2. **What the crew system is missing, in the order that makes each one worth
+   having.** Officers and morale shipped in 0.2.4, so this is no longer "build
+   the data model" — it is finishing what the data model made possible. Mutiny
+   first: PEMF's scale already reaches MUTINOUS and nothing happens when it gets
+   there, which is the largest gap between what the number says and what the
+   player feels. Then paying an officer off, so a post is not filled for the
+   career. Then officers who have opinions of each other, which is the half of
+   "named officers" that was never built. See *Crew & officers* above.
+3. **Authored content that uses what now exists.** The engine grew faster than
+   the content did: `stateCrosses` can fire on a souring crew, town-menu rows and
+   nested menus take authored JSON, and almost nothing ships that uses either.
+   This is writing rather than research, and it is what turns the systems into
+   something a player meets.
+4. **Labels on world objects** — the world-text facility takes any map
    position, not just the player's ship, so ports, rivals and waypoints can all
    carry our own text.
-4. **Audio: custom clips and callouts** — a one-shot path on our existing mixer,
+5. **Audio: custom clips and callouts** — a one-shot path on our existing mixer,
    a `sound` field in the event schema, and a voice line at the ship's position
    paired with the notice above it. Deliberately parked; the mixer already
    works, so this is plumbing rather than research whenever we want it.
-5. **Version detection** — broaden support beyond GOG and Steam.
+6. **Version detection** — broaden support beyond GOG and Steam.
 
 **Code signing is not on this list.** The SignPath Foundation rejected our
 application and paid certificates are out of scope, so PEMF ships unsigned and
@@ -456,7 +610,7 @@ what this stage is for.
 
 ## How this document works
 
-Items move up the list (💡 → 📐 → 🚧 → 🟡 → ✅) as they get real. When something
+Items move up the list (💡 → 📐 → 🚧 → 🟡 → ⚙️ → ✅) as they get real. When something
 ships, it moves into the "done" sections above with a note on what actually
 works. When something turns out to be a dead end, it's cut rather than left to
 rot. Treat the roadmap as the current best understanding, not a contract.

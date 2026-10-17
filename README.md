@@ -23,6 +23,30 @@ dialog routines, so they look native.
 > **Not affiliated with Firaxis Games, 2K, or Atari.** PEMF ships **no game
 > files** and modifies none on disk. You must own a legitimate copy of the game.
 
+## What's new (in development, after 0.2.6)
+
+- **Start as a pirate.** No crown to pick at the tavern: a new career begins in
+  a pirate haven, serving no one, flying the black flag.
+- **Flags are earned.** A governor's letter of marque comes with his crown's
+  flag; the tavern's trinket seller sometimes has one for sale. Press **Q** at
+  sea to choose which colours to fly.
+- **Suspicion by relationship.** The black flag makes every crown suspicious;
+  a crown's own colours with its commission make you a friend; aggression is
+  what turns suspicion into certainty. At the top, a ship trails you and backs
+  off if you stay quiet.
+- **Pirate-hunters** only from crowns that hate you, one at a time, more the
+  worse they think of you. Hostile crowns' governors, merchants and
+  shipwrights refuse you.
+- **Crew at sea (C)**, officers who unlock events, and an in-game **guide (H)**.
+- **The waterfront** in every port: bribe the harbourmaster, hear the gossip,
+  hire hands, buy stores. A **moving market** with shortages, gluts and war
+  prices. New events at sea.
+- **Louder sea battles:** more wreckage and men overboard, bigger gun smoke,
+  smoke that hangs where shot strikes, and a deck that shakes.
+- **Gentler wind** with rare sharp fronts, a **widescreen** interface with the
+  HUD in the true corners, and tuning files that update themselves unless
+  you've edited them.
+
 ## ⬇️ Download
 
 ### **[Get the latest release →](https://github.com/pemfofficial/PEMF/releases/latest)**
@@ -88,7 +112,7 @@ time into the DLL. Same code, different bytes.)
 | Path | What |
 |---|---|
 | `src/proxy/` | `version.dll` proxy — forwards every real export, loads the core |
-| `src/core/` | the framework: hooks, state, session/save, event + trigger engine |
+| `src/core/` | the framework: hooks, state, session/save, event + trigger engine, weather, suspicion, officers and crew, the town menu, the plugin host |
 | `content/` | authored content — events, menus, officers, tuning |
 | `sdk/` | `pemf_sdk.h`, the plugin ABI — ships inside the release |
 | `docs/` | player manual, event-authoring guide, developer + API notes |

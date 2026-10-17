@@ -1,0 +1,3979 @@
+[
+ {
+  "address": "0x00401400",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:448"
+  ]
+ },
+ {
+  "address": "0x00401ba6",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:438"
+  ]
+ },
+ {
+  "address": "0x00404229",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:358"
+  ]
+ },
+ {
+  "address": "0x004042e0",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:373"
+  ]
+ },
+ {
+  "address": "0x0040431d",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:373"
+  ]
+ },
+ {
+  "address": "0x00404810",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/crewmorale.h:4",
+   "src/core/game.h:140",
+   "src/core/morale.h:7"
+  ]
+ },
+ {
+  "address": "0x004051c0",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:1295"
+  ]
+ },
+ {
+  "address": "0x00409650",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/flagtrader.h:8"
+  ]
+ },
+ {
+  "address": "0x00409a94",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/flagtrader.h:14"
+  ]
+ },
+ {
+  "address": "0x00409ab0",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/flagtrader.h:15"
+  ]
+ },
+ {
+  "address": "0x00409aef",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/flagtrader.h:16",
+   "src/core/flagtrader.h:43"
+  ]
+ },
+ {
+  "address": "0x00409af7",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/flagtrader.h:17"
+  ]
+ },
+ {
+  "address": "0x00409b27",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/flagtrader.h:18"
+  ]
+ },
+ {
+  "address": "0x00409b4c",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/flagtrader.h:17"
+  ]
+ },
+ {
+  "address": "0x00409b78",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/flagtrader.h:8"
+  ]
+ },
+ {
+  "address": "0x0040c90c",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:396"
+  ]
+ },
+ {
+  "address": "0x0040c92e",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:396"
+  ]
+ },
+ {
+  "address": "0x0040c9a0",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:365"
+  ]
+ },
+ {
+  "address": "0x0040c9a7",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:366"
+  ]
+ },
+ {
+  "address": "0x0040c9aa",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:367"
+  ]
+ },
+ {
+  "address": "0x0040cab2",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:397"
+  ]
+ },
+ {
+  "address": "0x0040cb2e",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:368"
+  ]
+ },
+ {
+  "address": "0x0040d38f",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:389"
+  ]
+ },
+ {
+  "address": "0x0040d3bf",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/core.cpp:1251"
+  ]
+ },
+ {
+  "address": "0x0040d5ff",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/core.cpp:1252"
+  ]
+ },
+ {
+  "address": "0x0040d690",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:406"
+  ]
+ },
+ {
+  "address": "0x0040da19",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:418"
+  ]
+ },
+ {
+  "address": "0x0040da9a",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/core.cpp:2112"
+  ]
+ },
+ {
+  "address": "0x0040ff62",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:420"
+  ]
+ },
+ {
+  "address": "0x0041010b",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/market.h:18",
+   "src/core/market.h:39"
+  ]
+ },
+ {
+  "address": "0x00410c50",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:18",
+   "src/core/game.h:37",
+   "src/core/game.h:746",
+   "src/core/game.h:890",
+   "src/core/townmenu.h:60"
+  ]
+ },
+ {
+  "address": "0x004110b2",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/market.h:19",
+   "src/core/market.h:39"
+  ]
+ },
+ {
+  "address": "0x004118a8",
+  "region": "text",
+  "first_difference": 7,
+  "issues": [
+   "bytes differ at +7"
+  ],
+  "cited_at": [
+   "src/core/townmenu.h:36"
+  ]
+ },
+ {
+  "address": "0x0041191c",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:689"
+  ]
+ },
+ {
+  "address": "0x0041191e",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/townmenu.h:9",
+   "src/core/townmenu.h:59"
+  ]
+ },
+ {
+  "address": "0x00411925",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/townmenu.h:325"
+  ]
+ },
+ {
+  "address": "0x00411c91",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/townmenu.h:519"
+  ]
+ },
+ {
+  "address": "0x00411c96",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:679"
+  ]
+ },
+ {
+  "address": "0x00412900",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/hudcorners.h:79"
+  ]
+ },
+ {
+  "address": "0x00412f10",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:131"
+  ]
+ },
+ {
+  "address": "0x00414fc0",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:999"
+  ]
+ },
+ {
+  "address": "0x00415290",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:1027"
+  ]
+ },
+ {
+  "address": "0x004154f0",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:1028"
+  ]
+ },
+ {
+  "address": "0x00418013",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/hudcorners.h:143"
+  ]
+ },
+ {
+  "address": "0x0041a128",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/hudcorners.h:143"
+  ]
+ },
+ {
+  "address": "0x0041a144",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/hudcorners.h:143"
+  ]
+ },
+ {
+  "address": "0x0041a160",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/hudcorners.h:143"
+  ]
+ },
+ {
+  "address": "0x0041a17c",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/hudcorners.h:143"
+  ]
+ },
+ {
+  "address": "0x0041a198",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/hudcorners.h:143"
+  ]
+ },
+ {
+  "address": "0x0041a1b4",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/hudcorners.h:144"
+  ]
+ },
+ {
+  "address": "0x0041a1d0",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/hudcorners.h:144"
+  ]
+ },
+ {
+  "address": "0x004253e5",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/widescreen.h:103"
+  ]
+ },
+ {
+  "address": "0x00428570",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/market.h:38"
+  ]
+ },
+ {
+  "address": "0x00428e0d",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/market.h:20",
+   "src/core/market.h:39"
+  ]
+ },
+ {
+  "address": "0x004293d7",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:299"
+  ]
+ },
+ {
+  "address": "0x00429403",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:1538"
+  ]
+ },
+ {
+  "address": "0x0042bdbd",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/piratestart.h:7"
+  ]
+ },
+ {
+  "address": "0x0042c23f",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/hudcorners.h:54",
+   "src/core/hudcorners.h:161"
+  ]
+ },
+ {
+  "address": "0x0042c3c5",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/hudcorners.h:55",
+   "src/core/hudcorners.h:161"
+  ]
+ },
+ {
+  "address": "0x0042e1d0",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:517"
+  ]
+ },
+ {
+  "address": "0x0042e206",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:518",
+   "src/core/core.cpp:300"
+  ]
+ },
+ {
+  "address": "0x0042e20c",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/events.h:13",
+   "src/core/game.h:519"
+  ]
+ },
+ {
+  "address": "0x0042f7d0",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/flagtrader.h:15"
+  ]
+ },
+ {
+  "address": "0x00430190",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/flagtrader.h:16",
+   "src/core/flagtrader.h:44",
+   "src/core/game.h:40",
+   "src/core/game.h:2072"
+  ]
+ },
+ {
+  "address": "0x0043656e",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/hudcorners.h:144"
+  ]
+ },
+ {
+  "address": "0x004365d2",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/hudcorners.h:144"
+  ]
+ },
+ {
+  "address": "0x004365f3",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/hudcorners.h:144"
+  ]
+ },
+ {
+  "address": "0x0043a970",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:1276"
+  ]
+ },
+ {
+  "address": "0x0044e8c7",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/market.h:21",
+   "src/core/market.h:39"
+  ]
+ },
+ {
+  "address": "0x0044ef0d",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:1478"
+  ]
+ },
+ {
+  "address": "0x0044f2d9",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/piratestart.h:51"
+  ]
+ },
+ {
+  "address": "0x00451910",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/loot.h:24"
+  ]
+ },
+ {
+  "address": "0x0045337b",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/piratestart.h:51"
+  ]
+ },
+ {
+  "address": "0x0045338d",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/piratestart.h:52"
+  ]
+ },
+ {
+  "address": "0x0045b890",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/sailmaster.h:40",
+   "src/core/sailmaster.h:42",
+   "src/core/sailmaster.h:250"
+  ]
+ },
+ {
+  "address": "0x0045b8a1",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/sailmaster.h:246"
+  ]
+ },
+ {
+  "address": "0x0045e6b0",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/suspicion.h:605"
+  ]
+ },
+ {
+  "address": "0x0045f060",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:1252",
+   "src/core/core.cpp:2167"
+  ]
+ },
+ {
+  "address": "0x0045f996",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:191",
+   "src/core/triggers.h:156"
+  ]
+ },
+ {
+  "address": "0x0045f99d",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/wind.h:67"
+  ]
+ },
+ {
+  "address": "0x0045fa70",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/storms.h:1329"
+  ]
+ },
+ {
+  "address": "0x0045fab0",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/storms.h:1308"
+  ]
+ },
+ {
+  "address": "0x0045faf6",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/storms.h:300"
+  ]
+ },
+ {
+  "address": "0x0045fd40",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:320"
+  ]
+ },
+ {
+  "address": "0x004612b0",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:496",
+   "src/core/render.h:33"
+  ]
+ },
+ {
+  "address": "0x00461e23",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/wind.h:30",
+   "src/core/wind.h:54",
+   "src/core/wind.h:61"
+  ]
+ },
+ {
+  "address": "0x00461e51",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/wind.h:10"
+  ]
+ },
+ {
+  "address": "0x00462098",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:1196"
+  ]
+ },
+ {
+  "address": "0x004622c2",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:1953"
+  ]
+ },
+ {
+  "address": "0x0046231a",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:73"
+  ]
+ },
+ {
+  "address": "0x00462548",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:329"
+  ]
+ },
+ {
+  "address": "0x0046257a",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:329"
+  ]
+ },
+ {
+  "address": "0x00462e88",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:74"
+  ]
+ },
+ {
+  "address": "0x004630de",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/widescreen.h:103"
+  ]
+ },
+ {
+  "address": "0x0046331f",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/widescreen.h:103"
+  ]
+ },
+ {
+  "address": "0x0046338d",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:1793"
+  ]
+ },
+ {
+  "address": "0x0046354a",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/storms.h:231"
+  ]
+ },
+ {
+  "address": "0x0046359c",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/storms.h:944",
+   "src/core/wind.h:22"
+  ]
+ },
+ {
+  "address": "0x004635d2",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/wind.h:22"
+  ]
+ },
+ {
+  "address": "0x0046374a",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/storms.h:64",
+   "src/core/storms.h:266"
+  ]
+ },
+ {
+  "address": "0x0046376e",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/storms.h:65",
+   "src/core/storms.h:271"
+  ]
+ },
+ {
+  "address": "0x0046377a",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/storms.h:341",
+   "src/core/storms.h:350",
+   "src/core/townmenu.h:13"
+  ]
+ },
+ {
+  "address": "0x0046393a",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/storms.h:275"
+  ]
+ },
+ {
+  "address": "0x0046395d",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/storms.h:283"
+  ]
+ },
+ {
+  "address": "0x00463973",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/storms.h:279"
+  ]
+ },
+ {
+  "address": "0x00463cb2",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/render.h:33"
+  ]
+ },
+ {
+  "address": "0x00463cb4",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:1203"
+  ]
+ },
+ {
+  "address": "0x00465670",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:1253"
+  ]
+ },
+ {
+  "address": "0x0046568d",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:1388"
+  ]
+ },
+ {
+  "address": "0x004673f4",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/widescreen.h:103"
+  ]
+ },
+ {
+  "address": "0x00468845",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/wind.h:67"
+  ]
+ },
+ {
+  "address": "0x0046885e",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/wind.h:20"
+  ]
+ },
+ {
+  "address": "0x004689ab",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:148"
+  ]
+ },
+ {
+  "address": "0x00468b35",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:148"
+  ]
+ },
+ {
+  "address": "0x004692da",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:790"
+  ]
+ },
+ {
+  "address": "0x004692ef",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:729"
+  ]
+ },
+ {
+  "address": "0x0046932e",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:729"
+  ]
+ },
+ {
+  "address": "0x0046934d",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:885"
+  ]
+ },
+ {
+  "address": "0x00469698",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:1726"
+  ]
+ },
+ {
+  "address": "0x00469f40",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:1483"
+  ]
+ },
+ {
+  "address": "0x0046a345",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/core.cpp:2180"
+  ]
+ },
+ {
+  "address": "0x0046a4fc",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:1472"
+  ]
+ },
+ {
+  "address": "0x0046aecc",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:1734",
+   "src/core/suspicion.h:549"
+  ]
+ },
+ {
+  "address": "0x0046aef0",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/suspicion.h:560",
+   "src/core/suspicion.h:604"
+  ]
+ },
+ {
+  "address": "0x0046aefd",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/suspicion.h:824"
+  ]
+ },
+ {
+  "address": "0x0046ba80",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:174"
+  ]
+ },
+ {
+  "address": "0x0046d597",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/piratestart.h:22"
+  ]
+ },
+ {
+  "address": "0x0046f488",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/widescreen.h:103"
+  ]
+ },
+ {
+  "address": "0x00470391",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/piratestart.h:15",
+   "src/core/piratestart.h:37",
+   "src/core/piratestart.h:73"
+  ]
+ },
+ {
+  "address": "0x00470397",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/piratestart.h:16"
+  ]
+ },
+ {
+  "address": "0x004706f5",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/piratestart.h:139"
+  ]
+ },
+ {
+  "address": "0x0047073d",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/piratestart.h:139"
+  ]
+ },
+ {
+  "address": "0x00470782",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/piratestart.h:16"
+  ]
+ },
+ {
+  "address": "0x004707bb",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/piratestart.h:18"
+  ]
+ },
+ {
+  "address": "0x00471ab0",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/piratestart.h:9"
+  ]
+ },
+ {
+  "address": "0x00471f41",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/sailmaster.h:160"
+  ]
+ },
+ {
+  "address": "0x00471f9b",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/piratestart.h:24"
+  ]
+ },
+ {
+  "address": "0x00471fe6",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/piratestart.h:25"
+  ]
+ },
+ {
+  "address": "0x00471fe8",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/piratestart.h:26",
+   "src/core/piratestart.h:40",
+   "src/core/piratestart.h:74"
+  ]
+ },
+ {
+  "address": "0x00472264",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/piratestart.h:27",
+   "src/core/piratestart.h:41",
+   "src/core/piratestart.h:75"
+  ]
+ },
+ {
+  "address": "0x0047226d",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/piratestart.h:28"
+  ]
+ },
+ {
+  "address": "0x004722f7",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/piratestart.h:30",
+   "src/core/core.cpp:1250"
+  ]
+ },
+ {
+  "address": "0x00472318",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/piratestart.h:31"
+  ]
+ },
+ {
+  "address": "0x0047235c",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/piratestart.h:32"
+  ]
+ },
+ {
+  "address": "0x0047246d",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/sailmaster.h:158"
+  ]
+ },
+ {
+  "address": "0x004726ca",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:495",
+   "src/core/render.h:16",
+   "src/core/render.h:40",
+   "src/core/render.h:103"
+  ]
+ },
+ {
+  "address": "0x00472fca",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/sailkeys.h:25"
+  ]
+ },
+ {
+  "address": "0x00472ff0",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/sailkeys.h:24"
+  ]
+ },
+ {
+  "address": "0x00472ff7",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/sailkeys.h:23"
+  ]
+ },
+ {
+  "address": "0x00473731",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/sailkeys.h:46",
+   "src/core/sailkeys.h:71"
+  ]
+ },
+ {
+  "address": "0x00473749",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/sailmaster.h:36"
+  ]
+ },
+ {
+  "address": "0x0047376d",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/sailmaster.h:5",
+   "src/core/sailmaster.h:249"
+  ]
+ },
+ {
+  "address": "0x00473968",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/sailkeys.h:69",
+   "src/core/core.cpp:1023"
+  ]
+ },
+ {
+  "address": "0x00473b70",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/hudcorners.h:80"
+  ]
+ },
+ {
+  "address": "0x00473be2",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/hudcorners.h:101"
+  ]
+ },
+ {
+  "address": "0x00473ccf",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/hudcorners.h:102"
+  ]
+ },
+ {
+  "address": "0x00473dd3",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/hudcorners.h:102"
+  ]
+ },
+ {
+  "address": "0x00473dfc",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/hudcorners.h:103"
+  ]
+ },
+ {
+  "address": "0x00473e25",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/hudcorners.h:103"
+  ]
+ },
+ {
+  "address": "0x00473e4e",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/hudcorners.h:104"
+  ]
+ },
+ {
+  "address": "0x00473e77",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/hudcorners.h:104"
+  ]
+ },
+ {
+  "address": "0x00473e9d",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/hudcorners.h:105"
+  ]
+ },
+ {
+  "address": "0x00473ec3",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/hudcorners.h:105"
+  ]
+ },
+ {
+  "address": "0x00473ee9",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/hudcorners.h:106"
+  ]
+ },
+ {
+  "address": "0x00473f97",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/hudcorners.h:107"
+  ]
+ },
+ {
+  "address": "0x00473fc0",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/hudcorners.h:107"
+  ]
+ },
+ {
+  "address": "0x00473ff3",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/hudcorners.h:106"
+  ]
+ },
+ {
+  "address": "0x00474009",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/hudcorners.h:152"
+  ]
+ },
+ {
+  "address": "0x00474227",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/hudcorners.h:144"
+  ]
+ },
+ {
+  "address": "0x004742e1",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/hudcorners.h:110"
+  ]
+ },
+ {
+  "address": "0x0047432c",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/hudcorners.h:110"
+  ]
+ },
+ {
+  "address": "0x004743ce",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/hudcorners.h:111"
+  ]
+ },
+ {
+  "address": "0x004743f1",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/hudcorners.h:112"
+  ]
+ },
+ {
+  "address": "0x00474434",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/hudcorners.h:153"
+  ]
+ },
+ {
+  "address": "0x0047457f",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/hudcorners.h:113"
+  ]
+ },
+ {
+  "address": "0x004745f1",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/hudcorners.h:154"
+  ]
+ },
+ {
+  "address": "0x00474779",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/hudcorners.h:113"
+  ]
+ },
+ {
+  "address": "0x00474a0f",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/hudcorners.h:114"
+  ]
+ },
+ {
+  "address": "0x00474a47",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/hudcorners.h:114"
+  ]
+ },
+ {
+  "address": "0x00474ab6",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/hudcorners.h:115"
+  ]
+ },
+ {
+  "address": "0x00474b0b",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/hudcorners.h:115"
+  ]
+ },
+ {
+  "address": "0x00474b4d",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/hudcorners.h:116"
+  ]
+ },
+ {
+  "address": "0x00474b9c",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/hudcorners.h:117"
+  ]
+ },
+ {
+  "address": "0x00474bd9",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/hudcorners.h:117"
+  ]
+ },
+ {
+  "address": "0x00474c13",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/hudcorners.h:118"
+  ]
+ },
+ {
+  "address": "0x00474c61",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/hudcorners.h:116"
+  ]
+ },
+ {
+  "address": "0x00474ca3",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/hudcorners.h:118"
+  ]
+ },
+ {
+  "address": "0x00474d13",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/hudcorners.h:119"
+  ]
+ },
+ {
+  "address": "0x00474d5c",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/hudcorners.h:119"
+  ]
+ },
+ {
+  "address": "0x00474e41",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/hudcorners.h:120"
+  ]
+ },
+ {
+  "address": "0x00474ea9",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/hudcorners.h:120"
+  ]
+ },
+ {
+  "address": "0x00474eca",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/hudcorners.h:121"
+  ]
+ },
+ {
+  "address": "0x004761e7",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/hudcorners.h:145"
+  ]
+ },
+ {
+  "address": "0x0047626c",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/hudcorners.h:155"
+  ]
+ },
+ {
+  "address": "0x00476326",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/hudcorners.h:124"
+  ]
+ },
+ {
+  "address": "0x00476373",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/hudcorners.h:124"
+  ]
+ },
+ {
+  "address": "0x004763db",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/hudcorners.h:125"
+  ]
+ },
+ {
+  "address": "0x00476490",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/hudcorners.h:125"
+  ]
+ },
+ {
+  "address": "0x004764c3",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/hudcorners.h:126"
+  ]
+ },
+ {
+  "address": "0x00476516",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/hudcorners.h:126"
+  ]
+ },
+ {
+  "address": "0x00476558",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/hudcorners.h:127"
+  ]
+ },
+ {
+  "address": "0x004765a3",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/hudcorners.h:128"
+  ]
+ },
+ {
+  "address": "0x00476609",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/hudcorners.h:128"
+  ]
+ },
+ {
+  "address": "0x00476f10",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/combatfx.h:49"
+  ]
+ },
+ {
+  "address": "0x00477cb0",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/combatfx.h:51"
+  ]
+ },
+ {
+  "address": "0x0047a07b",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:190",
+   "src/core/triggers.h:156"
+  ]
+ },
+ {
+  "address": "0x0047a0c9",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/wind.h:16"
+  ]
+ },
+ {
+  "address": "0x0047b3cb",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/storms.h:479"
+  ]
+ },
+ {
+  "address": "0x0047b3d5",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/storms.h:504"
+  ]
+ },
+ {
+  "address": "0x0047b708",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/hudcorners.h:131"
+  ]
+ },
+ {
+  "address": "0x0047b749",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/hudcorners.h:131"
+  ]
+ },
+ {
+  "address": "0x0047b7d1",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/hudcorners.h:132"
+  ]
+ },
+ {
+  "address": "0x0047b86e",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/hudcorners.h:132"
+  ]
+ },
+ {
+  "address": "0x0047b8db",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/hudcorners.h:133"
+  ]
+ },
+ {
+  "address": "0x0047b9c6",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/hudcorners.h:133"
+  ]
+ },
+ {
+  "address": "0x0047ba0c",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/hudcorners.h:134"
+  ]
+ },
+ {
+  "address": "0x0047baf1",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/hudcorners.h:136"
+  ]
+ },
+ {
+  "address": "0x0047bb08",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/hudcorners.h:136"
+  ]
+ },
+ {
+  "address": "0x0047bbb0",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/hudcorners.h:137"
+  ]
+ },
+ {
+  "address": "0x0047bc3c",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/storms.h:291",
+   "src/core/storms.h:312",
+   "src/core/storms.h:1432"
+  ]
+ },
+ {
+  "address": "0x0047de17",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/combatfx.h:14",
+   "src/core/combatfx.h:50"
+  ]
+ },
+ {
+  "address": "0x0047de91",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/combatfx.h:15",
+   "src/core/combatfx.h:50"
+  ]
+ },
+ {
+  "address": "0x0047df65",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/combatfx.h:27"
+  ]
+ },
+ {
+  "address": "0x0047df75",
+  "region": "text",
+  "first_difference": 21,
+  "issues": [
+   "bytes differ at +21"
+  ],
+  "cited_at": [
+   "src/core/combatfx.h:30",
+   "src/core/combatfx.h:58"
+  ]
+ },
+ {
+  "address": "0x0047df76",
+  "region": "text",
+  "first_difference": 20,
+  "issues": [
+   "bytes differ at +20"
+  ],
+  "cited_at": [
+   "src/core/combatfx.h:58"
+  ]
+ },
+ {
+  "address": "0x0047e044",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/combatfx.h:27",
+   "src/core/combatfx.h:57"
+  ]
+ },
+ {
+  "address": "0x0047e11b",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/combatfx.h:15",
+   "src/core/combatfx.h:50"
+  ]
+ },
+ {
+  "address": "0x0047e4e6",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/combatfx.h:17",
+   "src/core/combatfx.h:52"
+  ]
+ },
+ {
+  "address": "0x0047e56d",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/combatfx.h:18",
+   "src/core/combatfx.h:53"
+  ]
+ },
+ {
+  "address": "0x0047e56e",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/combatfx.h:53"
+  ]
+ },
+ {
+  "address": "0x0047ede3",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/wind.h:17"
+  ]
+ },
+ {
+  "address": "0x0047ee97",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/storms.h:1429"
+  ]
+ },
+ {
+  "address": "0x00480b26",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/combatfx.h:29"
+  ]
+ },
+ {
+  "address": "0x00480c72",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/combatfx.h:29"
+  ]
+ },
+ {
+  "address": "0x00483745",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/piratestart.h:52"
+  ]
+ },
+ {
+  "address": "0x00483c7f",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/piratestart.h:52"
+  ]
+ },
+ {
+  "address": "0x00486031",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/piratestart.h:52"
+  ]
+ },
+ {
+  "address": "0x00486796",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/widescreen.h:103"
+  ]
+ },
+ {
+  "address": "0x0048715e",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/piratestart.h:52"
+  ]
+ },
+ {
+  "address": "0x004879f0",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:17",
+   "src/core/game.h:36"
+  ]
+ },
+ {
+  "address": "0x00487cd5",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:654"
+  ]
+ },
+ {
+  "address": "0x004884a0",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/hudcorners.h:77"
+  ]
+ },
+ {
+  "address": "0x00488a80",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:60"
+  ]
+ },
+ {
+  "address": "0x00490eb6",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/widescreen.h:104"
+  ]
+ },
+ {
+  "address": "0x00491354",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/widescreen.h:104"
+  ]
+ },
+ {
+  "address": "0x00494cc2",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/widescreen.h:104"
+  ]
+ },
+ {
+  "address": "0x004ab290",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/combatfx.h:56"
+  ]
+ },
+ {
+  "address": "0x004aeb20",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:82"
+  ]
+ },
+ {
+  "address": "0x004aec30",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:22",
+   "src/core/game.h:88",
+   "src/core/game.h:2070"
+  ]
+ },
+ {
+  "address": "0x004af080",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/hudcorners.h:78"
+  ]
+ },
+ {
+  "address": "0x004af760",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:273",
+   "src/core/game.h:2068"
+  ]
+ },
+ {
+  "address": "0x004b00e0",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:2074"
+  ]
+ },
+ {
+  "address": "0x004b06c0",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:20",
+   "src/core/game.h:508",
+   "src/core/hudcorners.h:76"
+  ]
+ },
+ {
+  "address": "0x004b09ec",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/hudcorners.h:42"
+  ]
+ },
+ {
+  "address": "0x004b1794",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/widescreen.h:274"
+  ]
+ },
+ {
+  "address": "0x004b2df0",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/widescreen.h:514"
+  ]
+ },
+ {
+  "address": "0x004b3631",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/widescreen.h:509",
+   "src/core/widescreen.h:513"
+  ]
+ },
+ {
+  "address": "0x004bba60",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/hudcorners.h:75"
+  ]
+ },
+ {
+  "address": "0x004bbc10",
+  "region": "text",
+  "first_difference": 16,
+  "issues": [
+   "bytes differ at +16"
+  ],
+  "cited_at": [
+   "src/core/storms.h:490",
+   "src/core/storms.h:505"
+  ]
+ },
+ {
+  "address": "0x004bcdd9",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:430"
+  ]
+ },
+ {
+  "address": "0x004c81f9",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/widescreen.h:104"
+  ]
+ },
+ {
+  "address": "0x004c829c",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/widescreen.h:104"
+  ]
+ },
+ {
+  "address": "0x004cce40",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/widescreen.h:90"
+  ]
+ },
+ {
+  "address": "0x004ceab9",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/widescreen.h:104"
+  ]
+ },
+ {
+  "address": "0x004cf316",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/widescreen.h:105"
+  ]
+ },
+ {
+  "address": "0x004d3511",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/widescreen.h:105"
+  ]
+ },
+ {
+  "address": "0x004d3b78",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/widescreen.h:105",
+   "src/core/widescreen.h:295"
+  ]
+ },
+ {
+  "address": "0x004d3b7d",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/widescreen.h:295"
+  ]
+ },
+ {
+  "address": "0x004d3bbb",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/widescreen.h:268",
+   "src/core/widescreen.h:689"
+  ]
+ },
+ {
+  "address": "0x004d3e00",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/widescreen.h:47"
+  ]
+ },
+ {
+  "address": "0x004d4480",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/gameaudio.h:66"
+  ]
+ },
+ {
+  "address": "0x004d5ae2",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/widescreen.h:274"
+  ]
+ },
+ {
+  "address": "0x004d5fe1",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/piratestart.h:52"
+  ]
+ },
+ {
+  "address": "0x004d975d",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/widescreen.h:105"
+  ]
+ },
+ {
+  "address": "0x004da9e8",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/widescreen.h:105"
+  ]
+ },
+ {
+  "address": "0x004dd01f",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/loot.h:8"
+  ]
+ },
+ {
+  "address": "0x004dd1dd",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/widescreen.h:274"
+  ]
+ },
+ {
+  "address": "0x004f4ed0",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:24",
+   "src/core/game.h:313",
+   "src/core/game.h:2064"
+  ]
+ },
+ {
+  "address": "0x004f6090",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:15",
+   "src/core/game.h:34"
+  ]
+ },
+ {
+  "address": "0x004f60b0",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:16",
+   "src/core/game.h:35"
+  ]
+ },
+ {
+  "address": "0x004ff57e",
+  "region": "text",
+  "first_difference": 20,
+  "issues": [
+   "bytes differ at +20"
+  ],
+  "cited_at": [
+   "src/core/widescreen.h:105"
+  ]
+ },
+ {
+  "address": "0x004ff5e3",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/widescreen.h:106"
+  ]
+ },
+ {
+  "address": "0x00500850",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:25",
+   "src/core/game.h:314",
+   "src/core/game.h:2066"
+  ]
+ },
+ {
+  "address": "0x00500e85",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/widescreen.h:106"
+  ]
+ },
+ {
+  "address": "0x00501055",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/widescreen.h:106"
+  ]
+ },
+ {
+  "address": "0x00503dc2",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/widescreen.h:106"
+  ]
+ },
+ {
+  "address": "0x00510f40",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/widescreen.h:106"
+  ]
+ },
+ {
+  "address": "0x005115fc",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/widescreen.h:106"
+  ]
+ },
+ {
+  "address": "0x00533c9d",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/widescreen.h:502",
+   "src/core/widescreen.h:515"
+  ]
+ },
+ {
+  "address": "0x00533d10",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/widescreen.h:260",
+   "src/core/widescreen.h:690"
+  ]
+ },
+ {
+  "address": "0x00538400",
+  "region": "text",
+  "first_difference": 2,
+  "issues": [
+   "bytes differ at +2"
+  ],
+  "cited_at": [
+   "src/core/game.h:548"
+  ]
+ },
+ {
+  "address": "0x005c60e0",
+  "region": "text",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:533"
+  ]
+ },
+ {
+  "address": "0x006c0074",
+  "region": "rdata",
+  "first_difference": 0,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:528"
+  ]
+ },
+ {
+  "address": "0x006c0154",
+  "region": "rdata",
+  "first_difference": 0,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:529"
+  ]
+ },
+ {
+  "address": "0x006c03a4",
+  "region": "rdata",
+  "first_difference": 0,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:527",
+   "src/core/game.h:2014"
+  ]
+ },
+ {
+  "address": "0x006c0430",
+  "region": "rdata",
+  "first_difference": 0,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:526"
+  ]
+ },
+ {
+  "address": "0x00707a60",
+  "region": "rdata",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:1205"
+  ]
+ },
+ {
+  "address": "0x0070d594",
+  "region": "rdata",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/piratestart.h:54",
+   "src/core/piratestart.h:55",
+   "src/core/piratestart.h:88"
+  ]
+ },
+ {
+  "address": "0x00713600",
+  "region": "rdata",
+  "first_difference": 0,
+  "issues": [
+   "bytes differ at +0",
+   ".rdata item is at 0x007135f8 on Steam"
+  ],
+  "cited_at": [
+   "src/core/game.h:93",
+   "src/core/game.h:101",
+   "src/core/game.h:116"
+  ]
+ },
+ {
+  "address": "0x007177e0",
+  "region": "data",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/widescreen.h:20"
+  ]
+ },
+ {
+  "address": "0x007177e4",
+  "region": "data",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/widescreen.h:20"
+  ]
+ },
+ {
+  "address": "0x00722a08",
+  "region": "data",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:1020",
+   "src/core/game.h:1080"
+  ]
+ },
+ {
+  "address": "0x007242d0",
+  "region": "data",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/piratestart.h:10"
+  ]
+ },
+ {
+  "address": "0x007252d0",
+  "region": "data",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:1267",
+   "src/core/game.h:1281"
+  ]
+ },
+ {
+  "address": "0x007253bc",
+  "region": "data",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/wind.h:6",
+   "src/core/wind.h:60"
+  ]
+ },
+ {
+  "address": "0x00725600",
+  "region": "data",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/wind.h:71"
+  ]
+ },
+ {
+  "address": "0x00725678",
+  "region": "data",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/storms.h:22",
+   "src/core/storms.h:32",
+   "src/core/storms.h:34"
+  ]
+ },
+ {
+  "address": "0x00726238",
+  "region": "data",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/widescreen.h:518"
+  ]
+ },
+ {
+  "address": "0x0072637c",
+  "region": "data",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/content.h:1310",
+   "src/core/hudcorners.h:41",
+   "src/core/hudcorners.h:89",
+   "src/core/hudcorners.h:159"
+  ]
+ },
+ {
+  "address": "0x00726388",
+  "region": "data",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/gameaudio.h:12",
+   "src/core/gameaudio.h:17",
+   "src/core/gameaudio.h:59"
+  ]
+ },
+ {
+  "address": "0x0072638c",
+  "region": "data",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/gameaudio.h:13",
+   "src/core/gameaudio.h:60"
+  ]
+ },
+ {
+  "address": "0x00726390",
+  "region": "data",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/gameaudio.h:14",
+   "src/core/gameaudio.h:18",
+   "src/core/gameaudio.h:61"
+  ]
+ },
+ {
+  "address": "0x00726394",
+  "region": "data",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/gameaudio.h:15",
+   "src/core/gameaudio.h:62"
+  ]
+ },
+ {
+  "address": "0x007263bc",
+  "region": "data",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:490"
+  ]
+ },
+ {
+  "address": "0x007268dc",
+  "region": "data",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/combatfx.h:30"
+  ]
+ },
+ {
+  "address": "0x00726a84",
+  "region": "data",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:491"
+  ]
+ },
+ {
+  "address": "0x00726a88",
+  "region": "data",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:295"
+  ]
+ },
+ {
+  "address": "0x00726a8c",
+  "region": "data",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:296"
+  ]
+ },
+ {
+  "address": "0x00726a90",
+  "region": "data",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:286"
+  ]
+ },
+ {
+  "address": "0x00726aa8",
+  "region": "data",
+  "first_difference": 24,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:285"
+  ]
+ },
+ {
+  "address": "0x00726b8c",
+  "region": "data",
+  "first_difference": 24,
+  "issues": [],
+  "cited_at": [
+   "src/core/widescreen.h:94"
+  ]
+ },
+ {
+  "address": "0x007272b4",
+  "region": "data",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:434"
+  ]
+ },
+ {
+  "address": "0x00727444",
+  "region": "data",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:558"
+  ]
+ },
+ {
+  "address": "0x00727c30",
+  "region": "data",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:536",
+   "src/core/game.h:543"
+  ]
+ },
+ {
+  "address": "0x00728d74",
+  "region": "data",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:534",
+   "src/core/game.h:545"
+  ]
+ },
+ {
+  "address": "0x0072c6b8",
+  "region": "data",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:458"
+  ]
+ },
+ {
+  "address": "0x008142f8",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:170",
+   "src/core/game.h:204",
+   "src/core/game.h:937",
+   "src/core/game.h:1185"
+  ]
+ },
+ {
+  "address": "0x008142fa",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:1218"
+  ]
+ },
+ {
+  "address": "0x008142fc",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:177",
+   "src/core/game.h:206"
+  ]
+ },
+ {
+  "address": "0x00814300",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:1486"
+  ]
+ },
+ {
+  "address": "0x00814304",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:166"
+  ]
+ },
+ {
+  "address": "0x00814308",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:167"
+  ]
+ },
+ {
+  "address": "0x0081431a",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:1739"
+  ]
+ },
+ {
+  "address": "0x00814322",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:1185",
+   "src/core/game.h:1189"
+  ]
+ },
+ {
+  "address": "0x00814336",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:1190",
+   "src/core/game.h:1743"
+  ]
+ },
+ {
+  "address": "0x00814338",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:1191",
+   "src/core/game.h:1744"
+  ]
+ },
+ {
+  "address": "0x00814350",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:207",
+   "src/core/game.h:1745"
+  ]
+ },
+ {
+  "address": "0x00859ef8",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:937",
+   "src/core/game.h:938"
+  ]
+ },
+ {
+  "address": "0x0085a0f8",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:156",
+   "src/core/storms.h:102",
+   "src/core/storms.h:106",
+   "src/core/storms.h:295",
+   "src/core/storms.h:305",
+   "src/core/storms.h:310",
+   "src/core/storms.h:1322",
+   "src/core/storms.h:1438",
+   "src/core/storms.h:1444"
+  ]
+ },
+ {
+  "address": "0x0085a118",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:202",
+   "src/core/triggers.h:155"
+  ]
+ },
+ {
+  "address": "0x0085a11c",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:103",
+   "src/core/game.h:512"
+  ]
+ },
+ {
+  "address": "0x0085a154",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:940",
+   "src/core/sailmaster.h:38",
+   "src/core/sailmaster.h:39",
+   "src/core/sailmaster.h:64",
+   "src/core/sailmaster.h:158"
+  ]
+ },
+ {
+  "address": "0x0085a158",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/crewmorale.h:63",
+   "src/core/game.h:941",
+   "src/core/game.h:1735",
+   "src/core/morale.h:12",
+   "src/core/morale.h:39",
+   "src/core/sailmaster.h:39",
+   "src/core/sailmaster.h:45",
+   "src/core/sailmaster.h:65",
+   "src/core/wind.h:63"
+  ]
+ },
+ {
+  "address": "0x0085a164",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:104",
+   "src/core/game.h:943",
+   "src/core/game.h:1738",
+   "src/core/sailmaster.h:47",
+   "src/core/sailmaster.h:67"
+  ]
+ },
+ {
+  "address": "0x0085a168",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:377"
+  ]
+ },
+ {
+  "address": "0x0085a268",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:160",
+   "src/core/game.h:360"
+  ]
+ },
+ {
+  "address": "0x0085a26c",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:159",
+   "src/core/hudcorners.h:39"
+  ]
+ },
+ {
+  "address": "0x0085a353",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:938"
+  ]
+ },
+ {
+  "address": "0x0085b170",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:324",
+   "src/core/piratestart.h:34",
+   "src/core/sailmaster.h:73"
+  ]
+ },
+ {
+  "address": "0x0085bf70",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:1283",
+   "src/core/game.h:1285"
+  ]
+ },
+ {
+  "address": "0x0085bf7c",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:1298",
+   "src/core/game.h:1307",
+   "src/core/suspicion.h:21"
+  ]
+ },
+ {
+  "address": "0x0085bf7e",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:1734"
+  ]
+ },
+ {
+  "address": "0x0085bfb4",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/market.h:11",
+   "src/core/market.h:40"
+  ]
+ },
+ {
+  "address": "0x0085bff6",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/piratestart.h:79"
+  ]
+ },
+ {
+  "address": "0x00860b40",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:236",
+   "src/core/game.h:240"
+  ]
+ },
+ {
+  "address": "0x00860b54",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:237",
+   "src/core/game.h:241"
+  ]
+ },
+ {
+  "address": "0x00860b68",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/piratestart.h:10",
+   "src/core/piratestart.h:34",
+   "src/core/sailmaster.h:72",
+   "src/core/sailmaster.h:78"
+  ]
+ },
+ {
+  "address": "0x00860b70",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:325",
+   "src/core/game.h:1291",
+   "src/core/piratestart.h:78"
+  ]
+ },
+ {
+  "address": "0x00860b74",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:345"
+  ]
+ },
+ {
+  "address": "0x00860b75",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/market.h:13"
+  ]
+ },
+ {
+  "address": "0x00860b7c",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/market.h:13"
+  ]
+ },
+ {
+  "address": "0x00860b80",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:346",
+   "src/core/townmenu.h:325"
+  ]
+ },
+ {
+  "address": "0x00861b70",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/market.h:14"
+  ]
+ },
+ {
+  "address": "0x00861ff8",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/loot.h:13",
+   "src/core/loot.h:15",
+   "src/core/loot.h:22",
+   "src/core/loot.h:58",
+   "src/core/morale.h:157",
+   "src/core/morale.h:172"
+  ]
+ },
+ {
+  "address": "0x00869a70",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:460"
+  ]
+ },
+ {
+  "address": "0x00869a76",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/crewmorale.h:62",
+   "src/core/morale.h:12",
+   "src/core/morale.h:38"
+  ]
+ },
+ {
+  "address": "0x00869a78",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:398"
+  ]
+ },
+ {
+  "address": "0x00869a88",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:399",
+   "src/core/core.cpp:969"
+  ]
+ },
+ {
+  "address": "0x00869aa8",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:426",
+   "src/core/piratestart.h:30",
+   "src/core/piratestart.h:50",
+   "src/core/core.cpp:1250"
+  ]
+ },
+ {
+  "address": "0x00869ab0",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:141"
+  ]
+ },
+ {
+  "address": "0x00869ab4",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/flagtrader.h:18",
+   "src/core/flagtrader.h:45",
+   "src/core/game.h:142",
+   "src/core/loot.h:11",
+   "src/core/loot.h:14"
+  ]
+ },
+ {
+  "address": "0x00869b1a",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:143"
+  ]
+ },
+ {
+  "address": "0x00869b20",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/flagtrader.h:11"
+  ]
+ },
+ {
+  "address": "0x00869b26",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:152"
+  ]
+ },
+ {
+  "address": "0x00869b27",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/crewmorale.h:26",
+   "src/core/game.h:144",
+   "src/core/morale.h:14"
+  ]
+ },
+ {
+  "address": "0x00869b34",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/crewmorale.h:64",
+   "src/core/game.h:145",
+   "src/core/morale.h:40"
+  ]
+ },
+ {
+  "address": "0x00869b48",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/content.h:1526",
+   "src/core/game.h:84",
+   "src/core/game.h:133",
+   "src/core/townmenu.h:66"
+  ]
+ },
+ {
+  "address": "0x0086bcf0",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/hudcorners.h:86"
+  ]
+ },
+ {
+  "address": "0x0086c010",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/hudcorners.h:85"
+  ]
+ },
+ {
+  "address": "0x0086c1a0",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/hudcorners.h:84"
+  ]
+ },
+ {
+  "address": "0x0086c330",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/hudcorners.h:50",
+   "src/core/hudcorners.h:83"
+  ]
+ },
+ {
+  "address": "0x00876be0",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/piratestart.h:13",
+   "src/core/piratestart.h:24",
+   "src/core/piratestart.h:76",
+   "src/core/piratestart.h:206"
+  ]
+ },
+ {
+  "address": "0x00876bf8",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:230"
+  ]
+ },
+ {
+  "address": "0x00876cf8",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:226",
+   "src/core/game.h:231"
+  ]
+ },
+ {
+  "address": "0x008b96b0",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:1730",
+   "src/core/storms.h:1300"
+  ]
+ },
+ {
+  "address": "0x008b96b4",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:1729",
+   "src/core/storms.h:1300"
+  ]
+ },
+ {
+  "address": "0x008b98d4",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/sailmaster.h:39",
+   "src/core/sailmaster.h:44",
+   "src/core/sailmaster.h:48",
+   "src/core/sailmaster.h:50",
+   "src/core/sailmaster.h:66",
+   "src/core/sailmaster.h:160",
+   "src/core/sailmaster.h:246"
+  ]
+ },
+ {
+  "address": "0x008b98d8",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:95",
+   "src/core/game.h:102"
+  ]
+ },
+ {
+  "address": "0x008b98e4",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/storms.h:234",
+   "src/core/storms.h:317",
+   "src/core/storms.h:1298"
+  ]
+ },
+ {
+  "address": "0x008b98f0",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/storms.h:132",
+   "src/core/storms.h:235",
+   "src/core/storms.h:316",
+   "src/core/storms.h:1298"
+  ]
+ },
+ {
+  "address": "0x008b99d8",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/combatfx.h:10"
+  ]
+ },
+ {
+  "address": "0x008c8218",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:153"
+  ]
+ },
+ {
+  "address": "0x008c8494",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/combatfx.h:32",
+   "src/core/combatfx.h:62"
+  ]
+ },
+ {
+  "address": "0x008c9560",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:277"
+  ]
+ },
+ {
+  "address": "0x008c9564",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:278"
+  ]
+ },
+ {
+  "address": "0x008c9dd8",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:100",
+   "src/core/game.h:114"
+  ]
+ },
+ {
+  "address": "0x008ca930",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/wind.h:62"
+  ]
+ },
+ {
+  "address": "0x008ca9e8",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:232"
+  ]
+ },
+ {
+  "address": "0x008cab70",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/combatfx.h:31",
+   "src/core/combatfx.h:61"
+  ]
+ },
+ {
+  "address": "0x008cabf0",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/widescreen.h:517"
+  ]
+ },
+ {
+  "address": "0x008cac18",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/hudcorners.h:90",
+   "src/core/hudcorners.h:160",
+   "src/core/widescreen.h:91"
+  ]
+ },
+ {
+  "address": "0x008cac1c",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/widescreen.h:92"
+  ]
+ },
+ {
+  "address": "0x008cacd0",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:137"
+  ]
+ },
+ {
+  "address": "0x008cadec",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/widescreen.h:98"
+  ]
+ },
+ {
+  "address": "0x008cc498",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/storms.h:21",
+   "src/core/storms.h:479",
+   "src/core/storms.h:488",
+   "src/core/storms.h:495"
+  ]
+ },
+ {
+  "address": "0x008ccb58",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/storms.h:14",
+   "src/core/storms.h:477",
+   "src/core/storms.h:506",
+   "src/core/storms.h:562"
+  ]
+ },
+ {
+  "address": "0x008dbd08",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:342"
+  ]
+ },
+ {
+  "address": "0x008dc30c",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/hudcorners.h:47",
+   "src/core/hudcorners.h:82",
+   "src/core/hudcorners.h:152",
+   "src/core/hudcorners.h:153",
+   "src/core/hudcorners.h:154",
+   "src/core/hudcorners.h:155"
+  ]
+ },
+ {
+  "address": "0x008e66b4",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/combatfx.h:28"
+  ]
+ },
+ {
+  "address": "0x008e8fb0",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:266"
+  ]
+ },
+ {
+  "address": "0x008e8fb4",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:267"
+  ]
+ },
+ {
+  "address": "0x008e8fb8",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:268"
+  ]
+ },
+ {
+  "address": "0x008e8fbc",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:269"
+  ]
+ },
+ {
+  "address": "0x008e9f58",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/flagtrader.h:12",
+   "src/core/game.h:19",
+   "src/core/game.h:45"
+  ]
+ },
+ {
+  "address": "0x008e9fe0",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/content.h:1314",
+   "src/core/content.h:1321",
+   "src/core/widescreen.h:93",
+   "src/core/widescreen.h:278"
+  ]
+ },
+ {
+  "address": "0x008ea08c",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/widescreen.h:499",
+   "src/core/widescreen.h:516"
+  ]
+ },
+ {
+  "address": "0x008ecd78",
+  "region": "bss",
+  "first_difference": null,
+  "issues": [],
+  "cited_at": [
+   "src/core/game.h:49"
+  ]
+ }
+]

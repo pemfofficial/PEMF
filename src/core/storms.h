@@ -52,6 +52,8 @@
 #include "render.h"   // RedirectCall
 #include "events.h"   // Busy -- a card freezes the world, and the weather with it
 #include "stormaudio.h"
+#include "battlemusic.h"
+#include "wind.h"     // storms are born upwind and drift with it
 
 namespace storms {
 
@@ -125,6 +127,14 @@ struct Tuning {
     int driftPerSec   = 350;    // MEASURED: westward drift, map units/second
     int spawnDistance = 26000;  // born this far to windward -- off screen
     int killDistance  = 55000;  // once this far off, it is gone
+    // ONE STORM, SEEN AND FELT. The game's storm rules -- the +400 push, fleet
+    // damage in the core, the knots readout, the wind needle, our own cargo
+    // loss -- all measure from the ENGINE's storm slot 0 (0x008B98F0/E4). We
+    // draw our own system and hid the engine's, so until 2026-10-16 those rules
+    // followed an invisible storm somewhere else. With this on, slot 0 is held
+    // on our system every frame, and parked far off while the sky is clear.
+    int syncEngineStorm = 1;
+    int syncParkDistance = 120000; // where slot 0 waits while there is no system
     int spreadPerScale = 19;    // ring spread = stormScale * this / 10
     // How far off a storm must be before we will draw it. ⚠️ THE ENGINE SEEDS
     // AT ABOUT 8000 MAP UNITS DUE EAST, always -- so anything above that means
@@ -818,9 +828,28 @@ inline int SpreadForScale()
     return sp;
 }
 
+// Hold the engine's storm slot 0 where the storm actually is. See syncEngineStorm.
+inline void SyncEngineStorm(bool up, int px, int py)
+{
+    if (!g_tune.syncEngineStorm) return;
+    __try {
+        if (up) {
+            *(int*)addr::StormX = g_sysX;
+            *(int*)addr::StormY = g_sysY;
+        } else {
+            *(int*)addr::StormX = px + g_tune.syncParkDistance;
+            *(int*)addr::StormY = py + g_tune.syncParkDistance;
+        }
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER) { }
+}
+
 extern "C" int __cdecl PemfStormScale(int gameScale)
 {
-    if (!g_tune.enabled) return gameScale;
+    if (!g_tune.enabled) {
+        if (!events::Busy()) wind::OverworldTick();
+        return gameScale;
+    }
 
     const DWORD now = GetTickCount();
     const int px = game::PlayerX() / 1000;
@@ -865,6 +894,7 @@ extern "C" int __cdecl PemfStormScale(int gameScale)
 
     const int dt = g_sysLastMs ? (int)(now - g_sysLastMs) : 0;
     g_sysLastMs = now;
+    wind::OverworldTick();      // after the card hold: a dialog freezes the wind too
 
     // ---------------------------------------------- time spent somewhere else
     // A LONG GAP MEANS THE PLAYER WAS NOT AT SEA. This function runs from the
@@ -892,6 +922,7 @@ extern "C" int __cdecl PemfStormScale(int gameScale)
 
     if (!g_sysUp) {
         g_sysDist = -1;
+        SyncEngineStorm(false, px, py);
 
         // ⚠️ THE FIRST SYSTEM MUST NOT WAIT A FULL REST. Seeding g_sysNext with
         // `now + restMs` on the first call meant no weather at all for the
@@ -909,21 +940,32 @@ extern "C" int __cdecl PemfStormScale(int gameScale)
         // Always to windward and always off screen, but no further out than it
         // needs to be -- every extra thousand units is another three seconds of
         // empty sky before the weather arrives.
-        g_sysX    = px + g_tune.spawnDistance;
-        g_sysY    = py;
-        Log("storms: a system makes up to windward, %d off (arrives in ~%d s)",
-            g_tune.spawnDistance,
+        // UPWIND, wherever that is now. The engine moves weather by
+        // -(sin w, cos w) * speed (0x0046359C), so the wind comes FROM
+        // +(sin w, cos w). With the stock 90-degree trade wind that is due
+        // east, exactly where this always spawned before.
+        const double w  = wind::CurrentDeg() * 3.14159265358979 / 180.0;
+        g_sysX    = px + (int)(g_tune.spawnDistance * sin(w));
+        g_sysY    = py + (int)(g_tune.spawnDistance * cos(w));
+        Log("storms: a system makes up to windward (wind %.0f deg), %d off "
+            "(arrives in ~%d s)", wind::CurrentDeg(), g_tune.spawnDistance,
             g_tune.driftPerSec > 0
                 ? (g_tune.spawnDistance - 18000) / g_tune.driftPerSec : 0);
     }
 
-    // Drift west with the trade wind, at the rate the probe measured.
+    // Drift DOWNWIND at the rate the probe measured -- along the wind the game
+    // is using right now, so a front that swings the wind swings the storm.
     if (dt > 0 && dt < 1000) {
-        static int carry = 0;                 // keep the sub-unit remainder
-        carry += g_tune.driftPerSec * dt;
-        g_sysX -= carry / 1000;
-        carry  %= 1000;
+        static double carryX = 0, carryY = 0;   // keep the sub-unit remainders
+        const double w = wind::CurrentDeg() * 3.14159265358979 / 180.0;
+        const double step = g_tune.driftPerSec * dt / 1000.0;
+        carryX -= step * sin(w);
+        carryY -= step * cos(w);
+        const int mx = (int)carryX, my = (int)carryY;
+        g_sysX += mx; carryX -= mx;
+        g_sysY += my; carryY -= my;
     }
+    SyncEngineStorm(true, px, py);
 
     g_sysDist = OctDist(g_sysX - px, g_sysY - py);
 
@@ -1064,6 +1106,8 @@ inline void LoadTuning(const char* gameDir)
         else if (_stricmp(key, "stormFirstDelayMs")== 0) { g_tune.firstDelayMs       = value; ++applied; }
         else if (_stricmp(key, "stormDriftPerSec")  == 0) { g_tune.driftPerSec        = value; ++applied; }
         else if (_stricmp(key, "stormSpawnDistance")== 0) { g_tune.spawnDistance      = value; ++applied; }
+        else if (_stricmp(key, "syncEngineStorm")   == 0) { g_tune.syncEngineStorm    = value; ++applied; }
+        else if (_stricmp(key, "stormParkDistance") == 0) { g_tune.syncParkDistance   = value; ++applied; }
         else if (_stricmp(key, "stormKillDistance") == 0) { g_tune.killDistance       = value; ++applied; }
         else if (_stricmp(key, "clusterSpreadScale")== 0) { g_tune.spreadPerScale     = value; ++applied; }
         else if (_stricmp(key, "stormBirthDistance")== 0) { g_tune.birthDistance      = value; ++applied; }
@@ -1077,6 +1121,9 @@ inline void LoadTuning(const char* gameDir)
         else if (_stricmp(key, "stormMusicFadeMs")  == 0) { stormaudio::g_tune.fadeMs  = value; ++applied; }
         else if (_stricmp(key, "stormMusicDuck")    == 0) { stormaudio::g_tune.duckGameMusic = value; ++applied; }
         else if (_stricmp(key, "stormMusicSettleMs")== 0) { stormaudio::g_tune.settleMs  = value; ++applied; }
+        else if (_stricmp(key, "battleMusic")       == 0) { battlemusic::g_tune.enabled = value; ++applied; }
+        else if (_stricmp(key, "battleMusicVolume") == 0) { battlemusic::g_tune.volume  = value; ++applied; }
+        else if (_stricmp(key, "battleMusicFadeMs") == 0) { battlemusic::g_tune.fadeMs  = value; ++applied; }
         else if (_stricmp(key, "cargoLossEveryMs")== 0) { g_tune.cargoLossEveryMs = value; ++applied; }
         else if (_stricmp(key, "cargoLossMax")    == 0) { g_tune.cargoLossMax     = value; ++applied; }
         else if (_stricmp(key, "enabled")     == 0) { g_tune.enabled = (value != 0); ++applied; }
@@ -1103,6 +1150,7 @@ inline void LoadTuning(const char* gameDir)
     g_tune.placeDistance = Clamp(g_tune.placeDistance, 2000, 80000);
 
     stormaudio::Configure(gameDir);
+    battlemusic::Configure(gameDir);
 
     Log("storms: loaded %d setting(s) from %s -- STORM scale %d height %d | "
         "fair clouds scale %d count %d height %d%s",

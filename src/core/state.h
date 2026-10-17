@@ -48,6 +48,9 @@ inline int Crew()    { return game::CrewCount(); }
 inline int Plunder() { return game::UndividedPlunder(); }
 inline int Morale()  { return game::GetMoraleLevel(); }
 inline int Months()  { return (int)game::MonthsAtSea(); }
+// The engine refreshes these only on a sailing tick; callers gate on sailing.
+inline int Storm()   { const int v = game::StormState(); return v < 0 ? 0 : (v > 3 ? 3 : v); }
+inline int Wind()    { const int v = game::WindKnots();  return v < 0 ? 0 : v; }
 
 // ------------------------------------------------------------------ writes
 // Each returns whether the write actually happened.

@@ -1,0 +1,61 @@
+{
+  "_comment": [
+    "PEMF -- weather events.",
+    "",
+    "These use the game's OWN storm state, read straight from the engine:",
+    "  field 'storm': 0 clear, 1 near a storm, 2 inside it (the ship is blown",
+    "                 along), 3 in the core (a ship of your fleet takes damage).",
+    "  field 'wind':  the knots shown on the sailing HUD; it rises as a storm",
+    "                 nears. Ordinary sailing reads single figures.",
+    "Both read as calm unless the ship is under way.",
+    "",
+    "Delete this file to turn these events off; the weather itself is unchanged."
+  ],
+
+  "events": [
+    {
+      "id": "storm_wind_rising",
+      "kind": "notice",
+      "trigger": { "type": "stateCrosses", "field": "storm", "above": 0, "cooldown": 240 },
+      "body": "The glass is falling, Captain. Weather to windward.",
+      "seconds": 5,
+      "anchor": "ship"
+    },
+
+    {
+      "id": "storm_breaks",
+      "kind": "notice",
+      "trigger": { "type": "stateCrosses", "field": "storm", "above": 1, "cooldown": 240 },
+      "body": "All hands! Shorten sail!",
+      "seconds": 4,
+      "anchor": "ship"
+    },
+
+    {
+      "id": "storm_man_overboard",
+      "trigger": { "type": "stateCrosses", "field": "storm", "above": 2, "cooldown": 600 },
+      "body": "A green sea comes over the bow and sweeps the waist. When it clears there is a man in the water astern, and the ship is running before the gale.",
+      "options": [
+        {
+          "text": "Come about and search for him.",
+          "effects": [ { "op": "addMorale", "value": 4 } ],
+          "outcome": "It costs you the best part of an hour fighting the sea, but they haul him over the rail half drowned. Your crew of {crew} will not forget that you went back."
+        },
+        {
+          "text": "Hold your course. You cannot stop in this.",
+          "effects": [ { "op": "addCrew", "value": -1 }, { "op": "addMorale", "value": -4 } ],
+          "outcome": "You hold your course, and the man in the water falls astern and is gone. Nobody says anything. Nobody has to."
+        }
+      ]
+    },
+
+    {
+      "id": "storm_passes",
+      "kind": "notice",
+      "trigger": { "type": "stateCrosses", "field": "storm", "below": 1, "cooldown": 240 },
+      "body": "The storm passes astern. Shake out the reefs!",
+      "seconds": 5,
+      "anchor": "ship"
+    }
+  ]
+}

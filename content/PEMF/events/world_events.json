@@ -1,0 +1,127 @@
+{
+  "_comment": [
+    "PEMF -- happenings at sea and in harbour.",
+    "",
+    "Plain content events: triggers and effects as documented in",
+    "docs/EVENT_AUTHORING.md. Every one has a cooldown so none of them nags.",
+    "Delete this file to turn them all off."
+  ],
+
+  "events": [
+    {
+      "id": "world_wreckage",
+      "trigger": { "type": "elapsedSailing", "seconds": 420, "cooldown": 1500 },
+      "body": "The lookout sings out: wreckage on the swell, a spar and a tangle of rigging, and lashed to it a sea chest riding low in the water.",
+      "options": [
+        {
+          "text": "Heave to and haul it aboard.",
+          "effects": [ { "op": "addPlunder", "value": 150 } ],
+          "outcome": "It takes four men and a deal of swearing, but the chest comes over the rail. Inside, wrapped in oilcloth, are coins enough to make the morning worthwhile."
+        },
+        {
+          "text": "Leave it. Someone drowned for that chest.",
+          "effects": [ { "op": "addMorale", "value": 1 } ],
+          "outcome": "You hold your course. Some of the older hands nod; there are things a sailor does not take from the sea."
+        }
+      ]
+    },
+
+    {
+      "id": "world_fever",
+      "trigger": { "type": "stateCrosses", "field": "months", "above": 4, "cooldown": 1800 },
+      "body": "Fever has come aboard. Three men are down with it in the forecastle and the surgeon, such as he is, says it will spread before it burns out.",
+      "options": [
+        {
+          "text": "Make for the nearest port and put the sick ashore.",
+          "effects": [ { "op": "addCrew", "value": -2 }, { "op": "addMorale", "value": 2 } ],
+          "outcome": "Two of them are carried down the gangway and do not come back. The rest of your crew of {crew} sleep easier for it."
+        },
+        {
+          "text": "Keep them aboard and pray it passes.",
+          "effects": [ { "op": "addCrew", "value": -5 }, { "op": "addMorale", "value": -2 } ],
+          "outcome": "It does not pass quickly. By the time the fever breaks, five hammocks are empty and the men look at each other sidelong."
+        }
+      ]
+    },
+
+    {
+      "id": "world_castaway",
+      "trigger": { "type": "elapsedSailing", "seconds": 900, "cooldown": 2400 },
+      "body": "A thread of smoke from a sandbar no bigger than a longboat. As you close, a ragged figure staggers to the water's edge waving a shirt on a stick.",
+      "options": [
+        {
+          "text": "Send a boat for him.",
+          "effects": [ { "op": "addCrew", "value": 1 }, { "op": "addMorale", "value": 1 } ],
+          "outcome": "He has been there five weeks, he says, and he will sign any articles you care to name. He can hand, reef and steer, which is more than some."
+        },
+        {
+          "text": "Sail on. Castaways are marooned for a reason.",
+          "effects": [ { "op": "addMorale", "value": -1 } ],
+          "outcome": "The smoke dwindles astern. Nobody mentions it, which is how you know they are all thinking about it."
+        }
+      ]
+    },
+
+    {
+      "id": "world_deserters",
+      "trigger": { "type": "nearPort", "distance": 2500, "rearm": 9000, "cooldown": 2400 },
+      "body": "As {port} comes abeam, the bosun reports that a handful of men have been whispering about the taverns ashore and the wages honest ships pay.",
+      "options": [
+        {
+          "text": "Promise them a share of the next prize.",
+          "effects": [ { "op": "addPlunder", "value": -60 }, { "op": "addMorale", "value": 2 } ],
+          "outcome": "Coin changes hands and the whispering stops. For now, the crew of {crew} is yours."
+        },
+        {
+          "text": "Double the watch and let them try.",
+          "effects": [ { "op": "addCrew", "value": -3 } ],
+          "outcome": "Three of them go over the side in the dark and swim for {port}. You are well rid of them, you tell yourself."
+        }
+      ]
+    },
+
+    {
+      "id": "world_fair_wind",
+      "kind": "notice",
+      "trigger": { "type": "stateCrosses", "field": "wind", "above": 14, "cooldown": 900 },
+      "body": "A fair wind and a bone in her teeth! The men are singing at the capstan.",
+      "seconds": 5,
+      "anchor": "ship"
+    },
+
+    {
+      "id": "world_empty_purse",
+      "trigger": { "type": "stateCrosses", "field": "gold", "below": 50, "cooldown": 1800 },
+      "body": "The purser shows you the strongbox. There is more dust in it than gold, and the men will want paying before long.",
+      "options": [
+        {
+          "text": "Tell them the next prize is all theirs.",
+          "effects": [ { "op": "addMorale", "value": 1 } ],
+          "outcome": "They cheer, as men do when promised the moon. Best find them a prize."
+        },
+        {
+          "text": "Say nothing and hope they don't ask.",
+          "effects": [ { "op": "addMorale", "value": -2 } ],
+          "outcome": "They ask. Of course they ask."
+        }
+      ]
+    },
+
+    {
+      "id": "world_dolphins",
+      "kind": "notice",
+      "trigger": { "type": "elapsedSailing", "seconds": 600, "cooldown": 1500 },
+      "body": "Dolphins under the bow! The men call it a good omen.",
+      "seconds": 5,
+      "anchor": "ship"
+    },
+
+    {
+      "id": "world_long_voyage",
+      "kind": "notice",
+      "trigger": { "type": "stateCrosses", "field": "months", "above": 8, "cooldown": 2400 },
+      "body": "{months} months at sea. The men are talking about home, and about division of the plunder.",
+      "seconds": 6
+    }
+  ]
+}

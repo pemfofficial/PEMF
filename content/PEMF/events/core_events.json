@@ -60,11 +60,14 @@
     "A '%' is safe here: the engine formatter is @-token based and never calls",
     "printf, so there is no format-string hazard."
   ],
-
   "events": [
     {
       "id": "bosun_asks_for_rum",
-      "trigger": { "type": "elapsedSailing", "seconds": 120, "cooldown": 600 },
+      "trigger": {
+        "type": "elapsedSailing",
+        "seconds": 120,
+        "cooldown": 600
+      },
       "body": "The bosun corners you below decks, hat in hand and eyes hard. Your crew of {crew} has gone {morale}, and the men have been counting the days since the plunder was last divided.",
       "options": [
         {
@@ -74,47 +77,70 @@
         },
         {
           "text": "Break open the rum. (200 gold)",
-          "effects": [ { "op": "addPlunder", "value": -200 } ],
+          "effects": [
+            {
+              "op": "addPlunder",
+              "value": -200
+            }
+          ],
           "outcome": "The rum goes round and the deck turns loud. It costs you @NUM pieces of eight, but your crew of @NUM drinks your health and means it.",
-          "outcomeArgs": [200, "crew"]
+          "outcomeArgs": [
+            200,
+            "crew"
+          ]
         },
         {
           "text": "Divide the plunder here and now.",
-          "effects": [ { "op": "setPlunder", "value": 0 } ],
+          "effects": [
+            {
+              "op": "setPlunder",
+              "value": 0
+            }
+          ],
           "outcome": "You call the hands aft and split the take where every man can see it counted. Your crew of {crew} goes back to work satisfied, and the hold is emptier for it."
         }
       ]
     },
-
     {
       "id": "landfall_sighted",
       "kind": "notice",
-      "trigger": { "type": "nearPort", "distance": 3000, "rearm": 6000 },
+      "trigger": {
+        "type": "nearPort",
+        "distance": 3000,
+        "rearm": 6000
+      },
       "body": "Land ho! {port} off the bow!",
       "seconds": 5,
       "anchor": "ship"
     },
-
     {
       "id": "crew_morale_sours",
       "kind": "notice",
-      "trigger": { "type": "stateCrosses", "field": "morale", "below": 2 },
+      "trigger": {
+        "type": "stateCrosses",
+        "field": "morale",
+        "below": 2
+      },
       "body": "The men are grumbling, Captain.",
       "seconds": 5,
       "anchor": "ship"
     },
-
     {
       "id": "hush_on_deck",
       "body": "A hush falls over the deck. Your crew of {crew} stands {morale}, and word spreads that something has changed aboard this ship.",
       "options": [
-        { "text": "Say nothing and hold your course." }
+        {
+          "text": "Say nothing and hold your course."
+        }
       ]
     },
-
     {
       "id": "short_rations",
-      "trigger": { "type": "elapsedSailing", "seconds": 300, "once": true },
+      "trigger": {
+        "type": "elapsedSailing",
+        "seconds": 300,
+        "once": true
+      },
       "body": "The cook reports the salt pork is turning. You have {crew} mouths to feed and {months} months of sailing behind you, and the men have noticed the smell before you did.",
       "options": [
         {
@@ -124,86 +150,17 @@
         },
         {
           "text": "Throw the spoiled stores overboard and make for port.",
-          "effects": [ { "op": "addPlunder", "value": -100 } ],
+          "effects": [
+            {
+              "op": "addPlunder",
+              "value": -100
+            }
+          ],
           "outcome": "The barrels go over the side. It costs you @NUM in stores, but the air below decks is fit to breathe again.",
-          "outcomeArgs": [100]
+          "outcomeArgs": [
+            100
+          ]
         }
-      ]
-    },
-    {
-      "id": "harbourmaster_word",
-      "kind": "choice",
-      "body": "The harbourmaster of {port} keeps a ledger of every hull that has put in this season, and for a coin he is not shy about reading from it.",
-      "options": [
-        {
-          "text": "Pay for a look at the ledger.",
-          "effects": [ { "op": "addPlunder", "value": -50 } ],
-          "outcome": "Fifty pieces lighter, you learn which flags have been calling at {port} and which have been avoiding it."
-        },
-        {
-          "text": "Keep your coin.",
-          "outcome": "You leave him to his ledger. Whatever it says, it says without you."
-        }
-      ]
-    }
-  ],
-
-  "_menuRowsComment": [
-    "TEST ROW -- decide before release whether this ships.",
-    "",
-    "menuRows add PEMF's own options to the game's town menu. Each row needs",
-    "a 'label' and the 'event' id it fires. Rows appear just above",
-    "'Leave Town', so every one of the game's own options keeps its place.",
-    "",
-    "The event is POSTED, not shown on the spot: it comes up once you are out",
-    "of the menu, the same way every other PEMF trigger works."
-  ],
-  "menuRows": [
-    {
-      "label": "Ask after the harbourmaster",
-      "event": "harbourmaster_word"
-    }
-  ],
-
-  "_menusComment": [
-    "menus are PEMF's own screens. Each has an id, a title, and options.",
-    "",
-    "An option does exactly one of three things:",
-    "  \"menu\":    opens another menu (nest as deep as you like, up to 6)",
-    "  \"event\":   fires an event by id, then closes",
-    "  \"outcome\": shows a closing card with that text",
-    "",
-    "A 'Never mind.' row is added for you and is always last. Menus are drawn",
-    "with the game's own card renderer against the port you are standing in.",
-    "",
-    "The crew menu below is a SCAFFOLD for the expanded crew system -- the",
-    "options are deliberately named Test 1..5 and do nothing of consequence."
-  ],
-  "menus": [
-    {
-      "id": "crew_root",
-      "title": "Manage yer crew!",
-      "options": [
-        { "text": "Test 1 -- the roster",     "menu": "crew_test_roster" },
-        { "text": "Test 2 -- morale",         "outcome": "Test 2. Your crew of {crew} stands {morale}." },
-        { "text": "Test 3 -- shares",         "outcome": "Test 3. There is {gold} in undivided plunder." },
-        { "text": "Test 4 -- time at sea",    "outcome": "Test 4. You have been at sea {months} months." },
-        { "text": "Test 5 -- an event",       "event": "harbourmaster_word" }
-      ]
-    },
-    {
-      "id": "crew_test_roster",
-      "title": "Test 1. A menu opened from a menu, to prove nesting works.",
-      "options": [
-        { "text": "Go deeper",       "menu": "crew_test_deep" },
-        { "text": "Say something",   "outcome": "Test 1a. This card closes the whole thing." }
-      ]
-    },
-    {
-      "id": "crew_test_deep",
-      "title": "Test 1b. Two levels down. 'Never mind.' should walk back up one at a time.",
-      "options": [
-        { "text": "Confirm we got here", "outcome": "Test 1c. Three screens deep and back out cleanly." }
       ]
     }
   ]

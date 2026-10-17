@@ -21,6 +21,7 @@
 #include <string.h>
 
 #include "log.h"
+#include "gameaudio.h"
 #include "state.h"
 #include "game.h"
 #include "audiomix.h"
@@ -44,62 +45,11 @@ struct Tuning {
 inline Tuning g_tune;
 
 // ------------------------------------------------- ducking the game's music
-// PEMF's storm track is on its own mixer, so the game's sailing theme happily
-// plays over the top of it. The game keeps its four volume settings in globals
-// and copies them into the live channel array when its options screen applies
-// them:
-//
-//   FUN_004D4480 (void):
-//       channels[0] = 0x00726388     (sound)
-//       channels[1] = 0x0072638C     <-- MUSIC
-//       channels[2] = 0x00726390
-//       channels[3] = 0x00726394
-//
-// The key names are right beside them in the settings writer at 0x004D260F,
-// which is how "MusicVolume" was matched to 0x0072638C rather than guessed.
-//
-// So ducking is: remember the player's setting, write 0, call the apply. And
-// restoring is the same in reverse -- which makes it ESSENTIAL that we never
-// capture our own zero as "the player's setting", or a storm would leave the
-// game permanently silent.
-namespace duck {
-    constexpr uintptr_t MusicVolume = 0x0072638C;
-    constexpr uintptr_t ApplyFn     = 0x004D4480;
-    constexpr unsigned char kApplySig[] = {
-        0x8B, 0x0D, 0xC0, 0xD4, 0x8E, 0x00, 0x33, 0xC0
-    };
-    typedef void (__cdecl *Apply_t)(void);
-
-    inline bool g_ducked  = false;
-    inline int  g_saved   = 0;
-
-    inline bool Callable()
-    {
-        return game::BytesMatch(ApplyFn, kApplySig, sizeof(kApplySig));
-    }
-
-    inline void Set(bool on)
-    {
-        if (on == g_ducked) return;
-        if (!Callable()) return;
-
-        __try {
-            if (on) {
-                g_saved = *(const int*)MusicVolume;
-                if (g_saved <= 0) return;     // already silent; leave it alone
-                *(int*)MusicVolume = 0;
-            } else {
-                *(int*)MusicVolume = g_saved;
-            }
-            ((Apply_t)ApplyFn)();
-        }
-        __except (EXCEPTION_EXECUTE_HANDLER) { return; }
-
-        g_ducked = on;
-        Log("storm audio: the ship's music %s (game MusicVolume %d)",
-            on ? "falls away" : "returns", on ? 0 : g_saved);
-    }
-}
+// Moved to gameaudio.h. It is shared now: the battle track ducks the same
+// setting, and two owners each remembering "the player's value" is how one of
+// them ends up restoring the other's zero. That header also explains why these
+// globals are FLOATS -- the version that lived here read them as int, which
+// worked only because it copied bits rather than doing arithmetic on them.
 
 inline bool  g_loaded   = false;
 inline bool  g_failed   = false;
@@ -109,6 +59,15 @@ inline char  g_path[MAX_PATH] = {0};
 inline audiomix::Track g_track;
 
 inline int Clamp(int v, int lo, int hi) { return v < lo ? lo : (v > hi ? hi : v); }
+
+// What actually reaches the voice: the ramp, scaled by the game's own Master
+// and Music sliders. Reported as needing this -- PEMF is on its own mixer, so
+// it was deaf to the settings screen and a player at 26% master heard the storm
+// at full. One function so the ramp and the alt-tab path cannot disagree.
+inline float VoiceLevel()
+{
+    return ((float)g_level / 1000.0f) * gameaudio::MusicMix();
+}
 
 inline void Configure(const char* gameDir)
 {
@@ -161,7 +120,7 @@ inline void SetAway(bool away)
     // again and the storm is exactly where it was.
     // g_level is 0..1000; the mixer takes 0..1. Getting that conversion wrong
     // here would have set the gain to a thousand rather than to full.
-    audiomix::SetLevel(g_track, away ? 0.0f : (float)g_level / 1000.0f);
+    audiomix::SetLevel(g_track, away ? 0.0f : VoiceLevel());
     Log("storm audio: %s", away ? "silenced -- you are in another window"
                                 : "back");
 }
@@ -288,19 +247,19 @@ inline void Tick(int intensity, bool sailing)
             audiomix::SetLevel(g_track, 0.0f);   // always come UP from silence
             if (audiomix::Play(g_track)) Log("storm audio: in");
         }
-        audiomix::SetLevel(g_track, (float)g_level / 1000.0f);
+        audiomix::SetLevel(g_track, VoiceLevel());
         // Duck once we are past the toe of the fade, so the ship's theme goes
         // out as ours comes in rather than both being audible at full tilt.
-        if (g_tune.duckGameMusic && g_level > 40) duck::Set(true);
+        if (g_tune.duckGameMusic && g_level > 40) gameaudio::Duck(true);
     } else if (audiomix::Playing(g_track)) {
         audiomix::Stop(g_track);
-        duck::Set(false);
+        gameaudio::Restore();
         Log("storm audio: out");
     } else if (g_track.playing) {
         // The flag said yes and the voice said no. Tidy up the rest of the
         // state anyway, or the music stays ducked with nothing playing.
         g_track.playing = false;
-        duck::Set(false);
+        gameaudio::Restore();
     }
 }
 
@@ -309,13 +268,13 @@ inline void Silence()
 {
     if (audiomix::Playing(g_track)) audiomix::Stop(g_track);
     g_track.playing = false;
-    duck::Set(false);          // never leave the game silent
+    gameaudio::Restore();          // never leave the game silent
     g_level = 0;
 }
 
 inline void Shutdown()
 {
-    duck::Set(false);          // restore the player's setting on the way out
+    gameaudio::Restore();          // restore the player's setting on the way out
     audiomix::Release(g_track);
     audiomix::Shutdown();
     g_loaded = false;

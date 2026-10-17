@@ -89,6 +89,9 @@ struct ModState {
     // note below about that race is the reason. Plain characters keep it benign.
     char flagName[128]     = {0};   // what is on the mast now
     char trueFlagName[128] = {0};   // what this captain flies honestly
+    // The nation flags this captain HAS: bit n = nation n's colours, earned with
+    // a letter of marque or bought. A flag you do not have, you cannot fly.
+    unsigned flagsOwned = 0;
 
     // A FINGERPRINT OF THE CAREER THIS STATE BELONGS TO, written at save time.
     //
@@ -115,6 +118,7 @@ struct ModState {
         lastEventTick = 0;
         flagName[0] = 0;
         trueFlagName[0] = 0;
+        flagsOwned = 0;
         fpMonths = fpGold = fpCrew = -1;
         valid = false;
     }
@@ -267,6 +271,7 @@ inline bool Save(const char* savePath)
     // a sidecar identical to the ones earlier builds produced.
     if (g_state.flagName[0])     fprintf(f, "flag=%s\n",     g_state.flagName);
     if (g_state.trueFlagName[0]) fprintf(f, "trueFlag=%s\n", g_state.trueFlagName);
+    if (g_state.flagsOwned)      fprintf(f, "flagsOwned=%u\n", g_state.flagsOwned);
     // The fingerprint of the career this state belongs to, stamped from the
     // live game so a load can prove the state is its own. Without these three
     // lines every sidecar reads as "unknown" and no load can ever be verified,
@@ -344,6 +349,7 @@ inline bool LoadInto(const char* savePath, ModState& out)
             ReadName(line + 5, loaded.flagName, sizeof(loaded.flagName));
         else if (strncmp(line, "trueFlag=", 9) == 0)
             ReadName(line + 9, loaded.trueFlagName, sizeof(loaded.trueFlagName));
+        else if (sscanf_s(line, "flagsOwned=%d", &v) == 1)     loaded.flagsOwned = (unsigned)v & 0xFu;
         else if (sscanf_s(line, "fpMonths=%d", &v) == 1)       loaded.fpMonths = v;
         else if (sscanf_s(line, "fpGold=%d", &v) == 1)         loaded.fpGold = v;
         else if (sscanf_s(line, "fpCrew=%d", &v) == 1)         loaded.fpCrew = v;
@@ -401,6 +407,22 @@ inline void RecordTrueFlag(const char* name)
     if (g_state.trueFlagName[0]) return;
     strncpy_s(g_state.trueFlagName, sizeof(g_state.trueFlagName), name, _TRUNCATE);
     Log("session: this captain's own colours are '%s'", g_state.trueFlagName);
+}
+
+inline unsigned OwnedFlags() { return g_state.flagsOwned; }
+
+inline bool OwnsFlag(int nation)
+{
+    return nation >= 0 && nation < 4 && (g_state.flagsOwned & (1u << nation)) != 0;
+}
+
+// Returns true if this is a flag the captain did not have before.
+inline bool GrantFlag(int nation)
+{
+    Guard g;
+    if (nation < 0 || nation >= 4 || (g_state.flagsOwned & (1u << nation))) return false;
+    g_state.flagsOwned |= 1u << nation;
+    return true;
 }
 
 inline const char* FlagName()     { return g_state.flagName; }

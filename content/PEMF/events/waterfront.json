@@ -1,0 +1,75 @@
+{
+  "_comment": [
+    "PEMF -- the waterfront: things to do in port besides the game's own.",
+    "",
+    "One row in the town menu, 'Walk the waterfront', just above 'Leave'. It",
+    "opens a menu of the events below. Nothing of the game's own is changed.",
+    "",
+    "Effects used here:",
+    "  bribe   value = gold. This port's crown forgets the recent fright:",
+    "          their suspicion meter empties and the forgivable part of what",
+    "          being unmasked cost you is written off. What you actually did",
+    "          stays on the books. Shows its own card.",
+    "  gossip  what the waterfront knows about you: hunters out, ports shut,",
+    "          who is asking questions. Shows its own card.",
+    "",
+    "Delete this file to remove the row."
+  ],
+
+  "menuRows": [
+    { "label": "Walk the waterfront", "menu": "waterfront" }
+  ],
+
+  "menus": [
+    {
+      "id": "waterfront",
+      "title": "The waterfront of {port} is loud with gulls, hawkers and the creak of moored ships.",
+      "options": [
+        { "text": "Look for the harbourmaster", "event": "waterfront_bribe" },
+        { "text": "Listen to the dockside gossip", "event": "waterfront_gossip" },
+        { "text": "Stand the dockhands a round", "event": "waterfront_dockhands" },
+        { "text": "Visit the chandler", "event": "waterfront_chandler" }
+      ]
+    }
+  ],
+
+  "events": [
+    {
+      "id": "waterfront_bribe",
+      "body": "The harbourmaster keeps his office above the customs shed, a ledger open on the desk and his hand never far from it. For 300 gold, he lets it be known, a ship's record can be made to read however its captain prefers.",
+      "options": [
+        { "text": "Put 300 gold on the ledger.", "effects": [ { "op": "bribe", "value": 300 } ] },
+        { "text": "Leave him to his books.", "outcome": "You leave him to his books. He does not look up." }
+      ]
+    },
+
+    {
+      "id": "waterfront_gossip",
+      "body": "The dockside tavern is full of sailors between ships, and sailors between ships talk.",
+      "options": [
+        { "text": "Buy a round and listen.", "effects": [ { "op": "addPlunder", "value": -10 }, { "op": "gossip", "value": 0 } ] },
+        { "text": "Keep your own counsel.", "outcome": "You drink alone and learn nothing, which has its own value." }
+      ]
+    },
+
+    {
+      "id": "waterfront_dockhands",
+      "body": "A knot of dockhands is idling by the bollards, between ships and short of drink money. A round or two, the foreman suggests, and some of them might be persuaded to ship out.",
+      "options": [
+        { "text": "Stand them a round. (40 gold)", "effects": [ { "op": "addPlunder", "value": -40 }, { "op": "addCrew", "value": 3 } ],
+          "outcome": "Three of them follow you back to the ship before the night is out. Your crew is {crew} strong." },
+        { "text": "Walk on.", "outcome": "You walk on. They go back to idling." }
+      ]
+    },
+
+    {
+      "id": "waterfront_chandler",
+      "body": "The chandler has salt pork that has not turned, ship's biscuit without weevils, limes, and a barrel of decent rum. Fresh stores, he says, make for a contented crew.",
+      "options": [
+        { "text": "Lay in fresh stores. (60 gold)", "effects": [ { "op": "addPlunder", "value": -60 }, { "op": "addMorale", "value": 2 } ],
+          "outcome": "The stores come aboard. Tonight the crew of {crew} eats like gentlemen." },
+        { "text": "The old stores will do.", "outcome": "The old stores will do. The cook says nothing, pointedly." }
+      ]
+    }
+  ]
+}

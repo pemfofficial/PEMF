@@ -144,6 +144,17 @@ namespace addr {
     constexpr uintptr_t MoraleByte       = 0x00869B27;  // int8
     constexpr uintptr_t StateFlags       = 0x00869B34;  // int32, bit 0x80
 
+    // Weather as the game itself feels it (decompiled 2026-10-16, FUN_00467F90
+    // at 0x004689AB-0x00468B35, player ship only). Updated every sailing tick;
+    // stale anywhere else.
+    //   0 clear | 1 near a storm | 2 inside it (+400 speed, blown along) |
+    //   3 in the core (a random ship of the fleet takes +1 damage, max 70).
+    // The core's radius shrinks with the byte at 0x00869B26 (2*v + 3 divisor).
+    constexpr uintptr_t StormState       = 0x008C8218;  // int32, 0..3
+    // The "@NUM knots" readout on the sailing HUD (FUN_004741B0): the weather
+    // curve FUN_0045FA70 = 128000 / (distance to nearest weather + 4000).
+    constexpr uintptr_t WindKnots        = 0x0085A0F8;  // int32
+
     // Screen metrics used to position the card.
     constexpr uintptr_t ScreenW = 0x0085A26C;
     constexpr uintptr_t ScreenH = 0x0085A268;
@@ -176,6 +187,20 @@ namespace addr {
     // consults this field is the open question, and the reason it matters:
     // if it does, the disguise stops being cosmetic. state::SetNationality()
     // already writes it safely and reversibly.
+    // Non-zero while a NAVAL BATTLE is running. Set to 1 at 0x0047A07B, the
+    // prologue of the battle function FUN_0047A040, and cleared at 0x0045F996.
+    // Exactly two writers in the binary, one set and one clear.
+    //
+    // ⚠️ USE THIS, NOT THE SCREEN SIGNATURE, to ask "is a battle on". A naval
+    // battle is fought on the same sea in the same screen context and carries
+    // the OVERWORLD's signature -- measured over a whole engagement with no
+    // screen transition logged at all. The 0x8xxxxxxx signature this file used
+    // to call "battle" is the BOARDING duel. See triggers::InShipBattle.
+    //
+    // The flag stays set through a boarding duel, because boarding is entered
+    // from a battle.
+    constexpr uintptr_t BattleActive    = 0x0085A118;   // int, 0 or 1
+
     constexpr uintptr_t ShipArray       = 0x008142F8;
     constexpr int       kShipStride     = 0x45C;
     constexpr uintptr_t ShipNationality = 0x008142FC;   // int16, +0x04
@@ -453,7 +478,9 @@ namespace addr {
     //   sailing / overworld   0x0FFFEFDF, 0x0FFFFFDF   depth 3
     //   town                  0x0FFFEFFA, 0x0FFFFFFA   depth 3
     //   Load / Save           0x0FFBE770, 0x0FFBE750   depth 4
-    //   battle                0x8FFFEFFF, 0x8FFFFFFF   depth 4-5
+    //   boarding duel         0x8FFFEFFF, 0x8FFFFFFF   depth 4-5
+    //   (a NAVAL battle has no signature of its own -- it reads as
+    //    the overworld. See BattleActive above.)
     //   main menu             0x0FFFEFF0, 0x0FFFFFF0   depth 1
     //
     // These are recorded as EVIDENCE, not as constants to compare against --
@@ -536,6 +563,8 @@ inline int32_t&  CrewCount()        { return *(int32_t*)addr::CrewCount; }
 inline int32_t&  UndividedPlunder() { return *(int32_t*)addr::UndividedPlunder; }
 inline int16_t&  MonthsAtSea()      { return *(int16_t*)addr::MonthsAtSea; }
 inline int32_t&  StateFlags()       { return *(int32_t*)addr::StateFlags; }
+inline int32_t   StormState()       { return *(const int32_t*)addr::StormState; }
+inline int32_t   WindKnots()        { return *(const int32_t*)addr::WindKnots; }
 
 typedef int (*GetMoraleLevel_t)();
 inline int GetMoraleLevel() { return ((GetMoraleLevel_t)addr::GetMoraleLevel)(); }
@@ -1682,6 +1711,78 @@ inline int CityDistance(int cityIndex)
     if (dy < 0) dy = -dy;
     int d = (dy < dx) ? (dy + dx * 2) : (dx + dy * 2);
     return d / 2;
+}
+
+// ---------------------------------------------------- the pirate-hunter chase
+// ⚠️ CORRECTION, decompiled 2026-10-16 (FUN_00467F90, the per-ship sailing
+// update). kShipDestCity / kShipHomeCity are named the wrong way round; the
+// shipyard tools that use them are left alone rather than renamed under them:
+//
+//   +0x3E  the port she RETURNS to. FUN_0045B740 ("go home") sets flag 0x80 and
+//          writes it; with 0x80 set she steers for it. It is also the port a
+//          pirate-hunter is LEASHED to -- see below.
+//   +0x40  where she is BOUND. Ordinary traffic steers for it. A ship in port
+//          (flag 0x200) stays docked while +0x40 == +0x3E and sails once they
+//          differ (the in-port path, 0x00469698).
+//
+// And the chase the roadmap said did not exist does: a ship whose purpose
+// (+0x02) is 1 steers every tick for the PLAYER'S position (0x008B96B4 /
+// 0x008B96B0, copied from slot 0 at the top of the same function), through the
+// game's own terrain-aware pathing (FUN_004750C0), and skips the "arrived, so
+// dock" test. Her heading follows: +0x44 is the heading she wants, +0x14 the
+// one she has, turned toward it a little each tick. She stays a hunter only
+// while (0x0046AECC), with reach = (int16 [0x0085BF7E + c*0x94] / 50 -
+// reputation with c's crown) * ([0x0085A158] + 2) / 2 map cells:
+//
+//   distance(her, port +0x3E) <= reach(port +0x3E)         (else: leash)
+//   !(0x0085A164 & 0x400)
+//   damage word at 0x0081431A <= (10 - reputation[her nation]) * 5
+//
+// failing any of which she becomes a raider (purpose 3) and heads home. Note
+// the damage word is read at an ABSOLUTE address: slot 0's, not hers.
+constexpr int       kShipReturnPort    = 0x3E;   // 0x00814336
+constexpr int       kShipBoundFor      = 0x40;   // 0x00814338
+constexpr int       kShipFlagsOff      = 0x58;   // 0x00814350
+constexpr unsigned  kShipFlagGoingHome = 0x80;
+constexpr unsigned  kShipFlagInPort    = 0x200;
+
+inline void SetShipShortRaw(int index, int offset, int value)
+{
+    if (index < 0 || index >= addr::kMaxShips) return;
+    __try {
+        *(short*)(addr::ShipArray + (uintptr_t)index * addr::kShipStride + offset) =
+            (short)value;
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER) {}
+}
+
+inline int ShipShort(int index, int offset)
+{
+    if (index < 0 || index >= addr::kMaxShips) return -1;
+    __try {
+        return *(const short*)(addr::ShipArray + (uintptr_t)index * addr::kShipStride + offset);
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER) { return -1; }
+}
+
+inline unsigned ShipFlags(int index)
+{
+    if (index < 0 || index >= addr::kMaxShips) return 0;
+    __try {
+        return *(const unsigned*)(addr::ShipArray + (uintptr_t)index * addr::kShipStride +
+                                  kShipFlagsOff);
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER) { return 0; }
+}
+
+inline void ClearShipFlagsRaw(int index, unsigned bits)
+{
+    if (index < 0 || index >= addr::kMaxShips) return;
+    __try {
+        *(unsigned*)(addr::ShipArray + (uintptr_t)index * addr::kShipStride + kShipFlagsOff) &=
+            ~bits;
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER) {}
 }
 
 // --------------------------------------------------------------- HUD text

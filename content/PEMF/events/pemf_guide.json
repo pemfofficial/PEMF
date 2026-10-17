@@ -1,0 +1,95 @@
+{
+  "_comment": [
+    "PEMF -- the in-game guide. Opened with H while sailing (keys.ini).",
+    "Each topic is a menu; each entry closes on a card explaining it."
+  ],
+
+  "menus": [
+    {
+      "id": "pemf_guide",
+      "title": "PEMF -- what this mod adds to your voyages. Choose a topic.",
+      "options": [
+        { "text": "Colours and flags", "menu": "guide_flags" },
+        { "text": "Suspicion", "menu": "guide_suspicion" },
+        { "text": "The crowns and their hunters", "menu": "guide_crowns" },
+        { "text": "In port", "menu": "guide_port" },
+        { "text": "At sea", "menu": "guide_sea" }
+      ]
+    },
+
+    {
+      "id": "guide_flags",
+      "title": "Colours and flags.",
+      "options": [
+        { "text": "Earning a crown's flag",
+          "outcome": "You cannot fly colours you do not have. When a governor grants you a letter of marque, his crown's flag comes with it, and it is yours for good. You always have your own colours and the black flag." },
+        { "text": "Changing colours",
+          "outcome": "Press Q while sailing to choose which flag to fly from the ones in your locker. The one flying is marked. (The key can be changed in PEMF\\keys.ini.)" },
+        { "text": "Flags for sale",
+          "outcome": "The trader at the back of a tavern sometimes has a crown's flag as well as his usual wares. It costs gold, and it lets you fly colours no governor gave you." },
+        { "text": "Starting with no crown",
+          "outcome": "There is no crown to choose at the tavern: a new career begins in a pirate haven, serving no one and flying the black flag. Sail where you like and talk to any governor -- his letter of marque is what ties you to a crown." }
+      ]
+    },
+
+    {
+      "id": "guide_suspicion",
+      "title": "Suspicion -- how far they have seen through you.",
+      "options": [
+        { "text": "What raises it",
+          "outcome": "It depends on how a crown regards you. The black flag makes every crown suspicious. Their own colours with their letter of marque make you a friend; without one it is a disguise. An enemy's colours only bother them if they already think badly of you. It rises slowly -- faster the closer they get and the less they like you. The panel at the top right shows it." },
+        { "text": "Aggressive acts",
+          "outcome": "Attacking, taking or sacking what belongs to a crown is what turns suspicion into certainty: their meter jumps at once, more the worse the deed, and it costs you their good opinion -- even a crown that commissioned you. Do it while wearing someone's colours and the disguise is blown." },
+        { "text": "When a ship trails you",
+          "outcome": "At the top of the meter, the nearest ship of that crown falls in astern and shadows you. Nothing is lost yet. Keep your guns quiet for a minute or two and she falls away, and the meter drops back." },
+        { "text": "The challenge",
+          "outcome": "Near the top, a ship comes about and asks who you are. Hold the ruse (a gamble, better with a discreet officer), strike the false colours (no harm done), or run for it (out of sight, suspicion cools fast)." },
+        { "text": "Cooling off",
+          "outcome": "Sail where nobody of theirs can see you and it falls. It falls faster once you are well away from the water where it was raised." }
+      ]
+    },
+
+    {
+      "id": "guide_crowns",
+      "title": "The crowns, their opinion of you, and their hunters.",
+      "options": [
+        { "text": "Reputation",
+          "outcome": "Each crown thinks something of you. Below zero they are your enemy: their ports are closed to you, and their governor, merchant and shipwright will not deal with you. The tavern still serves anyone." },
+        { "text": "Pirate-hunters",
+          "outcome": "A crown you are below zero with sends pirate-hunters, one at a time. How many depends on how badly they think of you and on what you have actually done to them. A hunter chases you wherever you sail." },
+        { "text": "Losing a hunter",
+          "outcome": "Outrun her, outlast her (she gives up after a few minutes), or put into port and stay -- she will not wait outside the harbour for ever. Each escape buys time before that crown sends another." },
+        { "text": "Mending things",
+          "outcome": "Most of what being caught out costs is forgiven in time if nothing more comes of it. A harbourmaster's palm, greased on the waterfront, makes a port's crown forget sooner. What you actually did is remembered." }
+      ]
+    },
+
+    {
+      "id": "guide_port",
+      "title": "In port.",
+      "options": [
+        { "text": "The waterfront",
+          "outcome": "Walk the waterfront from the town menu: bribe the harbourmaster, listen to the gossip (who is hunting you, whose ports are shut), stand the dockhands a round for a few new hands, or lay in fresh stores." },
+        { "text": "Officers",
+          "outcome": "Manage yer crew! in the town menu finds officers to sign on -- a quartermaster, a sailing master, a surgeon and others. Each brings talents (and sometimes flaws), and some things only happen with the right officer aboard." },
+        { "text": "Markets",
+          "outcome": "Prices move. Word comes in of shortages and gluts around particular ports, and a town at war pays more for food and cannon." }
+      ]
+    },
+
+    {
+      "id": "guide_sea",
+      "title": "At sea.",
+      "options": [
+        { "text": "Keys",
+          "outcome": "While sailing (not in battle or in port): Q chooses your colours, C opens your crew and officers, H opens this guide. All three can be changed in PEMF\\keys.ini." },
+        { "text": "Wind and weather",
+          "outcome": "The wind wanders slowly about the trades, and now and then a front swings it hard. Storms make up to windward and drift with it; inside one you are driven along, and in its heart your ships take damage." },
+        { "text": "Sea battles",
+          "outcome": "Battles are louder and messier: wreckage and men go into the sea with every hit, the guns smoke harder, smoke hangs where shot strikes, and your broadsides shake the deck. PEMF\\combat.ini tunes all of it." },
+        { "text": "Things that happen",
+          "outcome": "Wreckage, castaways, fever, deserters, a fair wind -- events come along as you sail, and some depend on who you have aboard." }
+      ]
+    }
+  ]
+}

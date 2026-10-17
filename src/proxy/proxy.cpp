@@ -36,6 +36,7 @@ Entry g_table[] = {
 };
 
 HMODULE   g_real = nullptr;
+HMODULE   g_self = nullptr;
 INIT_ONCE g_once = INIT_ONCE_STATIC_INIT;
 
 BOOL CALLBACK DoResolve(PINIT_ONCE, PVOID, PVOID*)
@@ -111,10 +112,26 @@ static void ProxyLog(const char* fmt, ...)
 // ---------------------------------------------------------------- core load
 static DWORD WINAPI LoadCore(LPVOID)
 {
+    char exe[MAX_PATH]{};
+    GetModuleFileNameA(GetModuleHandleA(NULL), exe, MAX_PATH);
+
+    char self[MAX_PATH]{};
+    GetModuleFileNameA(g_self, self, MAX_PATH);
+
     char path[MAX_PATH]{};
-    GetModuleFileNameA(GetModuleHandleA(NULL), path, MAX_PATH);
+    strcpy_s(path, sizeof(path), exe);
     if (char* slash = strrchr(path, '\\')) *slash = 0;
     strcat_s(path, sizeof(path), "\\pemf_core.dll");
+
+    // Naming both files outright settles the two questions a silent install
+    // always turns on, and which nothing outside the process can answer once it
+    // has gone: whether the executable that started is the one the player
+    // installed into -- a second Steam library or a leftover copy makes that
+    // far less obvious than it sounds -- and whether Windows loaded our
+    // version.dll or its own. A report that says "no log at all" is a different
+    // fault from one where these two lines name the wrong folder.
+    ProxyLog("proxy: version.dll loaded from %s", self);
+    ProxyLog("proxy: host executable %s", exe);
 
     // The version leads the proxy log for the same reason it leads the core's:
     // a half-updated install reads as a broken release. A player who extracts a
@@ -146,6 +163,7 @@ BOOL APIENTRY DllMain(HMODULE mod, DWORD reason, LPVOID)
 {
     if (reason == DLL_PROCESS_ATTACH) {
         DisableThreadLibraryCalls(mod);
+        g_self = mod;
         CloseHandle(CreateThread(nullptr, 0, LoadCore, nullptr, 0, nullptr));
     }
     return TRUE;

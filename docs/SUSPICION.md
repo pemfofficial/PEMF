@@ -2,14 +2,36 @@
 
 False colours, and what it costs to wear them.
 
+> **V2, 2026-10-17** (after a playtest found it far too aggressive). Suspicion
+> now rises slowly and only from a crown's own ships and ports (never the
+> player's fleet, slots 1-7); an AGGRESSIVE ACT is what makes it jump. At 100
+> nothing is lost: the nearest ship of that crown trails you and backs off if
+> you stay quiet. Reputation, not suspicion, decides hunts: only a crown you are
+> below zero with sends hunters, one at a time, more the worse it thinks of you
+> and the more notorious you are. Details in [`JOURNAL.md`](JOURNAL.md)
+> ("Suspicion V2") and `PEMF\suspicion.ini`. Sections below that describe
+> branding, instant penalties at 100 or squadrons of hunters are superseded.
+>
+> **V2.1, same day: by relationship.** What a crown makes of your colours
+> depends on how it regards you. The black flag: every crown is suspicious.
+> Their own colours with their letter of marque: a friend, no suspicion. The
+> same colours without one (a bought flag): a disguise. An enemy crown's
+> colours: only if they already think badly of you (reputation below 0). The
+> rate is scaled by their opinion (100% at 0, 40% when they like you, up to 250%
+> when they loathe you), and an aggressive act jumps it by `aggressionSpike` ×
+> the engine's own penalty (1-3), costing reputation even with a crown that
+> commissioned you. A new career serves no crown and begins in a pirate haven
+> (`piratestart.h`).
+
 **Status: built and running in game.** Suspicion climbs, the beats fire, being
 unmasked drops your reputation and strikes your colours, and pirate-hunters
 sail. The engine work it rests on is in [`GAME_API.md`](GAME_API.md),
 [`re/experiments/nations/`](../re/experiments/nations/README.md) and
 [`re/experiments/shipyard/`](../re/experiments/shipyard/README.md).
 
-Tuning lives in **`PEMF\suspicion.ini`**, which is commented and never
-overwritten by a rebuild. This will be balanced by playing it.
+Tuning lives in **`PEMF\suspicion.ini`**, which is commented. An update
+replaces it only if it was never edited (a hand-edited one is kept, with the
+new file beside it as `suspicion.ini.new`). This will be balanced by playing it.
 
 ## Verified in game
 
@@ -90,7 +112,7 @@ choice card.
 | Low | The disguise holds. This is the *payoff* — you get to be near them. |
 | ~30 | Status notice: they are signalling for your colours. |
 | ~60 | Narrative notice: she is coming about. |
-| ~90 | **Challenge card** — hold the ruse / strike your colours / run. |
+| ~90 | **Challenge card** — hold the ruse / strike your colours / run. Built: `content/PEMF/events/suspicion_events.json`, effects `holdRuse`, `strikeColours`, `run`. |
 | 100 | **Unmasked.** True colours go back up, and the crown dispatches a hunter. |
 
 ---
@@ -206,40 +228,35 @@ Every input the design needs is confirmed working in a running game.
 
 ## How a hunt actually works
 
-The engine offers no way to make a ship hunt the player. Three measured runs
-closed that off for good — the pursuit-target field at `+0x08` exists, overrides
-the war-relations check, and does nothing when pointed at slot 0, because slot 0
-is also its "no target" sentinel. The battle handshake skips the player
-explicitly (`if (other != 0)`). Full evidence in
-[`GAME_API.md`](GAME_API.md#-0x08-is-a-pursuit-target--and-it-does-not-accept-the-player).
+> Rewritten 2026-10-16 from the decompiled sailing update (`FUN_00467F90`).
+> The earlier account — "the engine offers no way to make a ship hunt the
+> player", "aim BEYOND the player" — was wrong about the mechanism; see
+> [`JOURNAL.md`](JOURNAL.md), test round 11.
 
-So a hunt is **steering**, and it rests on one trick.
+**The chase is the game's own.** A ship whose purpose (`+0x02`) is `1` —
+pirate-hunter — steers every tick for the player's position, through the game's
+own pathing round islands, and never "arrives". PEMF's hunters are built with
+purpose 1, so the game steers them.
 
-### Aim BEYOND the player, never at them
+**What stopped them is a leash.** The game keeps a pirate-hunter only while she
+is within reach of her home port (`+0x3E`); past it she becomes a raider and
+sails home. The reach is short — a few dozen map cells, longer the more that
+crown hates you. The old "aim at a port beyond the player" trick worked by
+accident: the order it wrote was her *home port*, so her leash kept moving along
+behind the player.
 
-A destination is a *place*. Aim a hunter at the port nearest the player and she
-sails there, **arrives, and stops** — which is exactly what a playtest reported
-in those words, and why an earlier fix that merely re-issued the same order was
-treating a symptom.
+**PEMF lifts the leash for its own hunters only.** One redirected call
+(`0x0046AEF0`) asks PEMF first: for a slot PEMF marked as its hunter the reach is
+unlimited; every other ship, stock pirate-hunters included, gets the game's
+answer. PEMF then decides when a hunt ends (below).
 
-`ReaimHunter` reflects her position through the player's:
+**Leaving harbour.** A freshly built ship is in port, and stays docked while the
+port she is bound for (`+0x40`) equals her home port. PEMF binds her elsewhere,
+and as a hunter that destination is then ignored in favour of the player.
 
-```
-aim = player + (player - hunter)
-```
-
-and picks the port nearest *that* point, requiring it to be **farther from her
-than the player is**. The player now stands between her and where she is going.
-She sails at us the whole way and does not stop on arrival, because here was
-never the destination.
-
-Without the "farther than the player" rule the nearest port to the reflected
-point can be **the one she is standing in** — observed as `aimed past us at city
-24` on a hunter built at city 24. That is the parking bug in a new hat.
-
-The probe demonstrated the trick by accident before it was designed: a privateer
-ordered clear across the map drove straight through the player's water at speed
-and read, from the deck, exactly like a pursuit.
+**If the game calls her off anyway** (two other tests: a view flag, and a damage
+check that reads the player's record), PEMF puts her back; three times in ten
+seconds and she is let go — "she turns for home".
 
 ### Two ways a hunt can silently produce nothing
 
@@ -248,7 +265,7 @@ Both look identical in play — no ship — and both cost a test round here.
 | Cause | Fix |
 |---|---|
 | Built too far away; the overworld culls her in ~2 s | `hunterMaxSpawnDist` (9,000). Past it we decline and say so. |
-| Built with no fresh destination; she has *arrived* and docks | Aim her the instant she is built, not at the first re-aim. |
+| Built bound for her own port; she stays docked | Bind her elsewhere the instant she is built. |
 
 Because the guard means a distant crown sends nobody, dispatch **retries every
 15 s while reputation is negative**. The guard defers a hunt rather than
@@ -256,8 +273,9 @@ cancelling it: sail back into their waters and someone comes.
 
 ### Ending one
 
-A hunt ends when she sinks, when `hunterGiveUpMs` expires, when you are more
-than `hunterEscapeDist` clear — and, added after this was found missing, **when
+A hunt ends when she sinks, when `hunterGiveUpMs` expires, when you outrun her
+(the overworld drops a ship ~11,000 astern, announced as "we've lost her"), when
+you are more than `hunterEscapeDist` clear — and, added after this was found missing, **when
 reputation returns to 0 or better**. Without that last one the ledger could
 forgive a fright and reopen their ports while a warship was still hunting a
 captain nobody wanted. Reputation is the number that reopens the ports, so the

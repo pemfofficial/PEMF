@@ -3,17 +3,18 @@
 *Pirates! Expanded Modding Framework*
 
 A deeper Caribbean. Today that means **false colours** you can be hunted for,
-**weather** worth steering around, and a narrative engine that turns your
-situation into events with real consequences. In time it means named officers
-with their own histories and grudges, and a crew that has opinions about how you
-captain them.
+**weather** worth steering around, **named officers** you go looking for and pay
+to keep, a **crew with a temper** that answers to how you treat them, and a
+narrative engine that turns your situation into events with real consequences.
 
 > **Current state: early development.**
-> Three mechanics are real and playable: **False Flag**, **Weather**, and the
-> **event engine** — custom events render in the game's own style, offer real
-> choices, and change your game state. **Very little event content exists yet.**
-> Sections marked *Planned* — officers, crew, mutiny — are design intent, not
-> features you can use today, and nothing in them is built.
+> Five mechanics are real and playable: **False Flag**, **Weather**, **officers**,
+> **crew morale**, and the **event engine** — custom events render in the game's
+> own style, offer real choices, and change your game state. **Very little event
+> content exists yet**, which is the honest limit on all of it: the machinery is
+> further along than the writing.
+> Sections marked *Planned* — mutiny, factions, new artwork — are design intent,
+> not features you can use today.
 > Everything under [What Works Today](#what-works-today) is real and testable.
 
 ---
@@ -68,6 +69,15 @@ pemf_core.dll         <- new, PEMF itself
 PEMF\
     events\
         core_events.json
+    officers\
+        roster.json
+    audio\
+    suspicion.ini
+    storms.ini
+    crew.ini
+    KeyMap_WASD.ini
+    plugins\
+    sdk\
     docs\
 ```
 
@@ -167,6 +177,13 @@ fades as you leave it behind.
 
 It is on by default. Turn it off with `enabled = 0` in `PEMF\storms.ini`.
 
+A fight taken in weather keeps that weather: the storm goes overhead in the
+battle instead of vanishing, it is held where it was while you are off the
+overworld, and you come back out into the same system. What you will *not* see is
+convincing rain in a battle — the engine's battle rain draws heavy and static
+across part of the screen rather than falling, so it is left off. The cloud is
+the part that works.
+
 ### It can cost you
 
 Optionally, sailing inside real weather can put a little cargo over the side.
@@ -192,6 +209,81 @@ fade** (the value that looks like opacity is a timer — an engine limitation, n
 an oversight), and you cannot have **more than three** weather systems at once
 (the game keeps only three slots, and asking for a fourth writes past the end of
 its own array). Your edits survive reinstalling PEMF.
+
+---
+
+## Officers and crew
+
+Walk into any port and there is a new line in the menu: **Manage yer crew!**
+
+### Finding an officer
+
+Six posts to fill — Quartermaster, Sailing Master, Bosun, Master Gunner,
+Carpenter, Surgeon — each at three standings: Novice, Journeyman, Master.
+
+**You are paying for the search, not the man.** The gold sends your crew ashore
+to ask after somebody of that standing. Whether anyone turns up is a roll, and
+you pay either way. A Master is dear and often fruitless, which is rather the
+point of him being a Master.
+
+| Standing | Costs | Turns somebody up | Talents |
+|---|---|---|---|
+| Novice | 200 | often | 1 |
+| Journeyman | 500 | sometimes | 2 |
+| Master | 1,200 | seldom | 3 |
+
+If somebody is found you get a card — his name, his standing, a line of his
+history, and what he is good at. Take him on or let him walk.
+
+### They are not interchangeable
+
+Every officer is generated, so two Master Bosuns are not the same man. And he
+may carry a **flaw**, which is a real cost rather than flavour text: *Light
+Fingers* loses you part of every prize, *A Loose Tongue* gets your disguise seen
+through sooner, *More Butcher Than Surgeon* means men who would have lived do
+not. The cheap searches turn up flawed men far more often than the dear ones.
+
+What his talents touch, they actually change: what you take from a prize, the
+crew's temper, the cargo that stays aboard in a blow, how long false colours
+hold, and how many of the wounded live.
+
+⚠️ **One post holds one man, and you cannot pay him off yet.** Choose the
+Sailing Master you take on, because for now he is the Sailing Master you have.
+
+### The roster
+
+**Look over the roster** lists your officers, and each one can be spoken to. Ask
+how the men find the voyage and he will tell you in his own words. Ask what he
+does for you and you get his standing, how long he has been aboard, his history,
+and every talent with what it is actually worth.
+
+### Crew morale
+
+The game has always had a crew mood. PEMF has its own, and it is wider: seven
+states from **MUTINOUS** through **STEADY** to **DEVOTED**, including places
+worse than the game can express on its own.
+
+It moves for real reasons — the officers you keep, the plunder divided, men lost
+over the side, cargo lost in a storm, months at sea — and it moves **slowly**, so
+it is something you notice over a voyage rather than a bar that twitches.
+
+It is not decoration. PEMF drives the game's own morale from it, so the mood on
+your crew's faces and their willingness to stay follow the number. The two do not
+always agree exactly, and that is expected rather than broken: the game's own
+morale is a sum about pay per man, and PEMF's is a mood. Where PEMF asks for a
+level the game cannot reach at your current wealth, it takes the nearest one and
+says so in the log.
+
+Your morale and your officers travel **in your save**. Load an old game and that
+career's crew comes back with it.
+
+### Tuning it
+
+**`PEMF\crew.ini`** holds the crew and officer settings, and everything about the
+officers themselves — names, histories, talents, flaws, posts, standings, costs
+and odds — is in **`PEMF\officers\roster.json`**, meant to be edited. Both are
+commented. `crew.ini` survives a reinstall; `roster.json` is replaced, so keep a
+copy elsewhere if you have rewritten it.
 
 ---
 
@@ -235,10 +327,10 @@ not cut one short either.
 
 ### Your saves are respected
 
-The mod keeps its own state — which events have fired, and in time your officers
-— in a file beside each save (`<name>.pemf`). Load an older save and
-you get that save's state back, exactly as you left it. Nothing carries across
-into a career it does not belong to.
+The mod keeps its own state — which events have fired, your officers, your crew's
+temper, the colours you are flying — in a file beside each save (`<name>.pemf`).
+Load an older save and you get that save's state back, exactly as you left it.
+Nothing carries across into a career it does not belong to.
 
 ### WASD steering
 
@@ -362,7 +454,16 @@ The validation exists specifically to stop authored text reaching the 2004 engin
 in a state it cannot handle. It is thorough, but it is not a formal guarantee: if
 you do find content that misbehaves, please report it with your log.
 
+Events are not the only thing authored that way. The same files can add **your
+own rows to the game's town menu** — limitable to one port or one crown — and
+**menus of your own** behind them: a title, options, and each option opens
+another menu, fires an event, or ends on a card.
+
 See **[EVENT_AUTHORING.md](EVENT_AUTHORING.md)** for the full format.
+
+If you would rather write a mod in **code** than in JSON, PEMF loads plugins: a
+32-bit DLL in `PEMF\plugins\`, against the header that ships in `PEMF\sdk\`. See
+**[PLUGINS.md](PLUGINS.md)**.
 
 ---
 
@@ -370,20 +471,18 @@ See **[EVENT_AUTHORING.md](EVENT_AUTHORING.md)** for the full format.
 
 Everything below is design intent. None of it is playable yet.
 
-### Officers
+### Officers who have opinions of each other
 
-A limited roster of **named officers**, each a persistent individual with their
-own history, loyalties, ambitions and opinions — of you, of each other, and of
-how you run the ship. Officer slots are scarce, so who you keep matters.
+Your officers have histories and talents today. What they do not have is a view
+of one another, or a loyalty to you that can be lost. Rivalries, favourites and
+an officer who walks off over how you run the ship are all still to come.
 
-The plan includes a roster screen and a crew/officer count indicator.
+### Crew who speak up
 
-### Crew
-
-Beyond your officers, the crew are a body with **morale, needs and opinions**.
-They notice how long it has been since the plunder was divided, how well they
-eat, and how you treat them. Events grow out of that state rather than firing at
-random.
+The crew have a temper today, and it moves for real reasons — but it rarely says
+anything of its own. The intent is events that grow out of that state: the men
+noticing how long it has been since the plunder was divided, how well they eat,
+and how you treat them, rather than events firing at random.
 
 ### Mutiny and its consequences
 
@@ -422,8 +521,9 @@ bright pink sails and flags — the usual symptom of installing a flag pack that
 overwrote them. And that is also why *changing* a nation's flag still means
 replacing a file, while adding your own never does.
 
-What PEMF will add later is not more flags but a reason to change them: flying
-another nation's colours to get close, and the risk of being found out.
+What PEMF adds is not more flags but a reason to change them: flying another
+nation's colours to get close, and the risk of being found out. That is
+[False Flag](#playing-false-flag) above, and it works today.
 
 ---
 
@@ -447,6 +547,18 @@ problem. See [EVENT_AUTHORING.md](EVENT_AUTHORING.md).
 **Hotkeys do nothing.**
 Be in an actual game rather than the menu, and hold Ctrl and Shift together with
 the number key.
+
+**The game locked up on a black screen after I alt-tabbed.**
+Known, unfixed, and ours rather than the game's — the stock game survives the same
+test. Alt-tabbing out starts Windows restoring your desktop resolution, and
+alt-tabbing back *before* that finishes can leave the game stuck behind a black
+window. Give it a second before switching back and you will not see it; playing
+in a window instead of full screen avoids it completely, because the graphics
+device is never taken away.
+
+You do not need to reboot: **Ctrl+Shift+Esc**, find `Pirates!.exe`, End task.
+Task Manager draws above the stuck window. **Your saves are not at risk** — the
+game is stuck, not writing.
 
 **The game closed with no error message.**
 Please report it with your `pemf.log` — it is written continuously and

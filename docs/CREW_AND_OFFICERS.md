@@ -1,14 +1,18 @@
-# Crew & Officers — the plan
+# Crew & Officers
 
-The design for PEMF's expanded crew morale and named officer systems, and the
-reverse engineering it rests on.
+PEMF's crew morale and named officer systems, the reverse engineering they rest
+on, and the measurements that decided how they are built.
 
-**Nothing here is built yet.** This document exists so the build starts from
-measured ground rather than assumption, and so the parts that are *not* yet
-known are visible instead of being discovered halfway through.
+**Both systems ship.** Officers and PEMF's own morale went out in 0.2.4 and have
+been played. What is *not* built is gathered under
+[Still to build](#still-to-build) rather than left mixed in — chiefly mutiny and
+its consequences, and officers who have opinions of each other.
+
+The measurements come first here because they are still the reason the code looks
+the way it does. Very little about either system was a free choice.
 
 Engine detail lives in [`GAME_API.md`](GAME_API.md) under *Crew morale* and
-*Loot*; this page is the design that sits on top of it.
+*Loot*; this page is the reasoning that sits on top of it.
 
 ---
 
@@ -39,10 +43,13 @@ record, so it is saved and loaded with the career rather than maintained by code
 That is what makes a morale system possible: PEMF owns the byte during a
 session, and re-applies it after a load at a moment PEMF already detects.
 
-⚠️ **Its authority has never been measured.** As a signed byte it shifts the
-expectation by at most ±508, against a base of `(worldTerm)² / 4` of unknown
-magnitude. Small base and it is a complete lever; large base and it is a trim.
-**Phase B measures this before anything is designed around it.**
+**Its authority is measured.** As a signed byte it shifts the expectation by at
+most ±508, and against the base actually observed that is a complete lever
+rather than a trim: it reaches every level from 0 to 4. But it does so in only
+about four usable notches (−8…0), and at the wealth tested **level 3 could not
+be reached at all**. The reachable set moves with the player's gold, which is
+why the code searches for a byte rather than calculating one. Numbers in
+[`GAME_API.md`](GAME_API.md).
 
 ### 3. The engine cannot be taught new tier names
 
@@ -75,10 +82,11 @@ The engine then computes its morale from our byte. The HUD icon, the desertion
 behaviour and any engine logic reading morale all follow our number, because we
 moved the input its own arithmetic depends on.
 
-**Fidelity depends on Phase B.** If the byte turns out to have full authority the
-loop is exact; if not, PEMF's scale still drives everything PEMF owns and the
-engine's own level tracks as closely as the lever allows. Either way the design
-holds — only the tightness changes.
+**The loop is built and running, and it is not exact.** The byte has authority
+over the whole range but not over every point in it at every wealth, so PEMF's
+scale drives everything PEMF owns and the engine's own level tracks as closely as
+the lever allows. Where it cannot, the mismatch is logged and described as
+expected — see *The two moralities* below.
 
 ---
 
@@ -158,58 +166,69 @@ therefore split by duty, which also reads like something the game would write:
 
 ```
 Manage yer crew!
-> Hire officers
-  > Ship's officers
-    - Find a Sailing Master   (handles better in a blow -- 300g + rum)
-    - Find a Bosun            (crew work faster -- 250g + food)
-    - Find a Carpenter        (repairs at sea -- 250g + goods)
-  > The captain's men
-    - Find a Quartermaster    (a fairer share -- 300g + rum)
-    - Find a Master Gunner    (broadsides tell -- 350g + cannon)
-    - Find a Surgeon          (fewer die of wounds -- 300g + food)
-> The roster
-> ...
+> Ask after ship's officers
+    - Sailing Master, Bosun, Carpenter
+> Ask after the captain's men
+    - Quartermaster, Master Gunner, Surgeon
+> Look over the roster
+> Never mind.
 ```
 
-Each `Find a…` opens the three tiers — Novice, Journeyman, Master — with the
-cost shown. **Buying is buying the search, not the officer**: gold and goods are
-spent sending the crew ashore to ask around, and finding someone is a roll. Cost
-scales with tier; so does the chance and so does what you get.
+Each post opens the three standings, with the cost shown. **Paying buys the
+search, not the officer**: the gold sends the crew ashore to ask after somebody,
+and whether anyone turns up is a roll. Cost scales with standing; so does the
+chance, so does what you get, and so does how often he is sound.
 
-| Tier | Skills | Cost |
-|---|---|---|
-| Novice | 1 | low |
-| Journeyman | 2 | medium |
-| Master | 3 | high |
+| Standing | Skills | Cost | Found | Carries a flaw |
+|---|---|---|---|---|
+| Novice | 1 | 200 | 70% | 45% |
+| Journeyman | 2 | 500 | 45% | 25% |
+| Master | 3 | 1,200 | 25% | 10% |
+
+Those are the shipped values in `roster.json` and all five columns are authored,
+so a player who finds the search too kind or too cruel can say so in the file.
+
+📐 **Paying an officer off is not built.** One post holds one man, and the refusal
+to hire a second tells the player to pay the first off — but there is no row that
+does it yet. Until there is, a post filled is a post filled for the career.
 
 ---
 
 ## The data
 
-All of it authored, all of it extensible, all validated at load.
+All of it authored, all of it extensible, all validated at load. It lives in one
+file, `PEMF\officers\roster.json`, because four files that must agree with each
+other are four chances for them not to:
 
-| File | Holds |
+| Key | Holds |
 |---|---|
-| `PEMF\officers\names.json` | the master name pool — players add to it |
-| `PEMF\officers\bios.json` | bio lines, in the game's voice |
-| `PEMF\officers\skills.json` | skill definitions: name, text, target, operation, value |
-| `PEMF\officers\roles.json` | the six roles, their tiers and costs |
+| `names` | the master name pool — players add to it |
+| `bios` | bio lines, in the game's voice |
+| `skills` | skill definitions: id, name, text, target, value |
+| `roles` | the six posts, and which skills and flaws each may draw |
+| `tiers` | the three standings, their skill counts, costs, odds and `flawChance` |
 
 An officer is generated as: role + tier → a name from the pool, a bio, and
-1–3 skills drawn at random from those its role allows.
+1–3 skills drawn without replacement from those its role allows, plus a possible
+flaw. Nobody is good at the same thing twice.
 
 **Text is validated like every other authored string** — ASCII, token counts,
 and a length budget. A bio long enough to overflow the card is rejected at load
 **by name**, rather than overflowing in front of a player. The card wraps through
 `WrapText` (`0x004879F0`), the routine the game uses for its own.
 
-Officers live in the **save sidecar**, per career. `session::ModState` is three
-ints today and its own comment already says to move to JSON when it grows — this
-is that moment.
+Officers live in the **save sidecar**, per career, written as **authored ids
+rather than indices**. An index is a position in `roster.json`, so a player who
+adds a name or reorders a role would turn every saved officer into a different
+man. Ids survive an edited file, and a trait that has since been deleted is
+dropped with a line in the log saying whose it was.
 
 ---
 
-## Order of work
+## How it was built
+
+Four phases, in this order, because each one needed the last to have been
+measured first.
 
 **Phase A — the loot hook. ✅ BUILT AND VERIFIED IN GAME (2026-08-06).**
 `loot.h` samples `0x00861FF8` at the safe point. Measured on a real capture:
@@ -223,8 +242,8 @@ confirmed (`predicted == actual` every sample). The byte has **full authority**
 over the 0–4 range, but with **only about four usable notches (−8…0)**, and
 **level 3 was unreachable** at the wealth tested. The expectation base was 4
 because `A` and `B` were both zero, so the loop must solve from current inputs
-rather than a baked table. Details in `GAME_API.md`. Remaining: build the wide
-scale, the sidecar field, the tier names and the closed loop.
+rather than a baked table. Details in `GAME_API.md`. The wide scale, the sidecar
+field, the tier names and the closed loop all followed in Phase D.
 
 **Phase C — officers. ✅ BUILT AND PLAYED (2026-08-06).** Six roles, three
 standings, hiring against a roll, an interactive roster where each man has his
@@ -279,12 +298,39 @@ Two consequences the code handles:
 
 ---
 
+## Still to build
+
+The parts of the original design that have **not** shipped. Each is separated
+out here rather than left mixed in above, because a crew system that hires
+officers and keeps a mood is not the same thing as one the crew can turn on you.
+
+- 📐 **Mutiny, splintering and marooning.** PEMF's scale already reaches
+  MUTINOUS and the engine's own desertion follows the byte, so an unhappy crew
+  thins out today — but nothing takes the ship off the player. The outcomes
+  (crew breaking away, being put ashore at the next port, the plank) are
+  designed and not built.
+- 📐 **Officers who have opinions of each other.** An officer today has a name,
+  a standing, a history, a tenure and his talents. He has no view of the other
+  five and no loyalty of his own that can be lost. Relationships were always the
+  second half of "named officers" and none of them exists yet.
+- 📐 **Paying an officer off**, as above.
+- 📐 **Crew events grown from crew state.** `stateCrosses` can fire an event on
+  morale crossing a line, which is the hook; what is missing is authored content
+  that uses it, so the crew's mood rarely says anything of its own.
+- 📐 **A roster indicator outside the menu.** The roster is reachable only from
+  a port. Drawing it while sailing waits on shapes and panels, which is the open
+  half of the render work.
+
 ## Open questions
 
-- Which site awards the spoils of a captured ship (Phase A).
-- The magnitude of the morale expectation base (Phase B).
+- Which site awards the spoils of a captured ship. Still unidentified, and no
+  longer in the way: watching the running total covers every award site at once
+  without knowing where any of them are.
 - Whether the six-selectable-line limit is the engine's or only PEMF's — it
   comes from PEMF's own docs, not the disassembly. If the renderer takes more,
   the menu split becomes a choice rather than a constraint.
 - What `0x0085A158`, `0x00869A76` and `0x00869B34` are. All three feed the
-  morale formula and none is identified.
+  morale formula and none is identified. The solver reads them rather than
+  needing to understand them, which is why this has not blocked anything.
+- How much of the reachable morale range moves with wealth. Level 3 was
+  unreachable at the one wealth measured; whether that is general is unknown.

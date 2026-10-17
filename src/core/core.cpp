@@ -50,6 +50,13 @@
 #include "officers.h"
 #include "townmenu.h"
 #include "sailkeys.h"
+#include "sailmaster.h"
+#include "flagtrader.h"
+#include "market.h"
+#include "combatfx.h"
+#include "piratestart.h"
+#include "widescreen.h"
+#include "hudcorners.h"
 #include "plugin.h"
 #include "d3d9hook.h"
 
@@ -320,6 +327,9 @@ static void NoteColoursFlown(const char* flagName);
 extern char g_trueFlagName[128];
 extern bool g_haveTrueFlag;
 static void ApplyCareerFlag();
+static void GrantMarqueFlags();
+static int FlagCount();
+static const char* FlagAt(int i);
 // Latches cleared on a career change: a disguise, and our memory of the
 // captain's honest colours, both belong to the career they were formed in.
 extern bool g_careerFlagApplied;
@@ -424,14 +434,29 @@ static void RunSafePoint()
         // reason to write this early.
         if (g_targetOK) {          // implied here, but this is a code write
             storms::Apply();
+            wind::Install();
+            sailmaster::InstallPolicy();
+            suspicion::InstallLeash();
+            flagtrader::Install();
+            market::Install();
+            combatfx::Install();
+            piratestart::Install();
             townmenu::Install();
             render::Install();
+            widescreen::Install();
+            hudcorners::Install();
             // Only if OUR layout is the one in force -- see sailkeys.h. On the
             // stock layout 'A' and 'S' mean load and save, as the game intends,
             // and there is nothing to fix.
             if (g_wasdActive) sailkeys::Apply();
         }
     }
+
+    // Off the overworld (a sea battle above all) the game gets its own wind
+    // term back. One compare and a store, so it sits above the dormancy exit.
+    wind::SafePointTick();
+    // This frame's margin for the HUD in the corners. Two compares when idle.
+    hudcorners::Tick();
 
     // ------------------------------------------------ nothing to do right now
     // ⛔ DO NOT MOVE THIS BELOW THE WORLD WORK. The whole point is that none of
@@ -501,6 +526,7 @@ static void RunSafePoint()
     // work we are about to skip, so it has to be told here or it plays on into
     // an empty room. Cheap -- it only does anything on the edge.
     stormaudio::SetAway(!focus);
+    battlemusic::SetAway(!focus);
 
     const bool quiet = !focus || d3d9hook::Dormant();
 
@@ -617,6 +643,7 @@ static void RunSafePoint()
         const DWORD dt  = g_lastSusAt ? (now - g_lastSusAt) : 0;
         g_lastSusAt = now;
 
+        GrantMarqueFlags();
         suspicion::Tick(dt);
         suspicion::RefreshPanel();
 
@@ -635,6 +662,36 @@ static void RunSafePoint()
                     "go back to -- the flag stays as it is");
             }
         }
+
+        // ------------------------------------------------- battle music
+        // One boolean decides everything: our track plays IF AND ONLY IF a ship
+        // battle is on screen. A boarding duel and the boarding menu are not
+        // ship battles and keep the game's own music, which is what was asked
+        // for. ⚠️ The screen signature CANNOT tell a naval battle from the
+        // overworld -- measured, they are the same -- so this reads the
+        // engine's own battle flag and excludes the boarding duel, which is
+        // what the top bit actually marks. See triggers::InShipBattle.
+        //
+        // Evaluated BEFORE the storm so a fight that begins in weather silences
+        // the drums on the same frame it starts the battle track, rather than
+        // one frame of both.
+        // ONE sample. triggers::Sample() is not a pure read -- it updates the
+        // movement history and runs a 128-city nearest search -- so taking a
+        // second one per frame doubles that work for nothing.
+        const triggers::WorldSample ws = triggers::Sample();
+        triggers::LogScreenChange(ws);
+
+        const bool inShipBattle = triggers::InShipBattle();
+
+        if (inShipBattle) {
+            // ⛔ The storm's own hold grace would otherwise keep the drums
+            // going for holdMs INTO the fight -- that grace exists for the
+            // pause menu, where the player has not left the storm. A battle is
+            // leaving it. Reported as the drums playing over a fight that
+            // should have had battle music.
+            stormaudio::Silence();
+        }
+        battlemusic::Tick(inShipBattle);
 
         // Gated on the overworld being on screen, not merely in game --
         // otherwise the storm track plays over the main menu.
@@ -704,6 +761,12 @@ static void RunSafePoint()
     // PEMF's share of what the crew took. A read and a compare in the common
     // case; see loot.h for why this is sampled rather than hooked.
     if (g_targetOK) { loot::Tick(); crewwatch::Tick(); crewmorale::Tick(); }
+
+    // Read-only watch on the engine's "far out to sea" card. Logs only when the
+    // card actually speaks, so it costs four dword reads a frame and says
+    // nothing until there is something to say. Delete it once the fourth report
+    // is settled -- see the header for what would settle it.
+    if (g_targetOK) sailmaster::Poll();
 
     // Presenting only moves to the render phase once stage 3 is reached; until
     // then it happens here. The half-drawn background this used to leave behind
@@ -872,11 +935,25 @@ static int NationFromFlagName(const char* name)
 // flying English colours was treated as an impostor and hunted by his own
 // crown. Reported from a playtest, and obvious in hindsight: a flag name is not
 // an allegiance.
+static bool IsBlackFlag(const char* name)
+{
+    return name && _strnicmp(name, "flag_pir", 8) == 0;
+}
+
 static void NoteColoursFlown(const char* flagName)
 {
     const int worn = NationFromFlagName(flagName);
     const int own  = nations::HomeNation();
-    const int wearing = (worn >= 0 && worn != own) ? worn : -1;
+    // HONEST is any crown we hold a letter of marque from, not only the one the
+    // game caches as "served" -- a captain commissioned by the French flies
+    // French colours as of right. (Seen in play: a French letter, French colours,
+    // and PEMF calling it a disguise because the cache still said "no crown".)
+    const bool commissioned = worn >= 0 && nations::Rank(worn) > 0;
+    const int wearing = (worn >= 0 && worn != own && !commissioned) ? worn : -1;
+
+    // What the world sees, honest or not -- enemies of that crown, and every
+    // crown for the black flag, take an interest in it (suspicion.h, WhyFor).
+    suspicion::SetFlown(worn, IsBlackFlag(flagName));
 
     if (wearing != suspicion::g_wearing) {
         Log("suspicion: colours now %s (flag '%s'; we serve %s)",
@@ -885,6 +962,121 @@ static void NoteColoursFlown(const char* flagName)
             own >= 0 ? game::NationName(own) : "no crown");
     }
     suspicion::SetWearing(wearing);
+}
+
+// ------------------------------------------------------ flags you HAVE
+// You cannot fly colours you do not have aboard. A crown's flag comes with its
+// letter of marque (rank above 0 with them, 0x00869A88) or is bought; your own
+// colours, the black flag and any personal device are always aboard.
+static bool CanFly(const char* flagName)
+{
+    const int n = NationFromFlagName(flagName);
+    if (n < 0) return true;                        // black flag or a personal device
+    if (n == nations::HomeNation()) return true;   // the crown we serve
+    if (session::OwnsFlag(n)) return true;
+    return nations::Rank(n) > 0;                   // a letter in hand, not yet noted
+}
+
+// The player's keys (see "the player's keys" below for which and why).
+static char g_keyColours = 'Q';
+static char g_keyCrew    = 'C';
+static char g_keyGuide   = 'H';
+
+// The governor's gift, on a card.
+static void MarqueFlagCard(int nation)
+{
+    if (nation < 0 || nation >= game::addr::kNationsWithRank) return;
+    char body[512];
+    _snprintf_s(body, sizeof(body), _TRUNCATE,
+        "As the governor's secretary seals your letter of marque, he lays a folded "
+        "ensign beside it. 'His Excellency's colours, Captain. Fly them in the "
+        "service of the %s Crown -- and only in its service.'\n\n"
+        "The %s flag is yours. Press %c at sea to choose which colours to fly.",
+        game::NationName(nation), game::NationName(nation), g_keyColours);
+    game::ShowEventCard(body);
+}
+
+// Once a second at the safe point: a new letter of marque puts that crown's
+// flag in the locker for good, and the captain is told so.
+static void GrantMarqueFlags()
+{
+    static DWORD lastAt = 0;
+    const DWORD now = GetTickCount();
+    if (lastAt && (now - lastAt) < 1000) return;
+    lastAt = now;
+    if (!session::InCareer() || !session::Ready()) return;
+
+    market::Tick(true);    // once a second, with the career live
+
+    for (int n = 0; n < game::addr::kNationsWithRank; ++n) {
+        if (nations::Rank(n) <= 0) continue;
+        if (!session::GrantFlag(n)) continue;
+        Log("flags: letter of marque from the %s -- their colours are ours to fly",
+            game::NationName(n));
+        // Told on a card, at the next moment cards may be shown (after the
+        // governor's own scene), so it reads as part of the commission.
+        events::Post(&MarqueFlagCard, n, "marque-flag");
+    }
+}
+
+// ------------------------------------------------------- the player's keys
+// Plain letters the sailing view does not use (its own key table, 0x00473968,
+// leaves B C E G H I J K M N O Q R T U X Y Z free; KeyMap.ini adds v f w a s d).
+// Changeable in PEMF\keys.ini. Read only while sailing, with the game in front
+// and no card up; the menu itself is posted and shown at the next safe moment.
+
+static void LoadPlayerKeys(const char* gameDir)
+{
+    char path[MAX_PATH];
+    _snprintf_s(path, sizeof(path), _TRUNCATE, "%s\\PEMF\\keys.ini", gameDir);
+    FILE* f = nullptr;
+    if (fopen_s(&f, path, "r") == 0 && f) {
+        char line[256];
+        while (fgets(line, sizeof(line), f)) {
+            char key[64] = {0}, val[8] = {0};
+            if (sscanf_s(line, " %63[A-Za-z_] = %7s", key, (unsigned)sizeof(key),
+                         val, (unsigned)sizeof(val)) != 2) continue;
+            const char c = (char)toupper((unsigned char)val[0]);
+            if (c < 'A' || c > 'Z') continue;
+            if      (_stricmp(key, "colours") == 0) g_keyColours = c;
+            else if (_stricmp(key, "crew")    == 0) g_keyCrew    = c;
+            else if (_stricmp(key, "guide")   == 0) g_keyGuide   = c;
+        }
+        fclose(f);
+    }
+    Log("keys: %c = colours, %c = crew, %c = PEMF guide (while sailing)",
+        g_keyColours, g_keyCrew, g_keyGuide);
+}
+
+static void ColoursMenu(int);
+static void SeaCrewMenu(int);
+static void GuideMenu(int);
+
+static void PollPlayerKeys()
+{
+    static DWORD lastPoll = 0;
+    const DWORD now = GetTickCount();
+    if (now - lastPoll < 50) return;
+    lastPoll = now;
+
+    static bool wasDown[3] = { false, false, false };
+    const char keys[3] = { g_keyColours, g_keyCrew, g_keyGuide };
+    const bool ctrl = (GetAsyncKeyState(VK_CONTROL) & 0x8000) != 0;
+    for (int i = 0; i < 3; ++i) {
+        const bool down = !ctrl && (GetAsyncKeyState(keys[i]) & 0x8000) != 0;
+        const bool rising = down && !wasDown[i];
+        wasDown[i] = down;
+        if (!rising) continue;
+        // Sailing the overworld ONLY. Not in a sea battle (Q there would also
+        // change shot -- reported from play), and not in a duel, a land fight
+        // or a dance, where these letters are moves (depth 4-5, GAME_API.md).
+        if (!PemfHasFocus() || !session::InCareer() || events::Busy() ||
+            !content::WorldStillOnScreen() || triggers::InShipBattle() ||
+            session::ScreenDepth() != 3) continue;
+        if (i == 0) events::Post(&ColoursMenu, 0, "colours-menu");
+        if (i == 1) events::Post(&SeaCrewMenu, 0, "crew-menu");
+        if (i == 2) events::Post(&GuideMenu, 0, "pemf-guide");
+    }
 }
 
 // The shipyard experiment gets its own marker. It does not write game state so
@@ -1053,6 +1245,36 @@ static void ApplyCareerFlag()
     if (g_careerFlagApplied) return;
 
     __try {
+        // UNALIGNED START (suspicion.ini startUnaligned). The game's "nation"
+        // at character creation is only the crown of the starting port, cached
+        // at 0x00869AA8 by the career setup (0x004722F7); no rank is granted
+        // (the rank array is only ever incremented, by governors at 0x0040D3BF
+        // and 0x0040D5FF). The cache is read as @NATIONALITY text ([NATIONALITY]
+        // has a 5th entry, "Pirate"), in two compares, and as the index of the
+        // captain's outfit letter in FUN_004BCD90 -- which has no Pirate letter
+        // until piratestart.h gives it one. So a brand-new career gets 4 there
+        // and the black flag as its own colours, until a governor's letter of
+        // marque sets the crown.
+        if (suspicion::g_tune.startUnaligned && state::Months() == 0 &&
+            !session::TrueFlagName()[0]) {
+            bool anyRank = false;
+            for (int n = 0; n < game::addr::kNationsWithRank; ++n) anyRank |= nations::Rank(n) > 0;
+            short& served = *(short*)game::addr::PlayerNation;
+            if (!anyRank && served >= 0 && served < game::addr::kNationsWithRank) {
+                Log("career: unaligned start -- serves no crown (was %s); flying the black flag",
+                    game::NationName(served));
+                served = game::addr::kPirate;
+                for (int i = 0; i < FlagCount(); ++i)
+                    if (IsBlackFlag(FlagAt(i))) {
+                        session::RecordTrueFlag(FlagAt(i));
+                        session::RecordFlag(FlagAt(i));
+                        strncpy_s(g_trueFlagName, sizeof(g_trueFlagName), FlagAt(i), _TRUNCATE);
+                        g_haveTrueFlag = true;
+                        break;
+                    }
+            }
+        }
+
         // Whatever Config.ini had is this captain's honest choice, unless the
         // sidecar already recorded one.
         if (!session::TrueFlagName()[0]) {
@@ -1287,6 +1509,104 @@ static int FlagCount() { return g_flagNameCount; }
 static const char* FlagAt(int i)
 {
     return (i >= 0 && i < g_flagNameCount) ? g_flagNames[i] : nullptr;
+}
+
+static void RememberTrueFlag();
+static bool CanFly(const char* flagName);
+
+// What a flag is called on the colours menu.
+static void FlagLabel(const char* nm, char* out, size_t cch)
+{
+    const int n = NationFromFlagName(nm);
+    if (IsBlackFlag(nm))                    _snprintf_s(out, cch, _TRUNCATE, "The black flag");
+    else if (n >= 0)                        _snprintf_s(out, cch, _TRUNCATE, "%s colours", game::NationName(n));
+    else                                    _snprintf_s(out, cch, _TRUNCATE, "Our own device (%s)", nm);
+}
+
+// Q at sea: every flag aboard, the one flying marked.
+static void ColoursMenu(int)
+{
+    RememberTrueFlag();
+    const char* flying = session::FlagName();
+    if (!flying || !*flying) flying = g_haveTrueFlag ? g_trueFlagName : "";
+
+    char labels[10][96];
+    const char* opts[11] = { nullptr };
+    int idx[10];
+    int n = 0;
+    for (int i = 0; i < FlagCount() && n < 10; ++i) {
+        const char* nm = FlagAt(i);
+        if (!nm || !CanFly(nm)) continue;
+        char l[80];
+        FlagLabel(nm, l, sizeof(l));
+        const bool on = _stricmp(nm, flying) == 0;
+        _snprintf_s(labels[n], sizeof(labels[n]), _TRUNCATE, "%s%s", l, on ? "  (flying)" : "");
+        opts[n] = labels[n];
+        idx[n] = i;
+        ++n;
+    }
+    const int back = n;
+    opts[n++] = "Leave them as they are.";
+    const int pick = game::AskChoice("Which colours shall we run up, Captain?", opts, n);
+    if (pick < 0 || pick >= back) return;
+
+    const char* nm = FlagAt(idx[pick]);
+    if (!nm || _stricmp(nm, flying) == 0) return;
+    if (game::SetPlayerFlagByName(nm)) {
+        g_flagCursor = idx[pick];
+        session::RecordFlag(nm);
+        NoteColoursFlown(nm);
+        char l[80]; FlagLabel(nm, l, sizeof(l));
+        char msg[128]; _snprintf_s(msg, sizeof(msg), _TRUNCATE, "%s run up.", l);
+        content::PostDebugNotice(msg, 5);
+        Log("falsecolours: flying '%s' (colours menu)", nm);
+    } else {
+        Log("falsecolours: REFUSED '%s' from the colours menu", nm);
+    }
+}
+
+// C at sea: the crew and the officers aboard. Hiring is done in port.
+static void SeaCrewMenu(int)
+{
+    for (int guard = 0; guard < 16; ++guard) {
+        char title[320];
+        _snprintf_s(title, sizeof(title), _TRUNCATE,
+                    "Your crew of @NUM stands %s. There is @NUM in undivided plunder, "
+                    "and you have been @NUM months at sea.", crewmorale::Name());
+        int args[3] = { state::Crew(), state::Plunder(), state::Months() };
+        const char* opts[4] = {
+            "Look over your officers",
+            "Walk the deck and hear the men",
+            "Never mind."
+        };
+        const int pick = game::AskChoiceN(title, opts, 3, args, 3);
+        if (pick == 0) { officers::ShowRoster(); continue; }
+        if (pick != 1) return;
+
+        const int m = crewmorale::TargetEngineLevel(crewmorale::g_value);
+        const char* answer =
+            (m >= 4) ? "The men are singing at their work. They would follow you into a lee "
+                       "shore, and say so where you can hear it."
+          : (m == 3) ? "A contented ship. Nobody stops talking when you pass."
+          : (m == 2) ? "They work, and they grumble, and they work. They have had worse."
+          : (m == 1) ? "Talk stops when you come near and starts again behind you. They "
+                       "want their share."
+                     : "Sullen faces and muttering below decks. Divide the plunder before "
+                       "somebody else divides it for you.";
+        game::ShowModalTextN(answer, nullptr, 0);
+    }
+}
+
+// H at sea: what PEMF adds, and how it works. Authored in pemf_guide.json.
+static void GuideMenu(int)
+{
+    const int m = content::FindMenuIndex("pemf_guide");
+    if (m < 0) {
+        game::ShowModalTextN("The PEMF guide is missing (PEMF\\events\\pemf_guide.json).",
+                             nullptr, 0);
+        return;
+    }
+    townmenu::RunMenu(m, 0);
 }
 
 static void RememberTrueFlag()
@@ -2316,6 +2636,7 @@ static DWORD WINAPI Hook_timeGetTime(void)
     }
 
     ++g_tickCount;
+    if (!events::Faulted() && g_targetOK) PollPlayerKeys();
     if (events::Faulted() || !g_targetOK || !kDebugHotkeys) return r;
 
     // Throttle: this runs many times per frame across ~84 call sites.
@@ -2539,7 +2860,25 @@ static DWORD WINAPI Hook_timeGetTime(void)
             return r;
         }
 
-        g_flagCursor = (g_flagCursor + 1) % nflags;
+        // Only colours we HAVE. Walk on from the current one to the next we
+        // can fly; a full lap with nothing else means there is nothing to change to.
+        int next = -1;
+        for (int step = 1; step <= nflags; ++step) {
+            const int i = (g_flagCursor + step) % nflags;
+            const char* nm = FlagAt(i);
+            const char* flying = session::FlagName();
+            if (!nm || !CanFly(nm)) continue;
+            if (flying && *flying && _stricmp(nm, flying) == 0) continue;
+            next = i;
+            break;
+        }
+        if (next < 0) {
+            Log("falsecolours: no other colours aboard (owned mask 0x%X)",
+                session::OwnedFlags());
+            content::PostDebugNotice("We have no other colours aboard.", 6);
+            return r;
+        }
+        g_flagCursor = next;
         char pick[128];
         strncpy_s(pick, sizeof(pick), FlagAt(g_flagCursor), _TRUNCATE);
 
@@ -2814,8 +3153,20 @@ static DWORD WINAPI Init(LPVOID)
     ResolveProfileDir(dir);   // both of the next two depend on it
     ScanFlags();
     suspicion::LoadTuning(dir);
+    flagtrader::LoadSettings(dir);
+    LoadPlayerKeys(dir);
+    content::g_hasOfficer = [](const char* id) {
+        const int r = officers::FindRole(id);
+        return r >= 0 && officers::RosterHas(r);
+    };
+    market::LoadSettings(dir);
+    combatfx::LoadSettings(dir);
+    piratestart::LoadSettings(dir);
     storms::LoadTuning(dir);
+    wind::LoadTuning(dir);
+    sailmaster::LoadPolicy(dir);
     loot::LoadTuning(dir);
+    widescreen::LoadSettings(dir);
     InstallWasdKeymap(dir);
 
     Log("false colours: Ctrl+Shift+8 changes your flag, 9 runs your own back "
@@ -2964,8 +3315,18 @@ BOOL APIENTRY DllMain(HMODULE mod, DWORD reason, LPVOID reserved)
     else if (reason == DLL_PROCESS_DETACH && reserved == nullptr) {
         render::Uninstall();
         d3d9hook::Uninstall();
+        hudcorners::Restore();
+        widescreen::Restore();
+        wind::Restore();
+        sailmaster::RestorePolicy();
+        suspicion::RestoreLeash();
+        flagtrader::Restore();
+        market::Restore();
+        combatfx::Restore();
+        piratestart::Restore();
         storms::Restore();
         townmenu::Restore();
+        battlemusic::Shutdown();
         stormaudio::Shutdown();
         // Restore the slots only on an explicit FreeLibrary. On process teardown
         // the address space is going away and touching locks risks a hang.

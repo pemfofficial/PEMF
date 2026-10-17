@@ -1,0 +1,595 @@
+{
+ "gog_sha256_prefix": "6e88b90e4e2e3024",
+ "steam_image_sha256_prefix": "e09adbb9b56d8c21",
+ "parity": [
+  {
+   "section": ".text",
+   "va": "0x401000",
+   "identical": 2873268,
+   "different": 5334
+  },
+  {
+   "section": ".rdata",
+   "va": "0x6c0000",
+   "identical": 338114,
+   "different": 17636
+  },
+  {
+   "section": ".data",
+   "va": "0x717000",
+   "identical": 69617,
+   "different": 15
+  },
+  {
+   "section": ".rsrc",
+   "va": "0x8ef000",
+   "identical": 2681,
+   "different": 4239
+  }
+ ],
+ "relocated_rdata": {
+  "operand_pairs": 599,
+  "regions": {
+   "rdata->rdata": 599
+  },
+  "unexplained_code_bytes": 138,
+  "unexplained_ranges": [
+   "0x4edac0",
+   "0x4edad0",
+   "0x4edae0",
+   "0x4edaf0",
+   "0x4edb00",
+   "0x4edb10",
+   "0x4edb20",
+   "0x4edb30",
+   "0x4edb40"
+  ]
+ },
+ "source_addresses": {
+  "total": 417,
+  "by_region": {
+   "text": 292,
+   "rdata": 7,
+   "data": 27,
+   "bss": 91
+  },
+  "flagged": [
+   {
+    "address": "0x004118a8",
+    "region": "text",
+    "first_difference": 7,
+    "issues": [
+     "bytes differ at +7"
+    ],
+    "cited_at": [
+     "src/core/townmenu.h:36"
+    ]
+   },
+   {
+    "address": "0x0047df75",
+    "region": "text",
+    "first_difference": 21,
+    "issues": [
+     "bytes differ at +21"
+    ],
+    "cited_at": [
+     "src/core/combatfx.h:30",
+     "src/core/combatfx.h:58"
+    ]
+   },
+   {
+    "address": "0x0047df76",
+    "region": "text",
+    "first_difference": 20,
+    "issues": [
+     "bytes differ at +20"
+    ],
+    "cited_at": [
+     "src/core/combatfx.h:58"
+    ]
+   },
+   {
+    "address": "0x004bbc10",
+    "region": "text",
+    "first_difference": 16,
+    "issues": [
+     "bytes differ at +16"
+    ],
+    "cited_at": [
+     "src/core/storms.h:490",
+     "src/core/storms.h:505"
+    ]
+   },
+   {
+    "address": "0x004ff57e",
+    "region": "text",
+    "first_difference": 20,
+    "issues": [
+     "bytes differ at +20"
+    ],
+    "cited_at": [
+     "src/core/widescreen.h:105"
+    ]
+   },
+   {
+    "address": "0x00538400",
+    "region": "text",
+    "first_difference": 2,
+    "issues": [
+     "bytes differ at +2"
+    ],
+    "cited_at": [
+     "src/core/game.h:548"
+    ]
+   },
+   {
+    "address": "0x00713600",
+    "region": "rdata",
+    "first_difference": 0,
+    "issues": [
+     "bytes differ at +0",
+     ".rdata item is at 0x007135f8 on Steam"
+    ],
+    "cited_at": [
+     "src/core/game.h:93",
+     "src/core/game.h:101",
+     "src/core/game.h:116"
+    ]
+   }
+  ]
+ },
+ "instruction_bounds": {
+  "counts": {
+   "operand inside an instruction": 9,
+   "instruction start": 281,
+   "not code (table or data)": 2
+  },
+  "not_plain": [
+   [
+    "0x00463cb4",
+    "not inside an instruction",
+    "src/core/game.h:1203"
+   ],
+   [
+    "0x00473968",
+    "not inside an instruction",
+    "src/core/sailkeys.h:69"
+   ]
+  ]
+ },
+ "signatures": {
+  "total": 33,
+  "found_where_checked": 32,
+  "not_found": [
+   {
+    "where": "src/core/storms.h:1194",
+    "bytes": "6b c0 90 90 90 90",
+    "found_where_checked": false,
+    "note": "patch bytes PEMF writes, not a check"
+   }
+  ]
+ },
+ "doc_addresses": {
+  "total": 539,
+  "flagged": [
+   {
+    "address": "0x00411890",
+    "region": "text",
+    "first_difference": 31,
+    "issues": [
+     "bytes differ at +31"
+    ],
+    "cited_at": [
+     "docs/GAME_API.md:2403"
+    ]
+   },
+   {
+    "address": "0x00411897",
+    "region": "text",
+    "first_difference": 24,
+    "issues": [
+     "bytes differ at +24"
+    ],
+    "cited_at": [
+     "docs/GAME_API.md:2404"
+    ]
+   },
+   {
+    "address": "0x0041189e",
+    "region": "text",
+    "first_difference": 17,
+    "issues": [
+     "bytes differ at +17"
+    ],
+    "cited_at": [
+     "docs/GAME_API.md:2405"
+    ]
+   },
+   {
+    "address": "0x004118a8",
+    "region": "text",
+    "first_difference": 7,
+    "issues": [
+     "bytes differ at +7"
+    ],
+    "cited_at": [
+     "docs/GAME_API.md:2307",
+     "docs/GAME_API.md:2321",
+     "docs/GAME_API.md:2397"
+    ]
+   },
+   {
+    "address": "0x0042cc60",
+    "region": "text",
+    "first_difference": 21,
+    "issues": [
+     "bytes differ at +21"
+    ],
+    "cited_at": [
+     "docs/WIDESCREEN.md:274"
+    ]
+   },
+   {
+    "address": "0x00446bd1",
+    "region": "text",
+    "first_difference": 2,
+    "issues": [
+     "bytes differ at +2"
+    ],
+    "cited_at": [
+     "docs/WIDESCREEN.md:133"
+    ]
+   },
+   {
+    "address": "0x00446d5f",
+    "region": "text",
+    "first_difference": 2,
+    "issues": [
+     "bytes differ at +2"
+    ],
+    "cited_at": [
+     "docs/WIDESCREEN.md:133"
+    ]
+   },
+   {
+    "address": "0x0047df75",
+    "region": "text",
+    "first_difference": 21,
+    "issues": [
+     "bytes differ at +21"
+    ],
+    "cited_at": [
+     "docs/GAME_API.md:2904",
+     "docs/JOURNAL.md:999"
+    ]
+   },
+   {
+    "address": "0x0047df76",
+    "region": "text",
+    "first_difference": 20,
+    "issues": [
+     "bytes differ at +20"
+    ],
+    "cited_at": [
+     "docs/JOURNAL.md:1027"
+    ]
+   },
+   {
+    "address": "0x004bbc10",
+    "region": "text",
+    "first_difference": 16,
+    "issues": [
+     "bytes differ at +16"
+    ],
+    "cited_at": [
+     "docs/GAME_API.md:2990"
+    ]
+   },
+   {
+    "address": "0x004e4fa6",
+    "region": "text",
+    "first_difference": 11,
+    "issues": [
+     "bytes differ at +11"
+    ],
+    "cited_at": [
+     "docs/JOURNAL.md:286"
+    ]
+   },
+   {
+    "address": "0x004e596d",
+    "region": "text",
+    "first_difference": 19,
+    "issues": [
+     "bytes differ at +19"
+    ],
+    "cited_at": [
+     "docs/JOURNAL.md:286"
+    ]
+   },
+   {
+    "address": "0x004edac0",
+    "region": "text",
+    "first_difference": 0,
+    "issues": [
+     "bytes differ at +0"
+    ],
+    "cited_at": [
+     "docs/GAME_API.md:3243",
+     "docs/JOURNAL.md:1089"
+    ]
+   },
+   {
+    "address": "0x004ff6b0",
+    "region": "text",
+    "first_difference": 2,
+    "issues": [
+     "bytes differ at +2"
+    ],
+    "cited_at": [
+     "docs/JOURNAL.md:493"
+    ]
+   },
+   {
+    "address": "0x005038ed",
+    "region": "text",
+    "first_difference": 2,
+    "issues": [
+     "bytes differ at +2"
+    ],
+    "cited_at": [
+     "docs/WIDESCREEN.md:113"
+    ]
+   },
+   {
+    "address": "0x00503985",
+    "region": "text",
+    "first_difference": 2,
+    "issues": [
+     "bytes differ at +2"
+    ],
+    "cited_at": [
+     "docs/WIDESCREEN.md:113"
+    ]
+   },
+   {
+    "address": "0x0050436d",
+    "region": "text",
+    "first_difference": 2,
+    "issues": [
+     "bytes differ at +2"
+    ],
+    "cited_at": [
+     "docs/WIDESCREEN.md:97",
+     "docs/WIDESCREEN.md:112"
+    ]
+   },
+   {
+    "address": "0x005043c8",
+    "region": "text",
+    "first_difference": 2,
+    "issues": [
+     "bytes differ at +2"
+    ],
+    "cited_at": [
+     "docs/WIDESCREEN.md:98",
+     "docs/WIDESCREEN.md:112"
+    ]
+   },
+   {
+    "address": "0x0050c7ef",
+    "region": "text",
+    "first_difference": 2,
+    "issues": [
+     "bytes differ at +2"
+    ],
+    "cited_at": [
+     "docs/WIDESCREEN.md:114",
+     "docs/WIDESCREEN.md:119"
+    ]
+   },
+   {
+    "address": "0x0050c841",
+    "region": "text",
+    "first_difference": 2,
+    "issues": [
+     "bytes differ at +2"
+    ],
+    "cited_at": [
+     "docs/WIDESCREEN.md:114"
+    ]
+   },
+   {
+    "address": "0x0050cafc",
+    "region": "text",
+    "first_difference": 2,
+    "issues": [
+     "bytes differ at +2"
+    ],
+    "cited_at": [
+     "docs/WIDESCREEN.md:115",
+     "docs/WIDESCREEN.md:119"
+    ]
+   },
+   {
+    "address": "0x0050cb40",
+    "region": "text",
+    "first_difference": 2,
+    "issues": [
+     "bytes differ at +2"
+    ],
+    "cited_at": [
+     "docs/WIDESCREEN.md:115"
+    ]
+   },
+   {
+    "address": "0x0052d6d0",
+    "region": "text",
+    "first_difference": 15,
+    "issues": [
+     "bytes differ at +15"
+    ],
+    "cited_at": [
+     "docs/GAME_API.md:2213"
+    ]
+   },
+   {
+    "address": "0x0052d880",
+    "region": "text",
+    "first_difference": 9,
+    "issues": [
+     "bytes differ at +9"
+    ],
+    "cited_at": [
+     "docs/GAME_API.md:2215"
+    ]
+   },
+   {
+    "address": "0x0052f800",
+    "region": "text",
+    "first_difference": 8,
+    "issues": [
+     "bytes differ at +8"
+    ],
+    "cited_at": [
+     "docs/GAME_API.md:2194"
+    ]
+   },
+   {
+    "address": "0x00538400",
+    "region": "text",
+    "first_difference": 2,
+    "issues": [
+     "bytes differ at +2"
+    ],
+    "cited_at": [
+     "docs/JOURNAL.md:1108"
+    ]
+   },
+   {
+    "address": "0x00712e6c",
+    "region": "rdata",
+    "first_difference": 0,
+    "issues": [
+     "bytes differ at +0"
+    ],
+    "cited_at": [
+     "docs/GAME_API.md:2236"
+    ]
+   },
+   {
+    "address": "0x00712e74",
+    "region": "rdata",
+    "first_difference": 0,
+    "issues": [
+     "bytes differ at +0",
+     ".rdata item is at 0x00712e6c on Steam"
+    ],
+    "cited_at": [
+     "docs/GAME_API.md:2235"
+    ]
+   },
+   {
+    "address": "0x00712f60",
+    "region": "rdata",
+    "first_difference": 0,
+    "issues": [
+     "bytes differ at +0"
+    ],
+    "cited_at": [
+     "docs/GAME_API.md:2236"
+    ]
+   },
+   {
+    "address": "0x00712f68",
+    "region": "rdata",
+    "first_difference": 0,
+    "issues": [
+     "bytes differ at +0",
+     ".rdata item is at 0x00712f60 on Steam"
+    ],
+    "cited_at": [
+     "docs/GAME_API.md:2235"
+    ]
+   },
+   {
+    "address": "0x007135bc",
+    "region": "rdata",
+    "first_difference": 2,
+    "issues": [
+     "bytes differ at +2",
+     ".rdata item is at 0x007135b4 on Steam"
+    ],
+    "cited_at": [
+     "docs/JOURNAL.md:1096",
+     "docs/WIDESCREEN.md:20"
+    ]
+   },
+   {
+    "address": "0x007135c0",
+    "region": "rdata",
+    "first_difference": 2,
+    "issues": [
+     "bytes differ at +2",
+     ".rdata item is at 0x007135b8 on Steam"
+    ],
+    "cited_at": [
+     "docs/WIDESCREEN.md:20"
+    ]
+   },
+   {
+    "address": "0x007135c4",
+    "region": "rdata",
+    "first_difference": 2,
+    "issues": [
+     "bytes differ at +2",
+     ".rdata item is at 0x007135bc on Steam"
+    ],
+    "cited_at": [
+     "docs/JOURNAL.md:1096",
+     "docs/WIDESCREEN.md:20"
+    ]
+   },
+   {
+    "address": "0x007135c8",
+    "region": "rdata",
+    "first_difference": 0,
+    "issues": [
+     "bytes differ at +0",
+     ".rdata item is at 0x007135c0 on Steam"
+    ],
+    "cited_at": [
+     "docs/WIDESCREEN.md:20"
+    ]
+   },
+   {
+    "address": "0x007135f8",
+    "region": "rdata",
+    "first_difference": 0,
+    "issues": [
+     "bytes differ at +0",
+     ".rdata item is at 0x007135f0 on Steam"
+    ],
+    "cited_at": [
+     "docs/GAME_API.md:849",
+     "docs/JOURNAL.md:1093"
+    ]
+   },
+   {
+    "address": "0x00713600",
+    "region": "rdata",
+    "first_difference": 0,
+    "issues": [
+     "bytes differ at +0",
+     ".rdata item is at 0x007135f8 on Steam"
+    ],
+    "cited_at": [
+     "docs/GAME_API.md:833",
+     "docs/GAME_API.md:849",
+     "docs/GAME_API.md:850",
+     "docs/JOURNAL.md:1093"
+    ]
+   }
+  ]
+ }
+}

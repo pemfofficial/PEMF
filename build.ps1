@@ -179,8 +179,7 @@ function Copy-Payload([string]$dest) {
         New-Item -ItemType Directory -Force $offDst | Out-Null
         Copy-Item (Join-Path $offSrc '*.json') $offDst -Force
     }
-    # Tuning files are edited in place by players, so never overwrite one that
-    # is already there -- a rebuild must not discard someone's balance pass.
+    # The WASD keymap is ours, not the player's: always replaced.
     $kmSrc = Join-Path $root 'content\PEMF\KeyMap_WASD.ini'
     if (Test-Path $kmSrc) { Copy-Item $kmSrc (Join-Path $dest 'PEMF') -Force }
     # Audio ships as loose files -- overwrite these, they are ours not the
@@ -191,12 +190,34 @@ function Copy-Payload([string]$dest) {
         New-Item -ItemType Directory -Force $audioDst | Out-Null
         Copy-Item (Join-Path $audioSrc '*') $audioDst -Force
     }
-    foreach ($ini in @('suspicion.ini', 'storms.ini', 'crew.ini')) {
+    # A copy of each tuning file as it was installed is kept in PEMF\defaults.
+    # If the player's file still matches that copy they never touched it, and it
+    # is replaced with the new one; if they edited it, theirs stays and the new
+    # one is put beside it as <name>.ini.new. A file older than this scheme
+    # (no copy kept) is backed up to <name>.ini.bak and replaced.
+    $defDir = Join-Path $dest 'PEMF\defaults'
+    New-Item -ItemType Directory -Force $defDir | Out-Null
+    foreach ($ini in @('suspicion.ini', 'storms.ini', 'crew.ini', 'widescreen.ini', 'market.ini', 'combat.ini', 'keys.ini')) {
         $iniSrc = Join-Path $root "content\PEMF\$ini"
         $iniDst = Join-Path $dest "PEMF\$ini"
-        if ((Test-Path $iniSrc) -and -not (Test-Path $iniDst)) {
+        $iniDef = Join-Path $defDir $ini
+        if (-not (Test-Path $iniSrc)) { continue }
+        if (-not (Test-Path $iniDst)) {
             Copy-Item $iniSrc $iniDst -Force
+        } elseif ((Get-FileHash $iniDst).Hash -eq (Get-FileHash $iniSrc).Hash) {
+            # already current
+        } elseif ((Test-Path $iniDef) -and (Get-FileHash $iniDst).Hash -eq (Get-FileHash $iniDef).Hash) {
+            Copy-Item $iniSrc $iniDst -Force
+            Write-Host "  -> PEMF\$ini (updated; it had not been edited)"
+        } elseif (Test-Path $iniDef) {
+            Copy-Item $iniSrc "$iniDst.new" -Force
+            Write-Host "  !! PEMF\$ini was edited by hand -- kept; the new one is $ini.new"
+        } else {
+            Copy-Item $iniDst "$iniDst.bak" -Force
+            Copy-Item $iniSrc $iniDst -Force
+            Write-Host "  -> PEMF\$ini (replaced an older one; it is saved as $ini.bak)"
         }
+        Copy-Item $iniSrc $iniDef -Force
     }
     # Somewhere for plugins to go, with a note so an empty folder is not
     # mistaken for a broken install.
@@ -228,7 +249,7 @@ function Copy-Payload([string]$dest) {
     # whose game will not start needs it, and pointing them at a web page is no
     # help when the thing that failed was the download.
     foreach ($d in @('PLAYER_MANUAL.md', 'EVENT_AUTHORING.md', 'WINDOWS_SECURITY.md',
-                     'PLUGINS.md')) {
+                     'TROUBLESHOOTING.md', 'PLUGINS.md')) {
         $src = Join-Path $root "docs\$d"
         if (Test-Path $src) { Copy-Item $src $docs -Force }
     }
@@ -258,7 +279,30 @@ if ($Package) {
 
     $zip = Join-Path $dist "PEMF-$Version.zip"
     if (Test-Path $zip) { Remove-Item $zip -Force }
-    Compress-Archive -Path (Join-Path $stage '*') -DestinationPath $zip -CompressionLevel Optimal
+
+    # Written entry by entry rather than with Compress-Archive, which under
+    # Windows PowerShell 5.1 stores every path with a BACKSLASH separator.  The
+    # format specifies forward slashes (APPNOTE 4.4.17.1).  Windows tolerates
+    # the difference, so this was invisible here for six releases; Linux does
+    # not, because a backslash is an ordinary character in a filename there.
+    # Extracting 0.2.6 under Proton therefore produced sixteen files sitting in
+    # the game root literally named "PEMF\events\core_events.json" -- no PEMF
+    # folder, no content found, and nothing in the log to explain it.  Reported
+    # by a tester on Linux.  Verified after this change by reading the entry
+    # names back out of the zip, which is the only way to see it from Windows.
+    Add-Type -AssemblyName System.IO.Compression
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    $archive = [System.IO.Compression.ZipFile]::Open($zip, 'Create')
+    try {
+        Get-ChildItem $stage -Recurse -File | Sort-Object FullName | ForEach-Object {
+            $entry = $_.FullName.Substring($stage.Length + 1).Replace('\', '/')
+            [void][System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile(
+                $archive, $_.FullName, $entry,
+                [System.IO.Compression.CompressionLevel]::Optimal)
+        }
+    } finally {
+        $archive.Dispose()
+    }
 
     Write-Host "`n=== package ===" -ForegroundColor Green
     Write-Host "  $zip  ($([math]::Round((Get-Item $zip).Length/1KB)) KB)"

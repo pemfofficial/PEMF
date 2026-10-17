@@ -317,6 +317,63 @@ inline void RunMenu(int menuIndex, int depth)
 }
 
 // ------------------------------------------------------------------ the logic
+// ------------------------------------------------- a hostile crown's towns
+// Below zero with a crown, its governor, merchant and shipwright will not deal
+// with you. The tavern stays open -- it is where a wanted captain goes anyway.
+//
+// The pick is the RAW row index; in a village or mission (town field
+// 0x00860B80 = 5 or 6) the game remaps it after we return (0x00411925): 1 -> 2,
+// anything higher +3. Applied here first, so the refusal judges the action the
+// game would actually take. Only the four crowns keep a reputation.
+inline int ActionFor(int pick, int city)
+{
+    const int type = game::CityLocType(city);
+    if ((type == 5 || type == 6) && pick > 0) return pick + (pick == 1 ? 1 : 3);
+    return pick;
+}
+
+inline bool Refuse(int pick, int city, int bg)
+{
+    if (city < 0 || city >= game::addr::kMaxCities) return false;
+    const int nation = game::CityNation(city);
+    if (nation < 0 || nation >= game::addr::kNationsWithRank) return false;
+    if (nations::Reputation(nation) >= 0) return false;
+
+    const char* who = nullptr;
+    switch (ActionFor(pick, city)) {
+    case 0: who = "The governor's secretary does not even look up. 'His Excellency does "
+                  "not receive enemies of the Crown. You will leave, or you will be shown "
+                  "out.'"; break;
+    case 2: who = "The merchant shuts his ledger the moment you walk in. 'I trade with "
+                  "honest folk, not with enemies of the Crown. Good day.'"; break;
+    case 3: who = "The shipwright folds his arms. 'Not one plank, not one nail. Find "
+                  "yourself another yard -- one that does not answer to the Crown.'"; break;
+    default: return false;
+    }
+    Log("townmenu: refused at city %d (%s, reputation %d) -- action %d",
+        city, game::NationName(nation), nations::Reputation(nation), ActionFor(pick, city));
+
+    events::EnterDirect();
+    game::g_portCardCity  = bg;
+    game::g_portCardFlags = 0;
+    game::ShowEventCard(who);
+    game::g_portCardCity  = -1;
+    game::g_portCardFlags = 0;
+    events::LeaveDirect();
+    return true;
+}
+
+// The game's own menu with nothing of ours in it, still subject to refusal.
+inline int PresentStock(int bg, int flags, int form, int city, const char* snapshot)
+{
+    for (int guard = 0; guard < kMaxLoops; ++guard) {
+        const int pick = CallOriginal(bg, flags, form);
+        if (!Refuse(pick, city, bg)) return pick;
+        strncpy_s((char*)game::addr::MessageText, kMsgMax, snapshot, _TRUNCATE);
+    }
+    return CallOriginal(bg, flags, form);
+}
+
 // Runs with the menu composed and about to be shown. Returns the index the
 // game should act on -- always one the game itself produced.
 inline int Present(int bg, int flags, int form)
@@ -334,9 +391,12 @@ inline int Present(int bg, int flags, int form)
     const int nation = city >= 0 ? game::CityNation(city) : -1;
     ApplyContext(city, nation);
 
+    // The settlement the GAME is drawing this menu for decides who refuses.
+    const int here = (bg >= 0 && bg < game::addr::kMaxCities) ? bg : city;
+
     if (EnabledCount() <= 0) {
         Log("townmenu: port %d -- no PEMF rows offered here", city);
-        return CallOriginal(bg, flags, form);
+        return PresentStock(bg, flags, form, here, snapshot);
     }
 
     // Diagnostics for an unexplained R6025 ("pure virtual function call") seen
@@ -362,7 +422,7 @@ inline int Present(int bg, int flags, int form)
         // Not a shape we recognise. Put back exactly what the game composed and
         // stand aside -- an unfamiliar menu is not an invitation to guess.
         strncpy_s((char*)game::addr::MessageText, kMsgMax, snapshot, _TRUNCATE);
-        return CallOriginal(bg, flags, form);
+        return PresentStock(bg, flags, form, here, snapshot);
     }
 
     const int ourCount = EnabledCount();
@@ -381,6 +441,14 @@ inline int Present(int bg, int flags, int form)
         // game is about to spend it and the amount is the whole point.
         if (pick == 4 && bg == city)
             crewmorale::PlunderDivided(state::Plunder());
+
+        if ((pick < ourFirst || pick >= ourFirst + ourCount) && Refuse(pick, here, bg)) {
+            if (Compose(snapshot) < 0) {
+                strncpy_s((char*)game::addr::MessageText, kMsgMax, snapshot, _TRUNCATE);
+                return PresentStock(bg, flags, form, here, snapshot);
+            }
+            continue;
+        }
 
         if (pick < ourFirst || pick >= ourFirst + ourCount) {
             if (guard > 0)
