@@ -98,7 +98,7 @@ still leaves you with nothing in the log.
 
 ### The zip extracted as filenames instead of folders
 
-**Affects 0.2.6 and every release before it. Fixed in the next release.**
+**Affects 0.2.6 and every release before it. Fixed in 0.3.0.**
 
 Those builds were packaged by a Windows tool that wrote the paths inside the zip
 with backslashes. The zip format says forward slashes, but Windows accepts

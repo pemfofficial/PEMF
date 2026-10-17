@@ -27,7 +27,7 @@ The game executable is never modified.
 | **[WIDESCREEN.md](WIDESCREEN.md)** | Developers | The 16:9 work: why the UI is two fixed 4:3 virtual spaces rather than the real resolution |
 | **[JOURNAL.md](JOURNAL.md)** | Developers | Dated session log: what was tried, found and changed, and what is open — read the last entry first |
 | **[ARCHITECTURE_REVIEW.md](ARCHITECTURE_REVIEW.md)** | Developers | Nine passes: hazards found, fixed, and the invariants they establish |
-| **[RELEASE_NOTES_NEXT.md](RELEASE_NOTES_NEXT.md)** | Everyone | Everything since 0.2.6, not yet released: pirate start, earned flags, suspicion V2, the waterfront and market, louder battles, weather, widescreen; Steam checked statically; the text system mapped |
+| **[RELEASE_NOTES_0.3.0.md](RELEASE_NOTES_0.3.0.md)** | Everyone | The Black Flag: pirate start, earned flags, suspicion V2, the waterfront and market, louder battles, weather, widescreen; Steam checked statically; the text system mapped |
 | **[RELEASE_NOTES_0.2.6.md](RELEASE_NOTES_0.2.6.md)** | Everyone | Steering: `a`/`s` were loading and saving the game as well as steering, Attack moves off Space, ports get their records back |
 | **[RELEASE_NOTES_0.2.5.md](RELEASE_NOTES_0.2.5.md)** | Everyone | Alt-tab, second attempt: the R6025 crash on returning to the game, PEMF no longer burning a core while you are away, and the hard lockup that is still open |
 | **[RELEASE_NOTES_0.2.4.md](RELEASE_NOTES_0.2.4.md)** | Everyone | Officers and crew: named officers with talents and flaws, PEMF's own morale, town-menu rows, the plugin SDK, and a first attempt at the alt-tab crash |

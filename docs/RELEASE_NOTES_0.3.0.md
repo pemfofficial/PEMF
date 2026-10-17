@@ -1,15 +1,21 @@
-# PEMF — changes since 0.2.6 (not yet released)
+# PEMF 0.3.0 — The Black Flag
 
-Everything below is in the source tree on `main`. It has **not** been packaged
-as a release. Several features are still waiting on a playtest; each one is
-marked. `docs/JOURNAL.md` has the dated detail for every item.
+The biggest release so far: you can start as a pirate, flags are earned,
+suspicion depends on how each crown sees you, ports have a waterfront and a
+moving market, sea battles are louder, the weather moves, and the game runs
+widescreen. Tested on Steam. `docs/JOURNAL.md` has the dated detail for every
+item.
+
+**Install:** extract `PEMF-0.3.0.zip` into the game folder (the one with
+`Pirates!.exe`), replacing older PEMF files. Your tuning files are kept if you
+edited them; the new defaults are placed beside them as `.ini.new`.
 
 ## New for players
 
 - **Start as a pirate.** A new career signs on with no crown and begins in a
   pirate haven, flying the black flag. The captain is dressed in a crown's
   colours (`pirateOutfit`). Turn it off with `startUnaligned = 0` in
-  `suspicion.ini` for the shipped character creation. *Verified on Steam.*
+  `suspicion.ini` for the shipped character creation.
 - **Flags are earned.** A governor's letter of marque brings his crown's
   colours; the tavern's trinket seller sometimes has a flag for sale. Press
   **Q** at sea to choose which colours to fly.
@@ -17,8 +23,7 @@ marked. `docs/JOURNAL.md` has the dated detail for every item.
   suspicious. A crown's own colours with its commission make you a friend.
   Aggression is what turns suspicion into certainty, and worse deeds cost
   more. At the top of the meter a ship of that crown trails you and backs off
-  if you stay quiet. Your own fleet no longer counts as watchers. *Playtest
-  pending.*
+  if you stay quiet. Your own fleet no longer counts as watchers.
 - **Pirate-hunters** come only from crowns that hate you: one at a time, more
   the worse they think of you, and they give up if you sit in port. Hostile
   crowns' governors, merchants and shipwrights refuse you.
@@ -33,7 +38,7 @@ marked. `docs/JOURNAL.md` has the dated detail for every item.
   world.
 - **Louder sea battles.** More wreckage and men overboard, bigger gun smoke,
   smoke that hangs where shot strikes, and a deck that shakes on your
-  broadside. *Playtest pending.*
+  broadside.
 - **A battle song** that plays only while a ship battle is on screen and hands
   the game's music back everywhere else. Song by Nastelborn.
 - **Weather.** A wind that backs and veers, with rare sharp fronts. Storms
@@ -42,8 +47,7 @@ marked. `docs/JOURNAL.md` has the dated detail for every item.
   one.
 - **Widescreen and higher resolutions.** Every display mode in the menu, a
   wider 3D view, the 4:3 interface centred with a working mouse, and the HUD
-  in the true corners of the screen. *Full screen and upscaling confirmed
-  working on Steam.*
+  in the true corners of the screen.
 - **The sailing master** speaks only when you really are far out to sea.
 - **Tuning files update themselves** unless you've edited them. Edited files
   are kept, with the new defaults beside them as `.ini.new`.

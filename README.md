@@ -23,7 +23,7 @@ dialog routines, so they look native.
 > **Not affiliated with Firaxis Games, 2K, or Atari.** PEMF ships **no game
 > files** and modifies none on disk. You must own a legitimate copy of the game.
 
-## What's new (in development, after 0.2.6)
+## What's new in 0.3.0 — The Black Flag
 
 - **Start as a pirate.** No crown to pick at the tavern: a new career begins in
   a pirate haven, serving no one, flying the black flag.
@@ -51,7 +51,7 @@ dialog routines, so they look native.
 
 ### **[Get the latest release →](https://github.com/pemfofficial/PEMF/releases/latest)**
 
-Grab **`PEMF-0.2.6.zip`** from that page — it's the file under **Assets**.
+Grab **`PEMF-0.3.0.zip`** from that page — it's the file under **Assets**.
 Unzip it into your game folder, the one with `Pirates!.exe` in it, and launch the
 game. That's the whole install; nothing else is needed and the game executable is
 never modified.
@@ -67,14 +67,14 @@ and the `PEMF` folder.
 ### Check what you downloaded
 
 ```powershell
-Get-FileHash .\PEMF-0.2.6.zip -Algorithm SHA256
+Get-FileHash .\PEMF-0.3.0.zip -Algorithm SHA256
 ```
 
 | File | SHA256 |
 |---|---|
-| `PEMF-0.2.6.zip` | `84025AFE5C2B2117BDA4B24B1F4974625B73C76BFD078922DB2F9F72E75382E6` |
-| `pemf_core.dll` | `3B220098E12E7B1165CEAAC479A6D8E2136231789EB7222A5EB1B8EB53A57F7A` |
-| `version.dll` | `62E2BD9A6959A10DBC67638EDB73A956898F8B75CCE25193BDA9407F4D4072B3` |
+| `PEMF-0.3.0.zip` | `0097492AA6C6E7E277BAA06BC254A756D61BA1B320B150556C9493DB55E1C67F` |
+| `pemf_core.dll` | `BC3CD55365913A1B1AA183931A6D9C2BED82C4D3173F9A23C25C8C0A97628DBB` |
+| `version.dll` | `D5498ED9B373EFDB9E9A752F42058A04B82B26CFDC27C0433EDEC03CAF28E3B6` |
 
 PEMF is unsigned, so this hash is your integrity check. If it doesn't match,
 you didn't get the file from us.

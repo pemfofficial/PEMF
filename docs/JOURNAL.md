@@ -1183,3 +1183,22 @@ starting point and fill in what was still unknown.
   `text.ini`), and the name tokens via a helper that builds a game-style
   string. Code change; not made.
 - Next system: storms and weather.
+
+---
+
+## 2026-10-17 (cont.) — Release 0.3.0, The Black Flag
+
+**Done.** Owner tested and approved the build; released as 0.3.0.
+`build.ps1 -Package` → `dist\PEMF-0.3.0.zip` (35 entries, forward-slash paths,
+`INSTALL.txt` and both DLLs at the root). Hashes in `README.md` and, for the
+DLLs, `tools/check_install.ps1`; 0.2.6 moved into the older-releases table of
+`WINDOWS_SECURITY.md`, which never lists the release it ships in. Release notes
+`RELEASE_NOTES_0.3.0.md`, Discord text `RELEASE_DISCORD_0.3.0.md`.
+
+| File | SHA256 |
+|---|---|
+| `PEMF-0.3.0.zip` | `0097492AA6C6E7E277BAA06BC254A756D61BA1B320B150556C9493DB55E1C67F` |
+| `pemf_core.dll` | `BC3CD55365913A1B1AA183931A6D9C2BED82C4D3173F9A23C25C8C0A97628DBB` |
+| `version.dll` | `D5498ED9B373EFDB9E9A752F42058A04B82B26CFDC27C0433EDEC03CAF28E3B6` |
+
+**Open.** Next system to map: storms and weather.
